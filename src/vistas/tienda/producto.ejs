@@ -1,0 +1,104 @@
+<%- include('cabecera', { titulo }) %>
+<nav class="migas" aria-label="Estás en">
+  <a href="/">Inicio</a>
+  <% if (categoriasProducto.length) { %>
+    <%- icono('derecha', { tamano: 14 }) %><a href="<%= urlCategoria(categoriasProducto[0]) %>"><%= categoriasProducto[0].nombre %></a>
+  <% } %>
+  <%- icono('derecha', { tamano: 14 }) %><span aria-current="page"><%= producto.nombre %></span>
+</nav>
+
+<article class="ficha">
+  <div class="ficha-galeria" data-galeria>
+    <% if (fotos.length) { %>
+      <div class="galeria-pista" data-galeria-pista tabindex="0" aria-label="Fotos de <%= producto.nombre %>">
+        <% fotos.forEach((url, n) => { %>
+          <img class="galeria-foto" src="<%= url %>" alt="<%= producto.nombre %>, foto <%= n + 1 %> de <%= fotos.length %>"<%- n ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+        <% }) %>
+      </div>
+      <% if (fotos.length > 1) { %>
+        <div class="galeria-miniaturas">
+          <% fotos.forEach((url, n) => { %>
+            <button type="button" class="galeria-miniatura" data-galeria-ir="<%= n %>" aria-label="Ver foto <%= n + 1 %>"<%- n === 0 ? ' aria-current="true"' : '' %>>
+              <img src="<%= url %>" alt="" loading="lazy">
+            </button>
+          <% }) %>
+        </div>
+      <% } %>
+    <% } else { %>
+      <div class="foto foto-grande" aria-hidden="true"><span><%= producto.nombre.charAt(0) %></span></div>
+    <% } %>
+  </div>
+
+  <div class="ficha-datos">
+    <header class="ficha-encabezado">
+      <% if (producto.marca) { %><p class="marca-producto"><%= producto.marca %></p><% } %>
+      <h1><%= producto.nombre %></h1>
+    </header>
+
+    <div class="bloque-precio">
+      <p class="precio precio-grande">
+        <span data-precio><%= inicial.precio %></span>
+        <s data-precio-lista<%= inicial.precioLista ? '' : ' hidden' %>><%= inicial.precioLista %></s>
+        <span class="etiqueta etiqueta-oferta" data-off<%= inicial.off ? '' : ' hidden' %>>-<span data-off-numero><%= inicial.off %></span>%</span>
+      </p>
+      <% if (inicial.cuota || inicial.transferencia) { %>
+        <ul class="beneficios">
+          <% if (inicial.cuota) { %>
+            <li><%- icono('tarjeta', { tamano: 18 }) %><span><strong><%= ajustes.cuotasSinInteres %> cuotas sin interés</strong> de <span data-cuota><%= inicial.cuota %></span></span></li>
+          <% } %>
+          <% if (inicial.transferencia) { %>
+            <li><%- icono('banco', { tamano: 18 }) %><span><strong data-transferencia><%= inicial.transferencia %></strong> con transferencia <span class="beneficio-off"><%= ajustes.descuentoTransferencia %>% off</span></span></li>
+          <% } %>
+        </ul>
+      <% } %>
+    </div>
+
+    <% if (producto.atributos.length) { %>
+      <div class="selector-variantes">
+        <% producto.atributos.forEach((atributo, n) => { %>
+          <fieldset class="opciones">
+            <legend><%= atributo %>: <strong data-elegido="<%= n %>"><%= inicial.valores[n] %></strong></legend>
+            <div class="opciones-lista">
+              <% for (const valor of valoresPorAtributo[n]) { %>
+                <label class="opcion">
+                  <input type="radio" name="atributo-<%= n %>" value="<%= valor %>" data-atributo="<%= n %>"<%= valor === inicial.valores[n] ? ' checked' : '' %>>
+                  <span><%= valor %></span>
+                </label>
+              <% } %>
+            </div>
+          </fieldset>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <p class="stock <%= inicial.stock.clase %>" data-stock role="status"><%= inicial.stock.texto %></p>
+
+    <% if (inicial.whatsapp) { %>
+      <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= inicial.whatsapp %>" target="_blank" rel="noopener" data-whatsapp>
+        <%- icono('whatsapp', { tamano: 20 }) %> Consultar por WhatsApp
+      </a>
+    <% } %>
+
+    <p class="sku">SKU <span data-sku><%= inicial.sku %></span></p>
+
+    <% if (producto.descripcion) { %>
+      <section class="descripcion">
+        <h2>Descripción</h2>
+        <p><%= producto.descripcion %></p>
+      </section>
+    <% } %>
+
+    <% if (categoriasProducto.length) { %>
+      <nav class="chips" aria-label="Categorías del producto">
+        <% for (const categoria of categoriasProducto) { %>
+          <a class="chip" href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a>
+        <% } %>
+      </nav>
+    <% } %>
+  </div>
+</article>
+
+<% if (producto.atributos.length) { %>
+  <script type="application/json" id="variantes"><%- variantesJson %></script>
+<% } %>
+<%- include('pie', { sinWhatsappFlotante: Boolean(inicial.whatsapp) }) %>

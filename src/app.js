@@ -3,7 +3,11 @@ import session from 'express-session';
 import path from 'node:path';
 import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
+import { rutasTienda } from './rutas/tienda.js';
+import { buscarTiendaPorSlug } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
+import { icono } from './util/iconos.js';
+import { slugDeHost, urlPanel } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
@@ -14,9 +18,32 @@ export function crearApp({ db, config }) {
 
   app.set('views', path.join(import.meta.dirname, 'vistas'));
   app.set('view engine', 'ejs');
-  Object.assign(app.locals, { formatearPrecio, usuario: null, aviso: null, csrf: '' });
+  Object.assign(app.locals, {
+    formatearPrecio,
+    icono,
+    usuario: null,
+    aviso: null,
+    csrf: '',
+    urlMiTienda: null,
+    nombreTienda: null,
+    seccionActual: null,
+  });
 
   app.use(express.static(path.join(import.meta.dirname, 'publico')));
+  // Imágenes subidas por los clientes. Cada archivo tiene un nombre nuevo, así que se pueden cachear para siempre.
+  app.use('/subidas', express.static(config.dirSubidas, { immutable: true, maxAge: '365d', index: false }));
+
+  // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:
+  // la vidriera no las usa y así las visitas no crean sesiones.
+  const vidriera = rutasTienda({ db, config });
+  app.use((req, res, next) => {
+    const slug = slugDeHost(req.hostname, config.dominio);
+    if (slug === null) return next();
+    req.tienda = buscarTiendaPorSlug(db, slug);
+    if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });
+    vidriera(req, res, next);
+  });
+
   app.use(express.urlencoded({ extended: false }));
   app.use(
     session({

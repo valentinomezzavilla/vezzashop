@@ -40,6 +40,12 @@ test('no deja repetir email ni nombre de tienda', async () => {
   await assert.rejects(crearTienda(db, { nombre: 'uno', email: 'otro@ejemplo.com' }), /nombre/i);
 });
 
+test('no deja usar nombres que no sirven como subdominio', async () => {
+  const db = abrirBase(':memory:');
+  await assert.rejects(crearTienda(db, { nombre: 'WWW', email: 'w@ejemplo.com' }), /no se puede usar/);
+  await assert.rejects(crearTienda(db, { nombre: 'a'.repeat(64), email: 'a@ejemplo.com' }), /muy largo/);
+});
+
 test('reabrir la base guarda los datos y no vuelve a aplicar migraciones', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'plataforma-'));
   try {

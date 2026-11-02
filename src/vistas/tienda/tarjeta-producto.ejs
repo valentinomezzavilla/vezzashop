@@ -1,0 +1,28 @@
+<% const extra = preciosExtra(p.precioDesde) %>
+<% const off = porcentajeOff(p.precioLista, p.precioDesde) %>
+<li>
+  <a class="tarjeta-producto<%= p.stock === 0 ? ' agotado' : '' %>" href="/producto/<%= p.slug %>">
+    <div class="foto<%= p.urlFoto ? ' con-foto' : '' %><%= p.urlFotoAlternativa ? ' con-alternativa' : '' %>">
+      <% if (p.urlFoto) { %>
+        <img src="<%= p.urlFoto %>" alt="<%= p.nombre %>" loading="lazy" decoding="async">
+        <% if (p.urlFotoAlternativa) { %><img class="foto-alternativa" src="<%= p.urlFotoAlternativa %>" alt="" loading="lazy" decoding="async"><% } %>
+      <% } else { %>
+        <span aria-hidden="true"><%= p.nombre.charAt(0) %></span>
+      <% } %>
+    </div>
+    <div class="etiquetas">
+      <% if (p.stock === 0) { %><span class="etiqueta etiqueta-sin-stock">Sin stock</span>
+      <% } else if (off) { %><span class="etiqueta etiqueta-oferta">-<%= off %>%</span><% } %>
+    </div>
+    <div class="datos">
+      <% if (p.marca) { %><span class="marca-producto"><%= p.marca %></span><% } %>
+      <span class="nombre"><%= p.nombre %></span>
+      <span class="precio">
+        <% if (p.precioHasta !== p.precioDesde) { %><small>Desde</small><% } %>
+        <%= formatearPrecio(p.precioDesde) %>
+        <% if (off) { %><s><%= formatearPrecio(p.precioLista) %></s><% } %>
+      </span>
+      <% if (extra.transferencia) { %><span class="precio-transferencia"><%= extra.transferencia %> con transferencia</span><% } %>
+    </div>
+  </a>
+</li>

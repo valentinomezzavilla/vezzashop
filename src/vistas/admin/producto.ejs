@@ -1,0 +1,251 @@
+<%- include('../parciales/cabecera', { titulo: producto ? producto.nombre : 'Nuevo producto' }) %>
+<%
+  const f = formulario;
+  const accion = producto ? `/admin/productos/${producto.id}` : '/admin/productos/nuevo';
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  const atributo = (n) => f.atributos[n] ?? '';
+  const filas = errores.filas ?? {};
+%>
+<a class="volver" href="/admin/productos"><%- icono('izquierda', { tamano: 16 }) %> Productos</a>
+<header class="encabezado">
+  <div>
+    <h1><%= producto ? producto.nombre : 'Nuevo producto' %></h1>
+    <% if (producto) { %>
+      <p class="texto-suave">
+        <span class="pastilla<%= producto.visible ? ' pastilla-ok' : '' %>"><%= producto.visible ? 'Visible' : 'Oculto' %></span>
+        <% if (producto.destacado) { %><span class="pastilla pastilla-ambar"><%- icono('estrella', { tamano: 12 }) %> Destacado</span><% } %>
+      </p>
+    <% } else { %>
+      <p class="texto-suave">Completá los datos y guardalo. Después vas a poder sumarle fotos.</p>
+    <% } %>
+  </div>
+  <% if (producto && producto.visible && urlEnTienda) { %>
+    <a class="boton boton-secundario" href="<%= urlEnTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver en la tienda</a>
+  <% } %>
+</header>
+
+<% if (Object.keys(errores).length) { %>
+  <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay datos para revisar. Todavía no se guardó nada.</span></p>
+<% } %>
+
+<div class="editor">
+  <form id="form-producto" class="editor-principal" method="post" action="<%= accion %>" novalidate data-form-producto>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+    <section class="tarjeta seccion-editor">
+      <h2>Información</h2>
+      <div class="campo">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" type="text" name="nombre" value="<%= f.nombre %>" maxlength="150" required data-nombre-producto<%- invalido('nombre') %>>
+        <%- error('nombre') %>
+      </div>
+      <div class="campo">
+        <label for="descripcion">Descripción <span class="opcional">(opcional)</span></label>
+        <textarea id="descripcion" name="descripcion" rows="6" maxlength="5000"
+                  placeholder="Contá de qué está hecho, cómo calza, para qué sirve…"<%- invalido('descripcion') %>><%= f.descripcion %></textarea>
+        <%- error('descripcion') %>
+      </div>
+      <div class="campo campo-mitad">
+        <label for="marca">Marca <span class="opcional">(opcional)</span></label>
+        <input id="marca" type="text" name="marca" value="<%= f.marca %>" maxlength="100"<%- invalido('marca') %>>
+        <%- error('marca') %>
+      </div>
+    </section>
+
+    <section class="tarjeta seccion-editor">
+      <div class="seccion-editor-titulo">
+        <div>
+          <h2>Variantes, precios y stock</h2>
+          <p class="ayuda">Si el producto viene en varios talles o colores, cada combinación es una variante con su propio stock.</p>
+        </div>
+      </div>
+
+      <fieldset class="campo">
+        <legend class="etiqueta">¿Qué cambia entre las variantes? <span class="opcional">(opcional)</span></legend>
+        <div class="atributos">
+          <% for (let n = 0; n < maxAtributos; n++) { %>
+            <input type="text" name="atributo<%= n + 1 %>" value="<%= atributo(n) %>" maxlength="40" data-atributo-nombre="<%= n %>"
+                   placeholder="<%= ['Ej: Talle', 'Ej: Color', 'Ej: Material'][n] %>" aria-label="Variante <%= n + 1 %>"<%- invalido('atributos') %>>
+          <% } %>
+        </div>
+        <span class="ayuda">Dejalo vacío si el producto viene en una sola versión.</span>
+        <%- error('atributos') %>
+      </fieldset>
+
+      <details class="generador" data-generador>
+        <summary><%- icono('mover', { tamano: 16 }) %> Crear todas las combinaciones de una vez</summary>
+        <div class="generador-cuerpo">
+          <p class="ayuda">Escribí los valores separados por coma y armamos una variante por cada combinación. Las que ya existen no se repiten.</p>
+          <div class="generador-campos">
+            <% for (let n = 0; n < maxAtributos; n++) { %>
+              <div class="campo" data-generador-campo="<%= n %>">
+                <label for="generar-<%= n %>" data-generador-etiqueta="<%= n %>"><%= atributo(n) || `Variante ${n + 1}` %></label>
+                <input id="generar-<%= n %>" type="text" placeholder="<%= ['S, M, L, XL', 'Negro, Blanco', 'Algodón, Lino'][n] %>" data-generador-valores="<%= n %>">
+              </div>
+            <% } %>
+            <div class="campo">
+              <label for="generar-precio">Precio para todas</label>
+              <input id="generar-precio" type="text" inputmode="decimal" placeholder="12.500" data-generador-precio>
+            </div>
+          </div>
+          <div class="acciones">
+            <button class="boton boton-secundario boton-chico" type="button" data-generar><%- icono('mas', { tamano: 16 }) %> Crear variantes</button>
+            <span class="ayuda" data-generador-resultado role="status"></span>
+          </div>
+        </div>
+      </details>
+
+      <%- error('variantes') %>
+      <div class="tabla-contenedor tabla-variantes-contenedor">
+        <table class="tabla tabla-variantes" data-tabla-variantes>
+          <thead>
+            <tr>
+              <% for (let n = 0; n < maxAtributos; n++) { %>
+                <th scope="col" data-columna-valor="<%= n %>"<%= atributo(n) ? '' : ' hidden' %>><%= atributo(n) || `Variante ${n + 1}` %></th>
+              <% } %>
+              <th scope="col">SKU</th>
+              <th scope="col">Precio</th>
+              <th scope="col">Oferta <span class="opcional">(opc.)</span></th>
+              <th scope="col">Stock</th>
+              <th scope="col"><span class="visualmente-oculto">Quitar</span></th>
+            </tr>
+          </thead>
+          <tbody data-filas>
+            <% f.variantes.forEach((v, i) => { %>
+              <%- include('../parciales/fila-variante', { v, i, maxAtributos, atributos: f.atributos, erroresFila: filas[i] }) %>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <template data-plantilla-fila>
+        <%- include('../parciales/fila-variante', { v: { id: '', sku: '', valores: [], precio: '', precioPromocional: '', stock: '0' }, i: 'NUEVA', maxAtributos, atributos: f.atributos, erroresFila: null }) %>
+      </template>
+      <div class="acciones acciones-variantes">
+        <button class="boton boton-secundario boton-chico" type="button" data-agregar-fila><%- icono('mas', { tamano: 16 }) %> Agregar variante</button>
+        <div class="aplicar-todas">
+          <label class="visualmente-oculto" for="aplicar-valor">Valor para todas las variantes</label>
+          <input id="aplicar-valor" type="text" placeholder="Valor" data-aplicar-valor>
+          <label class="visualmente-oculto" for="aplicar-campo">Campo</label>
+          <select id="aplicar-campo" data-aplicar-campo>
+            <option value="precio">como precio</option>
+            <option value="precioPromocional">como oferta</option>
+            <option value="stock">como stock</option>
+          </select>
+          <button class="boton boton-fantasma boton-chico" type="button" data-aplicar>Aplicar a todas</button>
+        </div>
+      </div>
+      <p class="ayuda">Precios en pesos: 12500, 12.500 o 12.500,50. La oferta tiene que ser menor que el precio.</p>
+    </section>
+
+    <div class="barra-guardar">
+      <span class="ayuda" data-sin-guardar hidden><%- icono('alerta', { tamano: 16 }) %> Tenés cambios sin guardar</span>
+      <a class="boton boton-fantasma" href="/admin/productos">Cancelar</a>
+      <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> <%= producto ? 'Guardar cambios' : 'Crear producto' %></button>
+    </div>
+  </form>
+
+  <aside class="editor-lateral">
+    <section class="tarjeta seccion-editor">
+      <h2>Estado</h2>
+      <label class="interruptor">
+        <input type="checkbox" name="visible" value="1" form="form-producto"<%= f.visible ? ' checked' : '' %>>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>Visible en la tienda</strong><span class="ayuda">Si lo apagás, nadie lo ve, pero no se borra.</span></span>
+      </label>
+      <label class="interruptor">
+        <input type="checkbox" name="destacado" value="1" form="form-producto"<%= f.destacado ? ' checked' : '' %>>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>Destacado</strong><span class="ayuda">Aparece en la sección Destacados de la portada.</span></span>
+      </label>
+    </section>
+
+    <section class="tarjeta seccion-editor">
+      <div class="seccion-editor-titulo">
+        <h2>Categorías</h2>
+        <a class="enlace-chico" href="/admin/categorias">Administrar</a>
+      </div>
+      <% if (categorias.length) { %>
+        <div class="lista-categorias">
+          <% for (const c of categorias) { %>
+            <label class="casilla" style="--nivel: <%= c.nivel %>">
+              <input type="checkbox" name="categorias" value="<%= c.id %>" form="form-producto"<%= f.categoriaIds.includes(c.id) ? ' checked' : '' %>>
+              <%= c.nombre %>
+            </label>
+          <% } %>
+        </div>
+      <% } else { %>
+        <p class="ayuda">Todavía no creaste categorías. <a href="/admin/categorias">Crear una</a>.</p>
+      <% } %>
+    </section>
+
+    <% if (producto) { %>
+      <section class="tarjeta seccion-editor zona-peligro">
+        <h2>Borrar producto</h2>
+        <p class="ayuda">Se borran sus variantes y fotos. No se puede deshacer. Si solo querés que no se vea, apagá "Visible".</p>
+        <details class="confirmar">
+          <summary class="boton boton-peligro-suave boton-chico"><%- icono('basura', { tamano: 16 }) %> Borrar producto</summary>
+          <form method="post" action="/admin/productos/<%= producto.id %>/borrar" class="confirmar-cuerpo">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <p>¿Seguro que querés borrar "<%= producto.nombre %>"?</p>
+            <button class="boton boton-peligro boton-chico" type="submit">Sí, borrar</button>
+          </form>
+        </details>
+      </section>
+    <% } %>
+  </aside>
+
+  <section class="tarjeta seccion-editor editor-fotos" id="fotos">
+    <div class="seccion-editor-titulo">
+      <div>
+        <h2>Fotos</h2>
+        <p class="ayuda">La primera es la principal: es la que se ve en el catálogo. Hasta <%= maxFotos %>, de hasta <%= megasImagen %> MB cada una.</p>
+      </div>
+    </div>
+    <% if (aviso && aviso.seccion === 'fotos') { %>
+      <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%- icono(aviso.tipo === 'ok' ? 'check' : 'alerta', { tamano: 18 }) %><span><%= aviso.texto %></span></p>
+    <% } %>
+    <% if (!producto) { %>
+      <p class="estado-vacio-chico"><%- icono('imagen', { tamano: 20 }) %> Creá el producto y después vas a poder subir sus fotos acá.</p>
+    <% } else { %>
+      <% if (fotos.length) { %>
+        <ol class="grilla-fotos">
+          <% fotos.forEach((foto, n) => { %>
+            <li class="foto-item<%= n === 0 ? ' foto-principal' : '' %>">
+              <img src="<%= foto.url %>" alt="Foto <%= n + 1 %> de <%= producto.nombre %>" loading="lazy">
+              <% if (n === 0) { %><span class="foto-etiqueta">Principal</span><% } %>
+              <div class="foto-acciones">
+                <% for (const [accionFoto, nombreIcono, etiqueta, deshabilitado] of [
+                     ['principal', 'estrella', 'Usar como principal', n === 0],
+                     ['subir', 'izquierda', 'Mover antes', n === 0],
+                     ['bajar', 'derecha', 'Mover después', n === fotos.length - 1],
+                     ['borrar', 'basura', 'Borrar foto', false]]) { %>
+                  <form method="post" action="/admin/productos/<%= producto.id %>/fotos/<%= foto.id %>/<%= accionFoto %>">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="boton-icono boton-icono-chico<%= accionFoto === 'borrar' ? ' boton-icono-peligro' : '' %>" type="submit"
+                            aria-label="<%= etiqueta %> (foto <%= n + 1 %>)" title="<%= etiqueta %>"<%= deshabilitado ? ' disabled' : '' %>>
+                      <%- icono(nombreIcono, { tamano: 16 }) %>
+                    </button>
+                  </form>
+                <% } %>
+              </div>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+      <% if (fotos.length < maxFotos) { %>
+        <form method="post" action="/admin/productos/<%= producto.id %>/fotos" enctype="multipart/form-data" class="subir-fotos" data-subir-fotos>
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="zona-archivo">
+            <%- icono('imagen', { tamano: 28 }) %>
+            <span class="zona-archivo-texto" data-nombre-archivo><%= fotos.length ? 'Agregar más fotos' : 'Elegí las fotos del producto' %></span>
+            <span class="ayuda">Podés elegir varias a la vez · JPG, PNG o WEBP</span>
+            <input class="visualmente-oculto" type="file" name="fotos" accept="image/png,image/jpeg,image/webp" multiple required>
+          </label>
+          <div class="acciones"><button class="boton" type="submit"><%- icono('subir', { tamano: 18 }) %> Subir fotos</button></div>
+        </form>
+      <% } %>
+    <% } %>
+  </section>
+</div>
+<%- include('../parciales/pie') %>

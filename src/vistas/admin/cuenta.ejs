@@ -1,0 +1,67 @@
+<%- include('../parciales/cabecera', { titulo: 'Cuenta' }) %>
+<%
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<header class="encabezado">
+  <div>
+    <h1>Cuenta</h1>
+    <p class="texto-suave">Los datos de tu tienda y tu acceso al panel.</p>
+  </div>
+</header>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Tu tienda</h2>
+    <p class="texto-suave">El nombre se muestra en la tienda cuando no hay logo, en el pie y en la pestaña del navegador.</p>
+  </div>
+  <form method="post" action="/admin/cuenta/tienda" class="tarjeta ajuste-campos">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="campo">
+      <label for="nombre">Nombre de la tienda</label>
+      <input id="nombre" type="text" name="nombre" value="<%= tienda.nombre %>" maxlength="80" required<%- invalido('nombre') %>>
+      <%- error('nombre') %>
+    </div>
+    <div class="campo">
+      <span class="etiqueta">Link de la tienda</span>
+      <div class="dato-fijo">
+        <a href="<%= urlTienda %>" target="_blank" rel="noopener"><%= urlTienda.replace(/^https?:\/\//, '') %></a>
+        <button class="boton boton-secundario boton-chico" type="button" data-copiar="<%= urlTienda %>"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar</span></button>
+      </div>
+      <span class="ayuda">El link no cambia aunque cambies el nombre, así no se rompen los que ya compartiste.</span>
+    </div>
+    <div><button class="boton" type="submit">Guardar nombre</button></div>
+  </form>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Acceso</h2>
+    <p class="texto-suave">Ingresás al panel con <strong><%= email %></strong>.</p>
+  </div>
+  <form method="post" action="/admin/cuenta/clave" class="tarjeta ajuste-campos">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="text" name="usuario" value="<%= email %>" autocomplete="username" hidden>
+    <div class="campo">
+      <label for="claveActual">Clave actual</label>
+      <input id="claveActual" type="password" name="claveActual" autocomplete="current-password" required<%- invalido('claveActual') %>>
+      <%- error('claveActual') %>
+    </div>
+    <div class="ajuste-campos-dos">
+      <div class="campo">
+        <label for="claveNueva">Clave nueva</label>
+        <input id="claveNueva" type="password" name="claveNueva" autocomplete="new-password" minlength="<%= largoMinimoClave %>" required
+               aria-describedby="ayuda-claveNueva<%= errores.claveNueva ? ' error-claveNueva' : '' %>"<%- errores.claveNueva ? ' aria-invalid="true"' : '' %>>
+        <span class="ayuda" id="ayuda-claveNueva">Al menos <%= largoMinimoClave %> caracteres.</span>
+        <%- error('claveNueva') %>
+      </div>
+      <div class="campo">
+        <label for="claveRepetida">Repetí la clave nueva</label>
+        <input id="claveRepetida" type="password" name="claveRepetida" autocomplete="new-password" required<%- invalido('claveRepetida') %>>
+        <%- error('claveRepetida') %>
+      </div>
+    </div>
+    <div><button class="boton" type="submit"><%- icono('candado', { tamano: 18 }) %> Cambiar clave</button></div>
+  </form>
+</section>
+<%- include('../parciales/pie') %>

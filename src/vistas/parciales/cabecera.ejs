@@ -4,23 +4,59 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= titulo %> · Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
 </head>
 <body>
+<a class="saltar" href="#contenido">Ir al contenido</a>
 <% if (usuario) { %>
-  <header class="barra">
-    <a class="marca" href="/admin/productos">Panel de tu tienda</a>
-    <nav class="menu">
-      <a href="/admin/productos">Productos</a>
-      <a href="/admin/importar">Carga masiva</a>
-    </nav>
-    <form method="post" action="/admin/salir">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="boton-enlace" type="submit">Salir</button>
-    </form>
-  </header>
+  <%# [sección, texto, ícono, texto corto para el menú del celular] %>
+  <% const secciones = [
+       ['inicio', 'Inicio', 'inicio'],
+       ['productos', 'Productos', 'paquete'],
+       ['categorias', 'Categorías', 'carpeta'],
+       ['importar', 'Carga masiva', 'planilla', 'Excel'],
+       ['diseno', 'Diseño', 'paleta'],
+       ['cuenta', 'Cuenta', 'usuario'],
+     ] %>
+  <div class="app">
+    <aside class="lateral">
+      <div class="lateral-marca">
+        <span class="lateral-logo" aria-hidden="true"><%- icono('tienda', { tamano: 18 }) %></span>
+        <span class="lateral-textos">
+          <span class="lateral-tienda"><%= nombreTienda ?? 'Tu tienda' %></span>
+          <span class="lateral-sub">Panel de administración</span>
+        </span>
+      </div>
+      <nav class="lateral-menu" aria-label="Secciones del panel">
+        <% for (const [seccion, texto, nombreIcono, corto] of secciones) { %>
+          <a href="/admin/<%= seccion %>"<%- seccion === seccionActual ? ' class="activo" aria-current="page"' : '' %>>
+            <%- icono(nombreIcono) %>
+            <% if (corto) { %><span class="texto-largo"><%= texto %></span><span class="texto-corto"><%= corto %></span>
+            <% } else { %><span><%= texto %></span><% } %>
+          </a>
+        <% } %>
+      </nav>
+      <div class="lateral-pie">
+        <% if (urlMiTienda) { %>
+          <a class="boton boton-secundario boton-bloque" href="<%= urlMiTienda %>" target="_blank" rel="noopener">
+            <%- icono('externo', { tamano: 16 }) %> Ver mi tienda
+          </a>
+        <% } %>
+        <form method="post" action="/admin/salir">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-fantasma boton-bloque" type="submit"><%- icono('salir', { tamano: 16 }) %> Salir</button>
+        </form>
+      </div>
+    </aside>
+    <main class="contenido" id="contenido">
+<% } else { %>
+  <main class="contenido contenido-solo" id="contenido">
 <% } %>
-<main class="contenido">
-<% if (aviso) { %>
-  <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%= aviso.texto %></p>
+<%# Un aviso con sección se muestra dentro de esa sección (por ejemplo, los de banners). %>
+<% if (aviso && !aviso.seccion) { %>
+  <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%- icono(aviso.tipo === 'ok' ? 'check' : 'alerta', { tamano: 18 }) %><span><%= aviso.texto %></span></p>
 <% } %>

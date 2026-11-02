@@ -1,0 +1,23 @@
+<%# Una fila de la tabla de variantes del editor de producto. i = posición (o "NUEVA" en la plantilla). %>
+<tr class="fila-variante<%= erroresFila ? ' fila-con-error' : '' %>" data-fila>
+  <% for (let n = 0; n < maxAtributos; n++) { %>
+    <td data-columna-valor="<%= n %>"<%= atributos[n] ? '' : ' hidden' %>>
+      <input type="text" name="valor<%= n + 1 %>" value="<%= v.valores[n] ?? '' %>" maxlength="60" aria-label="<%= atributos[n] || `Variante ${n + 1}` %>" data-valor="<%= n %>">
+    </td>
+  <% } %>
+  <td>
+    <input type="hidden" name="varianteId" value="<%= v.id %>">
+    <input type="text" name="sku" value="<%= v.sku %>" maxlength="64" aria-label="SKU" class="entrada-sku" data-campo="sku">
+  </td>
+  <td><input type="text" name="precio" value="<%= v.precio %>" inputmode="decimal" aria-label="Precio" class="entrada-precio" data-campo="precio"></td>
+  <td><input type="text" name="precioPromocional" value="<%= v.precioPromocional %>" inputmode="decimal" aria-label="Precio de oferta" class="entrada-precio" data-campo="precioPromocional"></td>
+  <td><input type="text" name="stock" value="<%= v.stock %>" inputmode="numeric" aria-label="Stock" class="entrada-stock" data-campo="stock"></td>
+  <td>
+    <button class="boton-icono boton-icono-chico boton-icono-peligro" type="button" data-quitar-fila aria-label="Quitar esta variante" title="Quitar variante">
+      <%- icono('cerrar', { tamano: 16 }) %>
+    </button>
+  </td>
+</tr>
+<% if (erroresFila) { %>
+  <tr class="fila-errores"><td colspan="<%= maxAtributos + 5 %>"><%- icono('alerta', { tamano: 16 }) %> <%= erroresFila.join(' · ') %></td></tr>
+<% } %>

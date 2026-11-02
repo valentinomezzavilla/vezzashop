@@ -1,0 +1,47 @@
+</main>
+<% const redes = [['Instagram', 'instagram', ajustes.instagram], ['Facebook', 'facebook', ajustes.facebook], ['TikTok', 'tiktok', ajustes.tiktok]].filter(([, , url]) => url) %>
+<footer class="pie">
+  <div class="pie-interior">
+    <div class="pie-columna pie-marca">
+      <a class="marca" href="/"><% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"><% } else { %><%= tienda.nombre %><% } %></a>
+      <% if (ajustes.direccion) { %>
+        <p class="pie-dato"><%- icono('ubicacion', { tamano: 18 }) %><span><%= ajustes.direccion %></span></p>
+      <% } %>
+      <% if (redes.length) { %>
+        <div class="redes">
+          <% for (const [red, nombreIcono, url] of redes) { %>
+            <a class="red" href="<%= url %>" target="_blank" rel="noopener" aria-label="<%= red %> de <%= tienda.nombre %>"><%- icono(nombreIcono) %></a>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (categorias.length) { %>
+      <nav class="pie-columna" aria-label="Categorías">
+        <p class="pie-titulo">Categorías</p>
+        <% for (const categoria of categorias) { %><a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a><% } %>
+      </nav>
+    <% } %>
+
+    <% if (ajustes.emailContacto || ajustes.whatsapp) { %>
+      <div class="pie-columna">
+        <p class="pie-titulo">Contacto</p>
+        <% if (ajustes.whatsapp) { %>
+          <a class="pie-dato" href="https://wa.me/<%= ajustes.whatsapp %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 18 }) %><span>WhatsApp</span></a>
+        <% } %>
+        <% if (ajustes.emailContacto) { %>
+          <a class="pie-dato" href="mailto:<%= ajustes.emailContacto %>"><%- icono('mail', { tamano: 18 }) %><span><%= ajustes.emailContacto %></span></a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+  <p class="pie-copyright">© <%= new Date().getFullYear() %> <%= tienda.nombre %>. Todos los derechos reservados.</p>
+</footer>
+<%# En la ficha no va el botón flotante: ya está "Consultar por WhatsApp", con el producto en el mensaje. %>
+<% if (ajustes.whatsapp && !locals.sinWhatsappFlotante) { %>
+  <a class="boton-whatsapp" href="https://wa.me/<%= ajustes.whatsapp %>" target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp">
+    <%- icono('whatsapp', { tamano: 28 }) %>
+  </a>
+<% } %>
+</body>
+</html>

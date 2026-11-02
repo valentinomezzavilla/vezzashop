@@ -1,4 +1,63 @@
 // Utilidades solo para tests.
+import assert from 'node:assert/strict';
+import http from 'node:http';
+
+// Navegador mínimo contra el panel: guarda cookies y no sigue redirecciones.
+export function crearNavegador(base) {
+  const cookies = new Map();
+  async function pedir(ruta, opciones = {}) {
+    const headers = new Headers(opciones.headers);
+    if (cookies.size) headers.set('cookie', [...cookies].map(([k, v]) => `${k}=${v}`).join('; '));
+    const respuesta = await fetch(base + ruta, { ...opciones, headers, redirect: 'manual' });
+    for (const cookie of respuesta.headers.getSetCookie()) {
+      const [par] = cookie.split(';');
+      const i = par.indexOf('=');
+      cookies.set(par.slice(0, i), par.slice(i + 1));
+    }
+    return respuesta;
+  }
+  async function csrfDe(ruta) {
+    const html = await (await pedir(ruta)).text();
+    const encontrado = html.match(/name="_csrf" value="([^"]+)"/);
+    assert.ok(encontrado, `no encontré el token CSRF en ${ruta}`);
+    return encontrado[1];
+  }
+  // campos: un objeto, o una lista de pares [nombre, valor] para mandar campos repetidos (sku=A&sku=B).
+  async function enviar(ruta, campos, { desde = ruta } = {}) {
+    const pares = Array.isArray(campos) ? campos : Object.entries(campos);
+    const cuerpo = new URLSearchParams([['_csrf', await csrfDe(desde)], ...pares]);
+    return pedir(ruta, { method: 'POST', body: cuerpo });
+  }
+  // Formulario multipart. Los archivos van como { contenido, nombre }; una lista de archivos manda varios con el mismo nombre.
+  async function enviarArchivos(ruta, campos, { desde = ruta } = {}) {
+    const formulario = new FormData();
+    formulario.set('_csrf', await csrfDe(desde));
+    for (const [nombre, valor] of Object.entries(campos)) {
+      for (const item of Array.isArray(valor) ? valor : [valor]) {
+        if (item?.contenido) formulario.append(nombre, new Blob([item.contenido]), item.nombre);
+        else formulario.append(nombre, item);
+      }
+    }
+    return pedir(ruta, { method: 'POST', body: formulario });
+  }
+  const subirExcel = (contenido, nombre = 'productos.xlsx') =>
+    enviarArchivos('/admin/importar', { archivo: { contenido, nombre } });
+  return { pedir, enviar, enviarArchivos, subirExcel, csrfDe };
+}
+
+// GET con un header Host a elección (fetch no deja cambiarlo), para probar la vidriera por subdominio.
+export function pedirConHost(puerto, host, ruta) {
+  return new Promise((resolver, rechazar) => {
+    http
+      .get({ host: '127.0.0.1', port: puerto, path: ruta, headers: { host: `${host}:${puerto}` } }, (respuesta) => {
+        let cuerpo = '';
+        respuesta.setEncoding('utf8');
+        respuesta.on('data', (parte) => (cuerpo += parte));
+        respuesta.on('end', () => resolver({ status: respuesta.statusCode, location: respuesta.headers.location, cuerpo }));
+      })
+      .on('error', rechazar);
+  });
+}
 
 export function crearTiendaVacia(db, slug) {
   return Number(db.prepare('INSERT INTO tiendas (nombre, slug) VALUES (?, ?)').run(slug, slug).lastInsertRowid);

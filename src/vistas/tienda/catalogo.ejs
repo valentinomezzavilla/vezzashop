@@ -1,0 +1,87 @@
+<%- include('cabecera', { titulo }) %>
+<% if (banners.length) { %>
+  <section class="carrusel" aria-roledescription="carrusel" aria-label="Novedades" data-carrusel>
+    <div class="carrusel-pista" data-pista>
+      <% banners.forEach((banner, n) => { %>
+        <div class="carrusel-diapositiva" role="group" aria-roledescription="diapositiva" aria-label="<%= n + 1 %> de <%= banners.length %>">
+          <% if (banner.enlace) { %><a href="<%= banner.enlace %>"><% } %>
+          <picture>
+            <% if (banner.urlImagenMovil) { %><source media="(max-width: 640px)" srcset="<%= banner.urlImagenMovil %>"><% } %>
+            <img src="<%= banner.urlImagen %>" alt="<%= banner.textoAlternativo %>"<%- n > 0 ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+          </picture>
+          <% if (banner.enlace) { %></a><% } %>
+        </div>
+      <% }) %>
+    </div>
+    <% if (banners.length > 1) { %>
+      <button class="carrusel-flecha carrusel-anterior" type="button" data-anterior aria-label="Banner anterior"><%- icono('izquierda', { tamano: 22 }) %></button>
+      <button class="carrusel-flecha carrusel-siguiente" type="button" data-siguiente aria-label="Banner siguiente"><%- icono('derecha', { tamano: 22 }) %></button>
+      <div class="carrusel-puntos" data-puntos>
+        <% banners.forEach((_, n) => { %>
+          <button type="button" class="carrusel-punto" data-punto="<%= n %>" aria-label="Ir al banner <%= n + 1 %>"<%- n === 0 ? ' aria-current="true"' : '' %>></button>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+
+<% if (migas.length) { %>
+  <nav class="migas" aria-label="Estás en">
+    <a href="/">Inicio</a>
+    <% for (const miga of migas.slice(0, -1)) { %>
+      <%- icono('derecha', { tamano: 14 }) %><a href="<%= urlCategoria(miga) %>"><%= miga.nombre %></a>
+    <% } %>
+    <%- icono('derecha', { tamano: 14 }) %><span aria-current="page"><%= migas.at(-1).nombre %></span>
+  </nav>
+<% } %>
+
+<% if (destacados.length) { %>
+  <section class="seccion-destacados" aria-labelledby="titulo-destacados">
+    <div class="encabezado-catalogo">
+      <h2 id="titulo-destacados" class="titulo-seccion">Destacados</h2>
+    </div>
+    <ul class="grilla">
+      <% for (const p of destacados) { %><%- include('tarjeta-producto', { p }) %><% } %>
+    </ul>
+  </section>
+<% } %>
+
+<div class="encabezado-catalogo">
+  <div>
+    <h1><%= migas.length ? titulo : 'Todos los productos' %></h1>
+    <p class="cantidad"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %></p>
+  </div>
+  <% if (productos.length > 1) { %>
+    <form class="ordenar" method="get" data-ordenar>
+      <label for="orden"><%- icono('ordenar', { tamano: 16 }) %><span>Ordenar por</span></label>
+      <select id="orden" name="orden">
+        <% for (const [clave, opcion] of Object.entries(ordenes)) { %>
+          <option value="<%= clave %>"<%= clave === orden ? ' selected' : '' %>><%= opcion.titulo %></option>
+        <% } %>
+      </select>
+      <button class="boton boton-chico" type="submit" data-sin-js>Ordenar</button>
+    </form>
+  <% } %>
+</div>
+
+<% if (subcategorias.length) { %>
+  <nav class="chips" aria-label="<%= migas.length ? 'Subcategorías' : 'Categorías' %>">
+    <% for (const sub of subcategorias) { %>
+      <a class="chip" href="<%= urlCategoria(sub) %>"><%= sub.nombre %></a>
+    <% } %>
+  </nav>
+<% } %>
+
+<% if (productos.length === 0) { %>
+  <section class="estado-vacio">
+    <div class="estado-vacio-icono" aria-hidden="true"><%- icono('paquete', { tamano: 28 }) %></div>
+    <h2>Todavía no hay productos acá</h2>
+    <p>Volvé pronto o mirá el resto de la tienda.</p>
+    <% if (migas.length) { %><a class="boton" href="/">Ver todos los productos</a><% } %>
+  </section>
+<% } else { %>
+  <ul class="grilla">
+    <% for (const p of productos) { %><%- include('tarjeta-producto', { p }) %><% } %>
+  </ul>
+<% } %>
+<%- include('pie') %>

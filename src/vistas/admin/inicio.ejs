@@ -1,0 +1,98 @@
+<%- include('../parciales/cabecera', { titulo: 'Inicio' }) %>
+<% const { numeros, pasos, hechos, sinStock, pocasUnidades } = resumen %>
+<% const completa = hechos === pasos.length %>
+<header class="encabezado">
+  <div>
+    <h1>Hola, <%= tienda.nombre %></h1>
+    <p class="texto-suave">Esto es lo que está pasando en tu tienda.</p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton-secundario" href="/admin/productos/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo producto</a>
+    <% if (urlMiTienda) { %><a class="boton" href="<%= urlMiTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver mi tienda</a><% } %>
+  </div>
+</header>
+
+<% if (urlMiTienda) { %>
+  <section class="tarjeta enlace-tienda">
+    <div>
+      <span class="etiqueta">El link de tu tienda</span>
+      <a class="enlace-tienda-url" href="<%= urlMiTienda %>" target="_blank" rel="noopener" data-texto-copiar><%= urlMiTienda.replace(/^https?:\/\//, '') %></a>
+    </div>
+    <button class="boton boton-secundario boton-chico" type="button" data-copiar="<%= urlMiTienda %>"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar link</span></button>
+  </section>
+<% } %>
+
+<section class="numeros" aria-label="Tu tienda en números">
+  <a class="numero-tarjeta" href="/admin/productos?filtro=visibles">
+    <span class="numero-icono numero-icono-azul" aria-hidden="true"><%- icono('ojo') %></span>
+    <strong><%= numeros.visibles %></strong><span>productos visibles</span>
+  </a>
+  <a class="numero-tarjeta" href="/admin/productos?filtro=ocultos">
+    <span class="numero-icono" aria-hidden="true"><%- icono('ojo-tachado') %></span>
+    <strong><%= numeros.ocultos %></strong><span>ocultos</span>
+  </a>
+  <a class="numero-tarjeta<%= numeros.sinStock ? ' numero-alerta' : '' %>" href="/admin/productos?filtro=sin-stock">
+    <span class="numero-icono numero-icono-rojo" aria-hidden="true"><%- icono('alerta') %></span>
+    <strong><%= numeros.sinStock %></strong><span>sin stock</span>
+  </a>
+  <div class="numero-tarjeta">
+    <span class="numero-icono numero-icono-verde" aria-hidden="true"><%- icono('caja') %></span>
+    <strong><%= numeros.unidades.toLocaleString('es-AR') %></strong><span>unidades en stock</span>
+  </div>
+</section>
+
+<div class="inicio-columnas">
+  <section class="tarjeta pasos-tienda">
+    <div class="pasos-tienda-encabezado">
+      <div>
+        <h2><%= completa ? '¡Tu tienda está completa!' : 'Completá tu tienda' %></h2>
+        <p class="texto-suave"><%= hechos %> de <%= pasos.length %> pasos listos</p>
+      </div>
+      <span class="progreso-numero"><%= Math.round((hechos / pasos.length) * 100) %>%</span>
+    </div>
+    <div class="progreso" role="progressbar" aria-label="Progreso de la tienda" aria-valuemin="0" aria-valuemax="<%= pasos.length %>" aria-valuenow="<%= hechos %>">
+      <span style="width: <%= (hechos / pasos.length) * 100 %>%"></span>
+    </div>
+    <ol class="lista-pasos">
+      <% for (const paso of pasos) { %>
+        <li class="paso-tienda<%= paso.hecho ? ' hecho' : '' %>">
+          <span class="paso-marca" aria-hidden="true"><% if (paso.hecho) { %><%- icono('check', { tamano: 14 }) %><% } %></span>
+          <div class="paso-textos">
+            <strong><%= paso.titulo %><% if (paso.hecho) { %><span class="visualmente-oculto"> (listo)</span><% } %></strong>
+            <span class="ayuda"><%= paso.detalle %></span>
+          </div>
+          <% if (!paso.hecho) { %><a class="boton boton-secundario boton-chico" href="<%= paso.enlace %>"><%= paso.accion %></a><% } %>
+        </li>
+      <% } %>
+    </ol>
+  </section>
+
+  <section class="tarjeta alertas">
+    <h2>Stock para revisar</h2>
+    <% if (!sinStock.length && !pocasUnidades.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Todo en orden: no hay productos sin stock ni con pocas unidades.</p>
+    <% } %>
+    <% if (sinStock.length) { %>
+      <h3 class="alertas-titulo alertas-titulo-rojo">Sin stock</h3>
+      <ul class="lista-alertas">
+        <% for (const p of sinStock) { %>
+          <li><a href="/admin/productos/<%= p.id %>"><span><%= p.nombre %></span><%- icono('derecha', { tamano: 16 }) %></a></li>
+        <% } %>
+      </ul>
+    <% } %>
+    <% if (pocasUnidades.length) { %>
+      <h3 class="alertas-titulo alertas-titulo-ambar">Quedan pocas unidades</h3>
+      <ul class="lista-alertas">
+        <% for (const v of pocasUnidades) { %>
+          <li>
+            <a href="/admin/productos/<%= v.id %>">
+              <span><%= v.nombre %><% if (v.valores) { %> <span class="ayuda">· <%= v.valores %></span><% } %></span>
+              <span class="pastilla pastilla-ambar"><%= v.stock %></span>
+            </a>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+<%- include('../parciales/pie') %>

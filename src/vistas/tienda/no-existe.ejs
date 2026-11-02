@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tienda no encontrada</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Rubik:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/tienda.css">
+</head>
+<body>
+<main class="contenido contenido-centrado">
+  <section class="estado-vacio">
+    <div class="estado-vacio-icono" aria-hidden="true"><%- icono('tienda', { tamano: 28 }) %></div>
+    <h1>Esta tienda no existe</h1>
+    <p>Revisá que el link esté bien escrito.</p>
+    <a class="boton" href="<%= urlPanel %>">Ir al inicio</a>
+  </section>
+</main>
+</body>
+</html>

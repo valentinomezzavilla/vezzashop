@@ -1,26 +1,50 @@
 <%- include('../parciales/cabecera', { titulo: 'Carga masiva' }) %>
-<h1>Carga masiva desde Excel</h1>
+<header class="encabezado">
+  <div>
+    <h1>Carga masiva desde Excel</h1>
+    <p class="texto-suave">Cargá o actualizá muchos productos de una vez, en tres pasos.</p>
+  </div>
+</header>
 
 <ol class="pasos">
-  <li class="tarjeta">
-    <h2>1. Descargá la plantilla</h2>
-    <p>Tiene las columnas que necesitamos y una hoja con instrucciones.</p>
-    <a class="boton boton-secundario" href="/admin/importar/plantilla.xlsx">Descargar plantilla</a>
+  <li class="tarjeta paso">
+    <span class="paso-numero" aria-hidden="true">1</span>
+    <div class="paso-cuerpo">
+      <h2>Descargá la plantilla</h2>
+      <p class="texto-suave">Tiene las columnas que necesitamos y una hoja con instrucciones y ejemplos.</p>
+      <a class="boton boton-secundario" href="/admin/importar/plantilla.xlsx"><%- icono('descargar', { tamano: 18 }) %> Descargar plantilla</a>
+    </div>
   </li>
-  <li class="tarjeta">
-    <h2>2. Completala</h2>
-    <p>Una fila por producto, o por variante (talle, color). Las filas con el mismo nombre forman un solo producto.</p>
-    <p>Si volvés a subir la planilla, se actualizan los productos que ya existen y no se duplica nada.</p>
+  <li class="tarjeta paso">
+    <span class="paso-numero" aria-hidden="true">2</span>
+    <div class="paso-cuerpo">
+      <h2>Completala</h2>
+      <p class="texto-suave">Una fila por producto, o por variante (talle, color). Las filas con el mismo nombre forman un solo producto.</p>
+      <p class="texto-suave">Si la volvés a subir, se actualizan los productos que ya existen y no se duplica nada.</p>
+    </div>
   </li>
-  <li class="tarjeta">
-    <h2>3. Subila</h2>
-    <% if (error) { %><p class="aviso aviso-error" role="alert"><%= error %></p><% } %>
-    <form method="post" action="/admin/importar" enctype="multipart/form-data" class="formulario">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <input type="file" name="archivo" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-      <button class="boton" type="submit">Revisar archivo</button>
-    </form>
-    <p class="nota">Antes de guardar nada te mostramos un resumen para que confirmes.</p>
+  <li class="tarjeta paso">
+    <span class="paso-numero" aria-hidden="true">3</span>
+    <div class="paso-cuerpo">
+      <h2>Subila</h2>
+      <% if (error) { %>
+        <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= error %></span></p>
+      <% } %>
+      <form method="post" action="/admin/importar" enctype="multipart/form-data" class="formulario">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="zona-archivo">
+          <%- icono('planilla', { tamano: 28 }) %>
+          <span class="zona-archivo-texto" data-nombre-archivo>Elegí el archivo .xlsx</span>
+          <span class="ayuda">Hasta 5 MB</span>
+          <input class="visualmente-oculto" type="file" name="archivo" required
+                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </label>
+        <div class="acciones">
+          <button class="boton" type="submit">Revisar archivo</button>
+          <span class="ayuda">Antes de guardar te mostramos un resumen para que confirmes.</span>
+        </div>
+      </form>
+    </div>
   </li>
 </ol>
 <%- include('../parciales/pie') %>

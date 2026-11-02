@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo === tienda.nombre ? tienda.nombre : `${titulo} · ${tienda.nombre}` %></title>
+  <meta name="theme-color" content="<%= ajustes.colorPrincipal %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Rubik:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/tienda.css">
+  <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; }</style>
+  <script src="/tienda.js" defer></script>
+</head>
+<body>
+<a class="saltar" href="#contenido">Ir al contenido</a>
+<% if (ajustes.franjaTexto) { %>
+  <div class="franja"><p><%= ajustes.franjaTexto %></p></div>
+<% } %>
+<header class="cabecera">
+  <div class="cabecera-interior">
+    <a class="marca" href="/" aria-label="<%= tienda.nombre %>, inicio">
+      <% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"><% } else { %><%= tienda.nombre %><% } %>
+    </a>
+
+    <% if (categorias.length) { %>
+      <nav class="navegacion" aria-label="Categorías">
+        <ul class="navegacion-lista">
+          <% for (const categoria of categorias) { %>
+            <li class="navegacion-item<%= categoria.hijas.length ? ' con-submenu' : '' %>">
+              <a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %><% if (categoria.hijas.length) { %><%- icono('abajo', { tamano: 14 }) %><% } %></a>
+              <% if (categoria.hijas.length) { %>
+                <ul class="submenu">
+                  <li><a href="<%= urlCategoria(categoria) %>">Ver todo <%= categoria.nombre %></a></li>
+                  <% for (const hija of categoria.hijas) { %><li><a href="<%= urlCategoria(hija) %>"><%= hija.nombre %></a></li><% } %>
+                </ul>
+              <% } %>
+            </li>
+          <% } %>
+        </ul>
+      </nav>
+
+      <details class="menu-movil" data-menu-movil>
+        <summary class="boton-icono" aria-label="Abrir el menú"><%- icono('menu', { tamano: 22 }) %></summary>
+        <nav class="menu-movil-panel" aria-label="Categorías">
+          <a class="menu-movil-inicio" href="/">Todos los productos</a>
+          <% for (const categoria of categorias) { %>
+            <a class="menu-movil-categoria" href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a>
+            <% for (const hija of categoria.hijas) { %>
+              <a class="menu-movil-subcategoria" href="<%= urlCategoria(hija) %>"><%= hija.nombre %></a>
+            <% } %>
+          <% } %>
+        </nav>
+      </details>
+    <% } %>
+  </div>
+</header>
+<main class="contenido" id="contenido">

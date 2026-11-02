@@ -1,0 +1,261 @@
+<%- include('../parciales/cabecera', { titulo: 'Diseño' }) %>
+<%
+  // Atributos de accesibilidad de un campo: lo marca como inválido y lo asocia a su ayuda y su error.
+  const accesibilidad = (campo, conAyuda = true) => {
+    const describe = [conAyuda && `ayuda-${campo}`, errores[campo] && `error-${campo}`].filter(Boolean).join(' ');
+    return (errores[campo] ? ' aria-invalid="true"' : '') + (describe ? ` aria-describedby="${describe}"` : '');
+  };
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+%>
+<header class="encabezado">
+  <div>
+    <h1>Diseño de tu tienda</h1>
+    <p class="texto-suave">Cambiá cómo se ve tu tienda. Los cambios se ven apenas guardás.</p>
+  </div>
+  <% if (urlMiTienda) { %>
+    <a class="boton boton-secundario" href="<%= urlMiTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver cómo queda</a>
+  <% } %>
+</header>
+
+<% if (Object.keys(errores).length) { %>
+  <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>
+<% } %>
+
+<form method="post" action="/admin/diseno" enctype="multipart/form-data" class="ajustes" id="form-diseno">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Identidad</h2>
+      <p class="texto-suave">El logo y el color hacen que la tienda se vea como tu marca.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="campo">
+        <span class="etiqueta">Logo</span>
+        <div class="selector-imagen">
+          <div class="selector-imagen-vista" data-vista="logo">
+            <% if (urlLogo) { %><img src="<%= urlLogo %>" alt="Logo actual"><% } else { %><%- icono('imagen', { tamano: 24 }) %><% } %>
+          </div>
+          <div class="selector-imagen-acciones">
+            <label class="boton boton-secundario boton-chico">
+              <%- icono('subir', { tamano: 16 }) %> <%= urlLogo ? 'Cambiar logo' : 'Subir logo' %>
+              <input class="visualmente-oculto" type="file" name="logo" accept="image/png,image/jpeg,image/webp"
+                     data-previsualizar="logo"<%- accesibilidad('logo') %>>
+            </label>
+            <% if (urlLogo) { %>
+              <label class="casilla"><input type="checkbox" name="quitarLogo" value="1"> Quitar el logo</label>
+            <% } %>
+          </div>
+        </div>
+        <span class="ayuda" id="ayuda-logo">PNG, JPG o WEBP de hasta <%= megasImagen %> MB, mejor con fondo transparente. Si no subís uno, se muestra el nombre de la tienda.</span>
+        <%- error('logo') %>
+      </div>
+
+      <div class="campo">
+        <label for="colorPrincipal">Color principal</label>
+        <div class="selector-color">
+          <input id="colorPrincipal" type="color" name="colorPrincipal" value="<%= valores.colorPrincipal %>" data-color<%- accesibilidad('colorPrincipal') %>>
+          <code data-color-hex><%= valores.colorPrincipal %></code>
+        </div>
+        <span class="ayuda" id="ayuda-colorPrincipal">Se usa en la franja de anuncios y en los botones. El color del texto se ajusta solo para que se lea bien.</span>
+        <%- error('colorPrincipal') %>
+      </div>
+
+      <div class="campo">
+        <label for="franjaTexto">Franja de anuncios</label>
+        <input id="franjaTexto" type="text" name="franjaTexto" value="<%= valores.franjaTexto %>" maxlength="200" data-franja
+               placeholder="Envío gratis desde $100.000 / 15% off con transferencia"<%- accesibilidad('franjaTexto') %>>
+        <span class="ayuda" id="ayuda-franjaTexto">Aparece arriba de todo, en todas las páginas. Dejala vacía para no mostrarla.</span>
+        <%- error('franjaTexto') %>
+      </div>
+
+      <div class="vista-previa" data-vista-previa aria-hidden="true">
+        <span class="vista-previa-titulo">Vista previa</span>
+        <div class="vista-previa-franja" data-vista-franja><%= valores.franjaTexto || 'Tu anuncio va acá' %></div>
+        <div class="vista-previa-cuerpo">
+          <span class="vista-previa-boton">Botón de ejemplo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Precios</h2>
+      <p class="texto-suave">Mostrá cuánto se ahorra pagando por transferencia y en cuántas cuotas se puede pagar.</p>
+    </div>
+    <div class="tarjeta ajuste-campos ajuste-campos-dos">
+      <div class="campo">
+        <label for="descuentoTransferencia">Descuento por transferencia</label>
+        <div class="campo-con-sufijo">
+          <input id="descuentoTransferencia" type="number" name="descuentoTransferencia" value="<%= valores.descuentoTransferencia %>"
+                 min="0" max="90" step="1" inputmode="numeric"<%- accesibilidad('descuentoTransferencia') %>>
+          <span class="sufijo">%</span>
+        </div>
+        <span class="ayuda" id="ayuda-descuentoTransferencia">Muestra "$X con transferencia". Poné 0 para no mostrarlo.</span>
+        <%- error('descuentoTransferencia') %>
+      </div>
+      <div class="campo">
+        <label for="cuotasSinInteres">Cuotas sin interés</label>
+        <div class="campo-con-sufijo">
+          <input id="cuotasSinInteres" type="number" name="cuotasSinInteres" value="<%= valores.cuotasSinInteres %>"
+                 min="0" max="24" step="1" inputmode="numeric"<%- accesibilidad('cuotasSinInteres') %>>
+          <span class="sufijo">cuotas</span>
+        </div>
+        <span class="ayuda" id="ayuda-cuotasSinInteres">Muestra "6 cuotas sin interés de $X" en cada producto. Poné 0 para no mostrarlo.</span>
+        <%- error('cuotasSinInteres') %>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Catálogo</h2>
+      <p class="texto-suave">En qué orden aparecen los productos cuando alguien entra a la tienda.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="campo">
+        <label for="ordenCatalogo">Orden de los productos</label>
+        <select id="ordenCatalogo" name="ordenCatalogo"<%- accesibilidad('ordenCatalogo') %>>
+          <% for (const [clave, opcion] of Object.entries(ordenes)) { %>
+            <option value="<%= clave %>"<%= clave === valores.ordenCatalogo ? ' selected' : '' %>><%= opcion.titulo %></option>
+          <% } %>
+        </select>
+        <span class="ayuda" id="ayuda-ordenCatalogo">Tus clientes lo pueden cambiar desde la tienda.</span>
+        <%- error('ordenCatalogo') %>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Contacto y redes</h2>
+      <p class="texto-suave">Aparecen en el pie de la tienda. Con WhatsApp, además, se muestra un botón flotante en todas las páginas.</p>
+    </div>
+    <div class="tarjeta ajuste-campos ajuste-campos-dos">
+      <div class="campo">
+        <label for="whatsapp">WhatsApp</label>
+        <input id="whatsapp" type="tel" name="whatsapp" value="<%= valores.whatsapp %>" placeholder="5493511234567"
+               autocomplete="tel"<%- accesibilidad('whatsapp') %>>
+        <span class="ayuda" id="ayuda-whatsapp">Con código de país y de área, sin el 0 ni el 15.</span>
+        <%- error('whatsapp') %>
+      </div>
+      <div class="campo">
+        <label for="emailContacto">Email de contacto</label>
+        <input id="emailContacto" type="email" name="emailContacto" value="<%= valores.emailContacto %>"
+               placeholder="hola@mitienda.com" autocomplete="email"<%- accesibilidad('emailContacto', false) %>>
+        <%- error('emailContacto') %>
+      </div>
+      <div class="campo">
+        <label for="instagram">Instagram</label>
+        <input id="instagram" type="text" name="instagram" value="<%= valores.instagram %>" placeholder="@mitienda"<%- accesibilidad('instagram', false) %>>
+        <%- error('instagram') %>
+      </div>
+      <div class="campo">
+        <label for="facebook">Facebook</label>
+        <input id="facebook" type="text" name="facebook" value="<%= valores.facebook %>" placeholder="mitienda"<%- accesibilidad('facebook', false) %>>
+        <%- error('facebook') %>
+      </div>
+      <div class="campo">
+        <label for="tiktok">TikTok</label>
+        <input id="tiktok" type="text" name="tiktok" value="<%= valores.tiktok %>" placeholder="@mitienda"<%- accesibilidad('tiktok', false) %>>
+        <%- error('tiktok') %>
+      </div>
+      <div class="campo campo-ancho">
+        <label for="direccion">Dirección</label>
+        <input id="direccion" type="text" name="direccion" value="<%= valores.direccion %>" maxlength="300"
+               placeholder="Av. Siempre Viva 742, Córdoba"<%- accesibilidad('direccion') %>>
+        <span class="ayuda" id="ayuda-direccion">Si tenés varios locales, separalos con "/".</span>
+        <%- error('direccion') %>
+      </div>
+    </div>
+  </section>
+
+  <div class="barra-guardar">
+    <span class="ayuda" data-sin-guardar hidden><%- icono('alerta', { tamano: 16 }) %> Tenés cambios sin guardar</span>
+    <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar cambios</button>
+  </div>
+</form>
+
+<section class="ajuste" id="banners">
+  <div class="ajuste-intro">
+    <h2>Banners de bienvenida</h2>
+    <p class="texto-suave">Las imágenes grandes del carrusel de la portada, en este orden. Hasta <%= maxBanners %>.</p>
+    <p class="ayuda">Tamaño recomendado: 1600 × 600 px para computadora y 800 × 1000 px para celular.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (aviso && aviso.seccion === 'banners') { %>
+      <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%- icono(aviso.tipo === 'ok' ? 'check' : 'alerta', { tamano: 18 }) %><span><%= aviso.texto %></span></p>
+    <% } %>
+
+    <% if (banners.length) { %>
+      <ol class="lista-banners">
+        <% banners.forEach((banner, n) => { %>
+          <li class="banner">
+            <span class="banner-numero" aria-hidden="true"><%= n + 1 %></span>
+            <img src="<%= banner.urlImagen %>" alt="">
+            <div class="banner-datos">
+              <strong><%= banner.textoAlternativo || `Banner ${n + 1}` %></strong>
+              <span class="ayuda"><%= banner.enlace ? `Lleva a ${banner.enlace}` : 'Sin link' %><%= banner.imagenMovil ? ' · con imagen para celular' : '' %></span>
+            </div>
+            <div class="banner-acciones">
+              <% for (const [accion, nombreIcono, etiqueta, deshabilitado] of [
+                   ['subir', 'arriba', 'Subir', n === 0],
+                   ['bajar', 'abajo', 'Bajar', n === banners.length - 1],
+                   ['borrar', 'basura', 'Borrar', false]]) { %>
+                <form method="post" action="/admin/diseno/banners/<%= banner.id %>/<%= accion %>">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="boton-icono<%= accion === 'borrar' ? ' boton-icono-peligro' : '' %>" type="submit"
+                          aria-label="<%= etiqueta %> banner <%= n + 1 %>" title="<%= etiqueta %>"<%= deshabilitado ? ' disabled' : '' %>>
+                    <%- icono(nombreIcono, { tamano: 18 }) %>
+                  </button>
+                </form>
+              <% } %>
+            </div>
+          </li>
+        <% }) %>
+      </ol>
+    <% } else { %>
+      <p class="estado-vacio-chico"><%- icono('imagen', { tamano: 20 }) %> Todavía no hay banners. La portada muestra directamente los productos.</p>
+    <% } %>
+
+    <% if (banners.length < maxBanners) { %>
+      <form method="post" action="/admin/diseno/banners" enctype="multipart/form-data" class="agregar-banner">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <h3>Agregar un banner</h3>
+        <div class="ajuste-campos-dos">
+          <div class="campo">
+            <span class="etiqueta">Imagen para computadora</span>
+            <label class="zona-archivo zona-archivo-chica" data-vista="banner">
+              <%- icono('imagen', { tamano: 24 }) %>
+              <span class="zona-archivo-texto" data-nombre-archivo>Elegir imagen</span>
+              <input class="visualmente-oculto" type="file" name="imagen" accept="image/png,image/jpeg,image/webp" required data-previsualizar="banner">
+            </label>
+          </div>
+          <div class="campo">
+            <span class="etiqueta">Imagen para celular <span class="opcional">(opcional)</span></span>
+            <label class="zona-archivo zona-archivo-chica" data-vista="banner-movil">
+              <%- icono('imagen', { tamano: 24 }) %>
+              <span class="zona-archivo-texto" data-nombre-archivo>Elegir imagen</span>
+              <input class="visualmente-oculto" type="file" name="imagenMovil" accept="image/png,image/jpeg,image/webp" data-previsualizar="banner-movil">
+            </label>
+            <span class="ayuda">Si no la subís, en el celular se usa la misma.</span>
+          </div>
+          <div class="campo">
+            <label for="enlace">Link <span class="opcional">(opcional)</span></label>
+            <input id="enlace" type="text" name="enlace" placeholder="/categoria/ofertas" aria-describedby="ayuda-enlace">
+            <span class="ayuda" id="ayuda-enlace">A dónde lleva al tocarlo: una página de tu tienda o un link completo.</span>
+          </div>
+          <div class="campo">
+            <label for="textoAlternativo">Descripción de la imagen</label>
+            <input id="textoAlternativo" type="text" name="textoAlternativo" maxlength="150" placeholder="Nueva colección de invierno"
+                   aria-describedby="ayuda-textoAlternativo">
+            <span class="ayuda" id="ayuda-textoAlternativo">La leen los buscadores y las personas que usan lectores de pantalla.</span>
+          </div>
+        </div>
+        <div class="acciones"><button class="boton" type="submit"><%- icono('subir', { tamano: 18 }) %> Agregar banner</button></div>
+      </form>
+    <% } %>
+  </div>
+</section>
+<%- include('../parciales/pie') %>

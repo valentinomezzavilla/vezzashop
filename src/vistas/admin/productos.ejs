@@ -1,35 +1,112 @@
 <%- include('../parciales/cabecera', { titulo: 'Productos' }) %>
-<div class="encabezado">
-  <h1>Productos</h1>
-  <a class="boton" href="/admin/importar">Carga masiva desde Excel</a>
-</div>
+<% const volver = `/admin/productos?filtro=${filtro}${busqueda ? `&q=${encodeURIComponent(busqueda)}` : ''}` %>
+<header class="encabezado">
+  <div>
+    <h1>Productos</h1>
+    <p class="texto-suave"><%= cuentas.todos %> producto<%= cuentas.todos === 1 ? '' : 's' %> · <%= cuentas.visibles %> visible<%= cuentas.visibles === 1 ? '' : 's' %> en la tienda</p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton-secundario" href="/admin/importar"><%- icono('subir', { tamano: 18 }) %> Carga masiva</a>
+    <a class="boton" href="/admin/productos/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo producto</a>
+  </div>
+</header>
 
-<% if (productos.length === 0) { %>
-  <section class="tarjeta vacio">
-    <p>Todavía no cargaste productos.</p>
-    <p>Podés subir muchos de una vez con un Excel desde <a href="/admin/importar">Carga masiva</a>.</p>
+<% if (cuentas.todos === 0) { %>
+  <section class="tarjeta estado-vacio">
+    <div class="estado-vacio-icono" aria-hidden="true"><%- icono('paquete', { tamano: 28 }) %></div>
+    <h2>Todavía no cargaste productos</h2>
+    <p class="texto-suave">Cargalos de a uno, o muchos de una vez con una planilla de Excel.</p>
+    <div class="acciones">
+      <a class="boton" href="/admin/productos/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo producto</a>
+      <a class="boton boton-secundario" href="/admin/importar">Carga masiva</a>
+    </div>
   </section>
 <% } else { %>
-  <div class="tabla-contenedor">
-    <table class="tabla">
-      <thead>
-        <tr><th>Producto</th><th>Precio</th><th class="numero">Variantes</th><th class="numero">Stock</th><th>Estado</th></tr>
-      </thead>
-      <tbody>
-      <% for (const p of productos) { %>
-        <tr>
-          <td><%= p.nombre %></td>
-          <td>
-            <%= formatearPrecio(p.precioMinimo) %><% if (p.precioMaximo !== p.precioMinimo) { %> – <%= formatearPrecio(p.precioMaximo) %><% } %>
-          </td>
-          <td class="numero"><%= p.variantes %></td>
-          <td class="numero<%= p.stock === 0 ? ' sin-stock' : '' %>"><%= p.stock %></td>
-          <td><span class="etiqueta<%= p.visible ? '' : ' etiqueta-oculta' %>"><%= p.visible ? 'Visible' : 'Oculto' %></span></td>
-        </tr>
+  <div class="barra-herramientas">
+    <nav class="pestanias" aria-label="Filtrar productos">
+      <% for (const [clave, opcion] of Object.entries(filtros)) { %>
+        <a href="/admin/productos?filtro=<%= clave %><%= busqueda ? `&q=${encodeURIComponent(busqueda)}` : '' %>"<%- clave === filtro ? ' class="activa" aria-current="page"' : '' %>>
+          <%= opcion.titulo %> <span class="pestania-cuenta"><%= cuentas[clave] %></span>
+        </a>
       <% } %>
-      </tbody>
-    </table>
+    </nav>
+    <form class="buscador" method="get" action="/admin/productos" role="search">
+      <input type="hidden" name="filtro" value="<%= filtro %>">
+      <label class="visualmente-oculto" for="q">Buscar productos</label>
+      <%- icono('lupa', { tamano: 18 }) %>
+      <input id="q" type="search" name="q" value="<%= busqueda %>" placeholder="Buscar por nombre, marca o SKU">
+    </form>
   </div>
-  <p class="nota"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %></p>
+
+  <% if (productos.length === 0) { %>
+    <section class="tarjeta estado-vacio">
+      <div class="estado-vacio-icono" aria-hidden="true"><%- icono('lupa', { tamano: 28 }) %></div>
+      <h2>No hay productos que coincidan</h2>
+      <p class="texto-suave"><%= busqueda ? `No encontramos "${busqueda}"` : 'No hay productos en este filtro' %>.</p>
+      <a class="boton boton-secundario" href="/admin/productos">Ver todos</a>
+    </section>
+  <% } else { %>
+    <div class="tabla-contenedor">
+      <table class="tabla tabla-productos">
+        <thead>
+          <tr>
+            <th scope="col">Producto</th>
+            <th scope="col">Precio</th>
+            <th scope="col" class="numero">Stock</th>
+            <th scope="col">Estado</th>
+            <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+        <% for (const p of productos) { %>
+          <tr>
+            <td>
+              <a class="celda-producto" href="/admin/productos/<%= p.id %>">
+                <% if (p.urlFoto) { %><img class="miniatura" src="<%= p.urlFoto %>" alt="" loading="lazy">
+                <% } else { %><span class="miniatura" aria-hidden="true"><%- icono('imagen', { tamano: 16 }) %></span><% } %>
+                <span class="celda-producto-textos">
+                  <span class="celda-producto-nombre"><%= p.nombre %><% if (p.destacado) { %> <span class="destacado-marca" title="Destacado"><%- icono('estrella', { tamano: 14 }) %><span class="visualmente-oculto">(destacado)</span></span><% } %></span>
+                  <span class="ayuda"><%= p.variantes %> variante<%= p.variantes === 1 ? '' : 's' %><%= p.marca ? ` · ${p.marca}` : '' %></span>
+                </span>
+              </a>
+            </td>
+            <td class="precio-celda">
+              <%= formatearPrecio(p.precioMinimo) %><% if (p.precioMaximo !== p.precioMinimo) { %> – <%= formatearPrecio(p.precioMaximo) %><% } %>
+            </td>
+            <td class="numero">
+              <% if (p.stock === 0) { %><span class="sin-stock">Sin stock</span>
+              <% } else { %><%= p.stock %><% if (p.variantesSinStock) { %><span class="ayuda celda-nota"><%= p.variantesSinStock %> sin stock</span><% } %><% } %>
+            </td>
+            <td><span class="pastilla<%= p.visible ? ' pastilla-ok' : '' %>"><%= p.visible ? 'Visible' : 'Oculto' %></span></td>
+            <td>
+              <div class="acciones-fila">
+                <form method="post" action="/admin/productos/<%= p.id %>/destacado">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <input type="hidden" name="valor" value="<%= p.destacado ? '0' : '1' %>">
+                  <input type="hidden" name="volver" value="<%= volver %>">
+                  <button class="boton-icono<%= p.destacado ? ' boton-icono-activo' : '' %>" type="submit"
+                          aria-label="<%= p.destacado ? 'Quitar de destacados' : 'Destacar' %> <%= p.nombre %>" title="<%= p.destacado ? 'Quitar de destacados' : 'Destacar en la portada' %>">
+                    <%- icono('estrella', { tamano: 18 }) %>
+                  </button>
+                </form>
+                <form method="post" action="/admin/productos/<%= p.id %>/visible">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <input type="hidden" name="valor" value="<%= p.visible ? '0' : '1' %>">
+                  <input type="hidden" name="volver" value="<%= volver %>">
+                  <button class="boton-icono" type="submit" aria-label="<%= p.visible ? 'Ocultar' : 'Mostrar' %> <%= p.nombre %>"
+                          title="<%= p.visible ? 'Ocultar de la tienda' : 'Mostrar en la tienda' %>">
+                    <%- icono(p.visible ? 'ojo-tachado' : 'ojo', { tamano: 18 }) %>
+                  </button>
+                </form>
+                <a class="boton-icono" href="/admin/productos/<%= p.id %>" aria-label="Editar <%= p.nombre %>" title="Editar"><%- icono('lapiz', { tamano: 18 }) %></a>
+              </div>
+            </td>
+          </tr>
+        <% } %>
+        </tbody>
+      </table>
+    </div>
+    <p class="ayuda pie-tabla"><%= productos.length %> de <%= cuentas[filtro] %> producto<%= cuentas[filtro] === 1 ? '' : 's' %><%= busqueda ? ` que coinciden con "${busqueda}"` : '' %></p>
+  <% } %>
 <% } %>
 <%- include('../parciales/pie') %>

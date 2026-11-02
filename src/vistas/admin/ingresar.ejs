@@ -1,16 +1,22 @@
 <%- include('../parciales/cabecera', { titulo: 'Ingresar' }) %>
-<section class="tarjeta centrada angosta">
+<section class="ingreso">
+  <div class="ingreso-icono" aria-hidden="true"><%- icono('tienda', { tamano: 24 }) %></div>
   <h1>Ingresá a tu panel</h1>
-  <% if (error) { %><p class="aviso aviso-error" role="alert"><%= error %></p><% } %>
+  <p class="texto-suave">Administrá los productos y el diseño de tu tienda.</p>
+  <% if (error) { %>
+    <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= error %></span></p>
+  <% } %>
   <form method="post" action="/admin/ingresar" class="formulario">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <label>Email
-      <input type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus>
-    </label>
-    <label>Clave
-      <input type="password" name="clave" autocomplete="current-password" required>
-    </label>
-    <button class="boton" type="submit">Ingresar</button>
+    <div class="campo">
+      <label for="email">Email</label>
+      <input id="email" type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus>
+    </div>
+    <div class="campo">
+      <label for="clave">Clave</label>
+      <input id="clave" type="password" name="clave" autocomplete="current-password" required>
+    </div>
+    <button class="boton boton-bloque boton-grande" type="submit">Ingresar</button>
   </form>
 </section>
 <%- include('../parciales/pie') %>

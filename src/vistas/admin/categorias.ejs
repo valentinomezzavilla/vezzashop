@@ -1,0 +1,95 @@
+<%- include('../parciales/cabecera', { titulo: 'Categorías' }) %>
+<%
+  // Opciones de "Va adentro de": todas menos la misma categoría y sus subcategorías.
+  const opcionesPadre = (categoria) => {
+    if (!categoria) return categorias;
+    const excluir = new Set([categoria.id]);
+    for (const c of categorias) if (excluir.has(c.padreId)) excluir.add(c.id);
+    return categorias.filter((c) => !excluir.has(c.id));
+  };
+  const sangria = (nivel) => '— '.repeat(nivel);
+%>
+<header class="encabezado">
+  <div>
+    <h1>Categorías</h1>
+    <p class="texto-suave">Ordenan tu catálogo y aparecen en el menú de la tienda. Las que no tienen productos visibles no se muestran.</p>
+  </div>
+</header>
+
+<div class="categorias-columnas">
+  <section class="tarjeta seccion-editor">
+    <h2>Nueva categoría</h2>
+    <form method="post" action="/admin/categorias" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="nombre-nueva">Nombre</label>
+        <input id="nombre-nueva" type="text" name="nombre" maxlength="60" required placeholder="Ej: Remeras"
+               value="<%= editando === null ? (valores.nombre ?? '') : '' %>"<%- error && editando === null ? ' aria-invalid="true" aria-describedby="error-nueva"' : '' %>>
+        <% if (error && editando === null) { %><span class="error-campo" id="error-nueva"><%= error %></span><% } %>
+      </div>
+      <div class="campo">
+        <label for="padre-nueva">Va adentro de <span class="opcional">(opcional)</span></label>
+        <select id="padre-nueva" name="padreId">
+          <option value="">Ninguna: es una categoría principal</option>
+          <% for (const c of categorias) { %>
+            <option value="<%= c.id %>"<%= editando === null && String(valores.padreId) === String(c.id) ? ' selected' : '' %>><%= sangria(c.nivel) %><%= c.nombre %></option>
+          <% } %>
+        </select>
+        <span class="ayuda">Para armar subcategorías, como Ropa › Remeras.</span>
+      </div>
+      <button class="boton" type="submit"><%- icono('mas', { tamano: 18 }) %> Crear categoría</button>
+    </form>
+  </section>
+
+  <section class="tarjeta seccion-editor">
+    <h2>Tus categorías</h2>
+    <% if (!categorias.length) { %>
+      <p class="estado-vacio-chico"><%- icono('carpeta', { tamano: 20 }) %> Todavía no hay categorías. También se crean solas al cargar productos por Excel.</p>
+    <% } else { %>
+      <ul class="arbol-categorias">
+        <% for (const c of categorias) { %>
+          <% const abierta = editando === c.id %>
+          <li class="categoria-item" style="--nivel: <%= c.nivel %>">
+            <div class="categoria-fila">
+              <span class="categoria-nombre"><%- icono('carpeta', { tamano: 16 }) %> <%= c.nombre %></span>
+              <span class="ayuda"><%= c.productos %> producto<%= c.productos === 1 ? '' : 's' %></span>
+              <details class="categoria-editar"<%= abierta ? ' open' : '' %>>
+                <summary class="boton-icono boton-icono-chico" aria-label="Editar <%= c.nombre %>" title="Editar"><%- icono('lapiz', { tamano: 16 }) %></summary>
+                <div class="categoria-panel">
+                  <form method="post" action="/admin/categorias/<%= c.id %>" class="formulario">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <div class="campo">
+                      <label for="nombre-<%= c.id %>">Nombre</label>
+                      <input id="nombre-<%= c.id %>" type="text" name="nombre" maxlength="60" required value="<%= abierta ? valores.nombre : c.nombre %>"
+                             <%- abierta && error ? `aria-invalid="true" aria-describedby="error-${c.id}"` : '' %>>
+                      <% if (abierta && error) { %><span class="error-campo" id="error-<%= c.id %>"><%= error %></span><% } %>
+                    </div>
+                    <div class="campo">
+                      <label for="padre-<%= c.id %>">Va adentro de</label>
+                      <select id="padre-<%= c.id %>" name="padreId">
+                        <option value="">Ninguna: es una categoría principal</option>
+                        <% for (const p of opcionesPadre(c)) { %>
+                          <option value="<%= p.id %>"<%= p.id === c.padreId ? ' selected' : '' %>><%= sangria(p.nivel) %><%= p.nombre %></option>
+                        <% } %>
+                      </select>
+                    </div>
+                    <button class="boton boton-chico" type="submit">Guardar</button>
+                  </form>
+                  <details class="confirmar">
+                    <summary class="boton boton-peligro-suave boton-chico"><%- icono('basura', { tamano: 16 }) %> Borrar</summary>
+                    <form method="post" action="/admin/categorias/<%= c.id %>/borrar" class="confirmar-cuerpo">
+                      <input type="hidden" name="_csrf" value="<%= csrf %>">
+                      <p>Se borra <%= c.hijas.length ? 'con sus subcategorías' : 'la categoría' %>. Los productos no se borran: solo dejan de estar en ella.</p>
+                      <button class="boton boton-peligro boton-chico" type="submit">Sí, borrar</button>
+                    </form>
+                  </details>
+                </div>
+              </details>
+            </div>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+<%- include('../parciales/pie') %>

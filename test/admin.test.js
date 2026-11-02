@@ -10,6 +10,7 @@ import { abrirBase } from '../src/db.js';
 import { crearApp } from '../src/app.js';
 import { crearTienda } from '../src/tiendas.js';
 import { COLUMNAS, interpretarHoja } from '../src/importacion/interpretar.js';
+import { crearNavegador } from './ayudantes.js';
 
 let servidor;
 let base;
@@ -19,7 +20,12 @@ let dirImportaciones;
 before(async () => {
   dirImportaciones = mkdtempSync(path.join(tmpdir(), 'importaciones-'));
   db = abrirBase(':memory:');
-  const config = { produccion: false, secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres', dirImportaciones };
+  const config = {
+    produccion: false,
+    secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',
+    dirImportaciones,
+    dirSubidas: dirImportaciones,
+  };
   servidor = crearApp({ db, config }).listen(0);
   await once(servidor, 'listening');
   base = `http://127.0.0.1:${servidor.address().port}`;
@@ -30,38 +36,7 @@ after(() => {
   rmSync(dirImportaciones, { recursive: true, force: true });
 });
 
-// Navegador mínimo: guarda cookies y no sigue redirecciones.
-function navegador() {
-  const cookies = new Map();
-  async function pedir(ruta, opciones = {}) {
-    const headers = new Headers(opciones.headers);
-    if (cookies.size) headers.set('cookie', [...cookies].map(([k, v]) => `${k}=${v}`).join('; '));
-    const respuesta = await fetch(base + ruta, { ...opciones, headers, redirect: 'manual' });
-    for (const cookie of respuesta.headers.getSetCookie()) {
-      const [par] = cookie.split(';');
-      const i = par.indexOf('=');
-      cookies.set(par.slice(0, i), par.slice(i + 1));
-    }
-    return respuesta;
-  }
-  async function csrfDe(ruta) {
-    const html = await (await pedir(ruta)).text();
-    const encontrado = html.match(/name="_csrf" value="([^"]+)"/);
-    assert.ok(encontrado, `no encontré el token CSRF en ${ruta}`);
-    return encontrado[1];
-  }
-  async function enviar(ruta, campos, { desde = ruta } = {}) {
-    const cuerpo = new URLSearchParams({ _csrf: await csrfDe(desde), ...campos });
-    return pedir(ruta, { method: 'POST', body: cuerpo });
-  }
-  async function subirExcel(contenido, nombre = 'productos.xlsx') {
-    const formulario = new FormData();
-    formulario.set('_csrf', await csrfDe('/admin/importar'));
-    formulario.set('archivo', new Blob([contenido]), nombre);
-    return pedir('/admin/importar', { method: 'POST', body: formulario });
-  }
-  return { pedir, enviar, subirExcel, csrfDe };
-}
+const navegador = () => crearNavegador(base);
 
 async function ingresarComoNuevaTienda(nombre) {
   const { clave } = await crearTienda(db, { nombre, email: `${nombre}@ejemplo.com` });
