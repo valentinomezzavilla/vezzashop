@@ -1,0 +1,42 @@
+<%- include('../parciales/cabecera', { titulo: 'Revisar importación' }) %>
+<h1>Revisá antes de confirmar</h1>
+<p class="nota">Archivo: <strong><%= nombreArchivo %></strong></p>
+
+<% if (errores.length > 0) { %>
+  <section class="tarjeta">
+    <h2 class="titulo-error">Encontramos <%= errores.length %> problema<%= errores.length === 1 ? '' : 's' %></h2>
+    <p>No se guardó nada. Corregí estas filas en el Excel y volvé a subirlo.</p>
+    <div class="tabla-contenedor">
+      <table class="tabla">
+        <thead><tr><th>Fila</th><th>Problema</th></tr></thead>
+        <tbody>
+        <% for (const e of errores) { %>
+          <tr><td>Fila <%= e.fila %></td><td><%= e.mensaje %></td></tr>
+        <% } %>
+        </tbody>
+      </table>
+    </div>
+    <p><a class="boton" href="/admin/importar">Subir el archivo corregido</a></p>
+  </section>
+<% } else if (vacio) { %>
+  <section class="tarjeta">
+    <p>El archivo no tiene productos. ¿Completaste la hoja "Productos" de la plantilla?</p>
+    <p><a class="boton" href="/admin/importar">Volver</a></p>
+  </section>
+<% } else { %>
+  <section class="resumen">
+    <div class="dato"><strong data-dato="productos-nuevos"><%= resumen.productosNuevos %></strong><span>productos nuevos</span></div>
+    <div class="dato"><strong data-dato="productos-actualizados"><%= resumen.productosActualizados %></strong><span>productos a actualizar</span></div>
+    <div class="dato"><strong data-dato="variantes-nuevas"><%= resumen.variantesNuevas %></strong><span>variantes nuevas</span></div>
+    <div class="dato"><strong data-dato="variantes-actualizadas"><%= resumen.variantesActualizadas %></strong><span>variantes a actualizar</span></div>
+  </section>
+  <p class="nota">Las celdas vacías no cambian lo que ya está cargado. Los productos que no están en el archivo quedan como están.</p>
+  <div class="acciones">
+    <form method="post" action="/admin/importar/confirmar">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="boton" type="submit">Confirmar importación</button>
+    </form>
+    <a class="boton boton-secundario" href="/admin/importar">Cancelar</a>
+  </div>
+<% } %>
+<%- include('../parciales/pie') %>

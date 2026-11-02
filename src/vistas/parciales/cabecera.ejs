@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= titulo %> · Panel</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<% if (usuario) { %>
+  <header class="barra">
+    <a class="marca" href="/admin/productos">Panel de tu tienda</a>
+    <nav class="menu">
+      <a href="/admin/productos">Productos</a>
+      <a href="/admin/importar">Carga masiva</a>
+    </nav>
+    <form method="post" action="/admin/salir">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="boton-enlace" type="submit">Salir</button>
+    </form>
+  </header>
+<% } %>
+<main class="contenido">
+<% if (aviso) { %>
+  <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%= aviso.texto %></p>
+<% } %>

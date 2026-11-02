@@ -1,0 +1,35 @@
+<%- include('../parciales/cabecera', { titulo: 'Productos' }) %>
+<div class="encabezado">
+  <h1>Productos</h1>
+  <a class="boton" href="/admin/importar">Carga masiva desde Excel</a>
+</div>
+
+<% if (productos.length === 0) { %>
+  <section class="tarjeta vacio">
+    <p>Todavía no cargaste productos.</p>
+    <p>Podés subir muchos de una vez con un Excel desde <a href="/admin/importar">Carga masiva</a>.</p>
+  </section>
+<% } else { %>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr><th>Producto</th><th>Precio</th><th class="numero">Variantes</th><th class="numero">Stock</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+      <% for (const p of productos) { %>
+        <tr>
+          <td><%= p.nombre %></td>
+          <td>
+            <%= formatearPrecio(p.precioMinimo) %><% if (p.precioMaximo !== p.precioMinimo) { %> – <%= formatearPrecio(p.precioMaximo) %><% } %>
+          </td>
+          <td class="numero"><%= p.variantes %></td>
+          <td class="numero<%= p.stock === 0 ? ' sin-stock' : '' %>"><%= p.stock %></td>
+          <td><span class="etiqueta<%= p.visible ? '' : ' etiqueta-oculta' %>"><%= p.visible ? 'Visible' : 'Oculto' %></span></td>
+        </tr>
+      <% } %>
+      </tbody>
+    </table>
+  </div>
+  <p class="nota"><%= productos.length %> producto<%= productos.length === 1 ? '' : 's' %></p>
+<% } %>
+<%- include('../parciales/pie') %>

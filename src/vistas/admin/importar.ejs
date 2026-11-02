@@ -1,0 +1,26 @@
+<%- include('../parciales/cabecera', { titulo: 'Carga masiva' }) %>
+<h1>Carga masiva desde Excel</h1>
+
+<ol class="pasos">
+  <li class="tarjeta">
+    <h2>1. Descargá la plantilla</h2>
+    <p>Tiene las columnas que necesitamos y una hoja con instrucciones.</p>
+    <a class="boton boton-secundario" href="/admin/importar/plantilla.xlsx">Descargar plantilla</a>
+  </li>
+  <li class="tarjeta">
+    <h2>2. Completala</h2>
+    <p>Una fila por producto, o por variante (talle, color). Las filas con el mismo nombre forman un solo producto.</p>
+    <p>Si volvés a subir la planilla, se actualizan los productos que ya existen y no se duplica nada.</p>
+  </li>
+  <li class="tarjeta">
+    <h2>3. Subila</h2>
+    <% if (error) { %><p class="aviso aviso-error" role="alert"><%= error %></p><% } %>
+    <form method="post" action="/admin/importar" enctype="multipart/form-data" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="file" name="archivo" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+      <button class="boton" type="submit">Revisar archivo</button>
+    </form>
+    <p class="nota">Antes de guardar nada te mostramos un resumen para que confirmes.</p>
+  </li>
+</ol>
+<%- include('../parciales/pie') %>
