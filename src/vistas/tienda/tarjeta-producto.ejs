@@ -2,7 +2,8 @@
 <% const off = porcentajeOff(p.precioLista, p.precioDesde) %>
 <li>
   <a class="tarjeta-producto<%= p.stock === 0 ? ' agotado' : '' %>" href="/producto/<%= p.slug %>">
-    <div class="foto<%= p.urlFoto ? ' con-foto' : '' %><%= p.urlFotoAlternativa ? ' con-alternativa' : '' %>">
+    <%# conTransicion: la foto "viaja" a la ficha al entrar. Solo en una grilla por página, porque el nombre tiene que ser único. %>
+    <div class="foto<%= p.urlFoto ? ' con-foto' : '' %><%= p.urlFotoAlternativa ? ' con-alternativa' : '' %>"<%- locals.conTransicion ? ` style="view-transition-name: foto-${p.slug}"` : '' %>>
       <% if (p.urlFoto) { %>
         <img src="<%= p.urlFoto %>" alt="<%= p.nombre %>" loading="lazy" decoding="async">
         <% if (p.urlFotoAlternativa) { %><img class="foto-alternativa" src="<%= p.urlFotoAlternativa %>" alt="" loading="lazy" decoding="async"><% } %>

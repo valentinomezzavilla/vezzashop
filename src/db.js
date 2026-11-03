@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { slugificar } from './util/slug.js';
 
 const DIR_MIGRACIONES = path.join(import.meta.dirname, 'migraciones');
 
@@ -10,6 +11,8 @@ export function abrirBase(ruta) {
   const db = new DatabaseSync(ruta);
   db.exec('PRAGMA foreign_keys = ON');
   if (!enMemoria) db.exec('PRAGMA journal_mode = WAL');
+  // slugificar(texto) en SQL: para comparar sin tildes ni eñes (lower() de SQLite solo entiende ASCII).
+  db.function('slugificar', { deterministic: true }, (texto) => slugificar(texto ?? ''));
   migrar(db);
   return db;
 }

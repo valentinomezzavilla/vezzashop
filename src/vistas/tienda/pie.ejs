@@ -43,5 +43,42 @@
     <%- icono('whatsapp', { tamano: 28 }) %>
   </a>
 <% } %>
+
+<%# Buscador: se abre desde la lupa de la cabecera. Sin JavaScript, la lupa lleva a /buscar. %>
+<dialog class="panel-buscador" data-buscador aria-label="Buscar productos">
+  <form class="buscador-formulario" method="get" action="/buscar" role="search">
+    <%- icono('lupa', { tamano: 22 }) %>
+    <label class="visualmente-oculto" for="buscador-q">Buscar productos</label>
+    <input id="buscador-q" type="search" name="q" placeholder="¿Qué estás buscando?" autocomplete="off" data-buscador-entrada
+           aria-controls="sugerencias" aria-autocomplete="list" enterkeyhint="search">
+    <button class="boton-icono" type="button" data-cerrar aria-label="Cerrar el buscador"><%- icono('cerrar', { tamano: 22 }) %></button>
+  </form>
+  <div class="sugerencias" id="sugerencias" data-sugerencias aria-live="polite"></div>
+</dialog>
+
+<% if (ajustes.whatsapp) { %>
+  <%# Carrito: vive en el navegador y el pedido se manda por WhatsApp. Los precios se piden frescos al abrirlo. %>
+  <dialog class="panel-carrito" data-carrito aria-labelledby="titulo-carrito"
+          data-whatsapp="<%= ajustes.whatsapp %>" data-descuento="<%= ajustes.descuentoTransferencia %>" data-tienda="<%= tienda.nombre %>">
+    <div class="carrito-cabecera">
+      <h2 id="titulo-carrito">Tu carrito</h2>
+      <button class="boton-icono" type="button" data-cerrar aria-label="Cerrar el carrito"><%- icono('cerrar', { tamano: 22 }) %></button>
+    </div>
+    <div class="carrito-cuerpo" data-carrito-items></div>
+    <div class="carrito-pie" data-carrito-pie hidden>
+      <dl class="carrito-totales">
+        <div><dt>Total</dt><dd data-carrito-total></dd></div>
+        <% if (ajustes.descuentoTransferencia) { %>
+          <div class="carrito-transferencia"><dt>Con transferencia (<%= ajustes.descuentoTransferencia %>% off)</dt><dd data-carrito-transferencia></dd></div>
+        <% } %>
+      </dl>
+      <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="#" target="_blank" rel="noopener" data-carrito-enviar>
+        <%- icono('whatsapp', { tamano: 20 }) %> Enviar pedido por WhatsApp
+      </a>
+      <p class="carrito-nota">Te respondemos por WhatsApp para confirmar el stock, el envío y la forma de pago.</p>
+    </div>
+  </dialog>
+<% } %>
+<p class="visualmente-oculto" role="status" aria-live="polite" data-anuncio></p>
 </body>
 </html>

@@ -82,6 +82,18 @@ es el del panel; si un cliente entra a `/admin` desde su subdominio, lo manda al
 
 - Catálogo, categorías (incluye los productos de las subcategorías) y ficha de producto con selector
   de variantes.
+- **Buscador** (lupa o tecla `/`) con sugerencias mientras se escribe y página `/buscar`. Busca en el
+  nombre, la marca y los SKU, sin importar tildes ni mayúsculas.
+- **Filtros** (con stock, en oferta, rango de precio) y **orden**, en la URL para poder compartirlos.
+  El catálogo se pagina de a 24 con "Ver más productos".
+- **Carrito con pedido por WhatsApp** (solo si la tienda cargó su WhatsApp): se agrega con cantidad,
+  vive en el navegador (`localStorage`) y al abrirlo se piden precios y stock actuales a
+  `/api/carrito`. El pedido se manda armado por WhatsApp con total y precio con transferencia.
+- Ficha: galería con visor a pantalla completa, compartir, "Avisame cuando haya stock",
+  "También te puede gustar" y barra fija para agregar en el celular.
+- Vista previa al compartir el link (Open Graph), datos de producto para Google (JSON-LD),
+  `canonical` e ícono de la pestaña con el logo (o la inicial en el color de la tienda).
+- Transiciones entre páginas con View Transitions; todo respeta "reducir movimiento".
 - Solo se muestran los productos visibles y con al menos una variante. Las categorías sin productos
   visibles no aparecen en el menú.
 - No pueden usarse como nombre de tienda: `www`, `admin`, `panel`, `api`, `app`, `mail`.
@@ -149,9 +161,10 @@ test/                    tests (node:test)
 
 Etapas siguientes, en orden sugerido:
 
-1. Carrito y checkout con Mercado Pago (y aplicar de verdad el descuento por transferencia).
+1. Checkout con Mercado Pago sobre el carrito que ya existe (hoy el pedido se manda por WhatsApp),
+   aplicando de verdad el descuento por transferencia.
 2. Envíos y retiro en local.
-3. Dominio propio por cliente y buscador en la vidriera.
+3. Dominio propio por cliente.
 4. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
 5. Achicar las fotos al subirlas (hoy se guardan tal cual) y foto por color en las variantes.
 6. Para producción: límite de intentos de login, recuperar clave, cerrar otras sesiones al cambiar la clave,

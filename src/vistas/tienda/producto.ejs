@@ -1,4 +1,5 @@
 <%- include('cabecera', { titulo }) %>
+<% const conCarrito = Boolean(ajustes.whatsapp) %>
 <nav class="migas" aria-label="Estás en">
   <a href="/">Inicio</a>
   <% if (categoriasProducto.length) { %>
@@ -7,14 +8,17 @@
   <%- icono('derecha', { tamano: 14 }) %><span aria-current="page"><%= producto.nombre %></span>
 </nav>
 
-<article class="ficha">
+<article class="ficha" data-ficha data-nombre="<%= producto.nombre %>">
   <div class="ficha-galeria" data-galeria>
     <% if (fotos.length) { %>
-      <div class="galeria-pista" data-galeria-pista tabindex="0" aria-label="Fotos de <%= producto.nombre %>">
+      <div class="galeria-pista" data-galeria-pista tabindex="0" aria-label="Fotos de <%= producto.nombre %>" style="view-transition-name: foto-<%= producto.slug %>">
         <% fotos.forEach((url, n) => { %>
-          <img class="galeria-foto" src="<%= url %>" alt="<%= producto.nombre %>, foto <%= n + 1 %> de <%= fotos.length %>"<%- n ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+          <button type="button" class="galeria-boton" data-ampliar="<%= n %>" aria-label="Ver la foto <%= n + 1 %> en grande">
+            <img class="galeria-foto" src="<%= url %>" alt="<%= producto.nombre %>, foto <%= n + 1 %> de <%= fotos.length %>"<%- n ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+          </button>
         <% }) %>
       </div>
+      <span class="galeria-ampliar" aria-hidden="true"><%- icono('ampliar', { tamano: 18 }) %></span>
       <% if (fotos.length > 1) { %>
         <div class="galeria-miniaturas">
           <% fotos.forEach((url, n) => { %>
@@ -25,13 +29,16 @@
         </div>
       <% } %>
     <% } else { %>
-      <div class="foto foto-grande" aria-hidden="true"><span><%= producto.nombre.charAt(0) %></span></div>
+      <div class="foto foto-grande" aria-hidden="true" style="view-transition-name: foto-<%= producto.slug %>"><span><%= producto.nombre.charAt(0) %></span></div>
     <% } %>
   </div>
 
   <div class="ficha-datos">
     <header class="ficha-encabezado">
-      <% if (producto.marca) { %><p class="marca-producto"><%= producto.marca %></p><% } %>
+      <div class="ficha-encabezado-fila">
+        <% if (producto.marca) { %><p class="marca-producto"><%= producto.marca %></p><% } else { %><span></span><% } %>
+        <button class="boton-icono boton-compartir" type="button" data-compartir aria-label="Compartir este producto" title="Compartir"><%- icono('compartir', { tamano: 20 }) %></button>
+      </div>
       <h1><%= producto.nombre %></h1>
     </header>
 
@@ -73,9 +80,23 @@
 
     <p class="stock <%= inicial.stock.clase %>" data-stock role="status"><%= inicial.stock.texto %></p>
 
-    <% if (inicial.whatsapp) { %>
-      <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= inicial.whatsapp %>" target="_blank" rel="noopener" data-whatsapp>
-        <%- icono('whatsapp', { tamano: 20 }) %> Consultar por WhatsApp
+    <% if (conCarrito) { %>
+      <div class="comprar" data-comprar<%= inicial.hayStock ? '' : ' hidden' %>>
+        <div class="cantidad-selector" data-cantidad-selector>
+          <button class="cantidad-boton" type="button" data-cantidad-cambio="-1" aria-label="Una unidad menos"><%- icono('menos', { tamano: 18 }) %></button>
+          <label class="visualmente-oculto" for="cantidad">Cantidad</label>
+          <input id="cantidad" type="number" value="1" min="1" max="<%= inicial.disponibles %>" inputmode="numeric" data-cantidad>
+          <button class="cantidad-boton" type="button" data-cantidad-cambio="1" aria-label="Una unidad más"><%- icono('mas', { tamano: 18 }) %></button>
+        </div>
+        <button class="boton boton-grande boton-agregar" type="button" data-agregar disabled>
+          <%- icono('bolsa', { tamano: 20 }) %> Agregar al carrito
+        </button>
+      </div>
+      <a class="boton boton-grande boton-bloque boton-contorno" href="<%= inicial.avisame %>" target="_blank" rel="noopener" data-avisame<%= inicial.hayStock ? ' hidden' : '' %>>
+        <%- icono('campana', { tamano: 20 }) %> Avisame cuando haya stock
+      </a>
+      <a class="enlace-consultar" href="<%= inicial.whatsapp %>" target="_blank" rel="noopener" data-whatsapp>
+        <%- icono('whatsapp', { tamano: 18 }) %> ¿Tenés dudas? Consultanos por WhatsApp
       </a>
     <% } %>
 
@@ -98,7 +119,39 @@
   </div>
 </article>
 
-<% if (producto.atributos.length) { %>
-  <script type="application/json" id="variantes"><%- variantesJson %></script>
+<% if (relacionados.length) { %>
+  <section class="relacionados" aria-labelledby="titulo-relacionados">
+    <h2 id="titulo-relacionados" class="titulo-seccion">También te puede gustar</h2>
+    <ul class="grilla">
+      <% for (const p of relacionados) { %><%- include('tarjeta-producto', { p }) %><% } %>
+    </ul>
+  </section>
 <% } %>
+
+<% if (conCarrito) { %>
+  <%# En el celular, cuando el botón principal queda fuera de la pantalla, aparece esta barra. %>
+  <div class="barra-compra" data-barra-compra aria-hidden="true">
+    <div class="barra-compra-precio">
+      <span class="barra-compra-nombre"><%= producto.nombre %></span>
+      <strong data-barra-precio><%= inicial.precio %></strong>
+    </div>
+    <button class="boton" type="button" data-barra-agregar tabindex="-1"><%- icono('bolsa', { tamano: 18 }) %> Agregar</button>
+  </div>
+<% } %>
+
+<% if (fotos.length) { %>
+  <dialog class="visor" data-visor aria-label="Fotos de <%= producto.nombre %>">
+    <button class="boton-icono visor-cerrar" type="button" data-cerrar aria-label="Cerrar"><%- icono('cerrar', { tamano: 24 }) %></button>
+    <% if (fotos.length > 1) { %>
+      <button class="boton-icono visor-anterior" type="button" data-visor-paso="-1" aria-label="Foto anterior"><%- icono('izquierda', { tamano: 26 }) %></button>
+      <button class="boton-icono visor-siguiente" type="button" data-visor-paso="1" aria-label="Foto siguiente"><%- icono('derecha', { tamano: 26 }) %></button>
+    <% } %>
+    <img class="visor-foto" src="<%= fotos[0] %>" alt="" data-visor-foto>
+    <p class="visor-contador" data-visor-contador aria-live="polite"></p>
+    <script type="application/json" data-visor-fotos><%- JSON.stringify(fotos).replace(/</g, '\\u003c') %></script>
+  </dialog>
+<% } %>
+
+<script type="application/json" id="variantes"><%- variantesJson %></script>
+<script type="application/ld+json"><%- datosEstructurados %></script>
 <%- include('pie', { sinWhatsappFlotante: Boolean(inicial.whatsapp) }) %>

@@ -2,9 +2,31 @@
 <html lang="es-AR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= titulo === tienda.nombre ? tienda.nombre : `${titulo} · ${tienda.nombre}` %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <% const tituloPagina = titulo === tienda.nombre ? tienda.nombre : `${titulo} · ${tienda.nombre}` %>
+  <title><%= tituloPagina %></title>
+  <meta name="description" content="<%= meta.descripcion %>">
+  <link rel="canonical" href="<%= urlActual %>">
   <meta name="theme-color" content="<%= ajustes.colorPrincipal %>">
+  <%# Vista previa al compartir el link (WhatsApp, Instagram, Facebook). Las imágenes tienen que ser absolutas. %>
+  <meta property="og:site_name" content="<%= tienda.nombre %>">
+  <meta property="og:title" content="<%= titulo %>">
+  <meta property="og:description" content="<%= meta.descripcion %>">
+  <meta property="og:type" content="<%= meta.tipo %>">
+  <meta property="og:url" content="<%= urlActual %>">
+  <meta property="og:locale" content="es_AR">
+  <% if (meta.imagen) { %><meta property="og:image" content="<%= origen %><%= meta.imagen %>"><% } %>
+  <% if (meta.precio) { %>
+    <meta property="product:price:amount" content="<%= meta.precio %>">
+    <meta property="product:price:currency" content="ARS">
+  <% } %>
+  <meta name="twitter:card" content="<%= meta.imagen ? 'summary_large_image' : 'summary' %>">
+  <% if (urlLogo) { %>
+    <link rel="icon" href="<%= urlLogo %>">
+  <% } else { %>
+    <%# Sin logo: un ícono con la inicial de la tienda en su color. %>
+    <link rel="icon" href="data:image/svg+xml,<%= encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='${ajustes.colorPrincipal}'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-weight='700' font-size='36' fill='${colorTexto}'>${tienda.nombre.charAt(0).toUpperCase().replace(/[<>&'"]/g, '')}</text></svg>`) %>">
+  <% } %>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Rubik:wght@500;600;700&display=swap">
@@ -39,20 +61,31 @@
           <% } %>
         </ul>
       </nav>
-
-      <details class="menu-movil" data-menu-movil>
-        <summary class="boton-icono" aria-label="Abrir el menú"><%- icono('menu', { tamano: 22 }) %></summary>
-        <nav class="menu-movil-panel" aria-label="Categorías">
-          <a class="menu-movil-inicio" href="/">Todos los productos</a>
-          <% for (const categoria of categorias) { %>
-            <a class="menu-movil-categoria" href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a>
-            <% for (const hija of categoria.hijas) { %>
-              <a class="menu-movil-subcategoria" href="<%= urlCategoria(hija) %>"><%= hija.nombre %></a>
-            <% } %>
-          <% } %>
-        </nav>
-      </details>
     <% } %>
+
+    <div class="cabecera-acciones">
+      <a class="boton-icono" href="/buscar" data-abrir-buscador aria-label="Buscar productos"><%- icono('lupa', { tamano: 22 }) %></a>
+      <% if (ajustes.whatsapp) { %>
+        <button class="boton-icono boton-carrito" type="button" data-abrir-carrito hidden aria-label="Carrito">
+          <%- icono('bolsa', { tamano: 22 }) %>
+          <span class="contador-carrito" data-contador-carrito hidden>0</span>
+        </button>
+      <% } %>
+      <% if (categorias.length) { %>
+        <details class="menu-movil" data-menu-movil>
+          <summary class="boton-icono" aria-label="Abrir el menú"><%- icono('menu', { tamano: 22 }) %></summary>
+          <nav class="menu-movil-panel" aria-label="Categorías">
+            <a class="menu-movil-inicio" href="/">Todos los productos</a>
+            <% for (const categoria of categorias) { %>
+              <a class="menu-movil-categoria" href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a>
+              <% for (const hija of categoria.hijas) { %>
+                <a class="menu-movil-subcategoria" href="<%= urlCategoria(hija) %>"><%= hija.nombre %></a>
+              <% } %>
+            <% } %>
+          </nav>
+        </details>
+      <% } %>
+    </div>
   </div>
 </header>
 <main class="contenido" id="contenido">
