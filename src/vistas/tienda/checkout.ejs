@@ -1,0 +1,196 @@
+<%- include('cabecera', { titulo }) %>
+<%
+  const accesibilidad = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  const error = (campo) => (errores[campo] ? `<p class="error-campo" id="error-${campo}">${icono('alerta', { tamano: 16 })}<span>${errores[campo].replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])}</span></p>` : '');
+  const v = (campo) => valores[campo] ?? '';
+  const sinDireccion = entregaElegida ? entregaElegida.tipo !== 'domicilio' : !entregas.some((e) => e.tipo === 'domicilio');
+  const hayErrores = Object.keys(errores).length > 0;
+%>
+<nav class="migas" aria-label="Estás en">
+  <a href="/">Inicio</a><%- icono('derecha', { tamano: 14 }) %><span aria-current="page">Finalizar compra</span>
+</nav>
+
+<% if (lineas.length === 0) { %>
+  <section class="estado-vacio">
+    <div class="estado-vacio-icono" aria-hidden="true"><%- icono('bolsa', { tamano: 28 }) %></div>
+    <h1>Tu carrito está vacío</h1>
+    <% for (const cambio of cambios.filter((c) => c !== 'Tu carrito está vacío.')) { %><p><%= cambio %></p><% } %>
+    <p>Agregá productos para hacer tu pedido.</p>
+    <a class="boton" href="/">Ver productos</a>
+  </section>
+  <script type="application/json" id="datos-checkout"><%- datosCheckout %></script>
+<% } else { %>
+<h1 class="checkout-titulo">Finalizar compra</h1>
+
+<% if (cambios.length) { %>
+  <div class="checkout-aviso" role="alert">
+    <%- icono('alerta', { tamano: 20 }) %>
+    <div>
+      <strong>Actualizamos tu carrito con el stock disponible</strong>
+      <ul><% for (const cambio of cambios) { %><li><%= cambio %></li><% } %></ul>
+    </div>
+  </div>
+<% } else if (hayErrores) { %>
+  <p class="checkout-aviso" role="alert"><%- icono('alerta', { tamano: 20 }) %><span>Revisá los campos marcados para terminar tu pedido.</span></p>
+<% } %>
+
+<form class="checkout" method="post" action="/checkout" data-checkout-formulario novalidate>
+  <% for (const l of lineas) { %>
+    <input type="hidden" name="sku" value="<%= l.sku %>"><input type="hidden" name="cantidad" value="<%= l.cantidad %>">
+  <% } %>
+  <%# Trampa para robots: las personas no lo ven ni lo completan. %>
+  <div class="trampa" aria-hidden="true"><label>No completar <input type="text" name="sitio" tabindex="-1" autocomplete="off"></label></div>
+
+  <div class="checkout-pasos">
+    <section class="checkout-paso" aria-labelledby="paso-datos">
+      <h2 id="paso-datos"><span class="paso-numero" aria-hidden="true">1</span> Tus datos</h2>
+      <div class="campos">
+        <div class="campo campo-ancho">
+          <label for="nombre">Nombre y apellido</label>
+          <input id="nombre" name="nombre" type="text" value="<%= v('nombre') %>" autocomplete="name" maxlength="100" required<%- accesibilidad('nombre') %>>
+          <%- error('nombre') %>
+        </div>
+        <div class="campo">
+          <label for="telefono">Teléfono / WhatsApp</label>
+          <input id="telefono" name="telefono" type="tel" value="<%= v('telefono') %>" autocomplete="tel" inputmode="tel" maxlength="30"
+                 placeholder="351 123 4567" required<%- accesibilidad('telefono') %>>
+          <%- error('telefono') %>
+        </div>
+        <div class="campo">
+          <label for="email">Email <span class="opcional">(opcional)</span></label>
+          <input id="email" name="email" type="email" value="<%= v('email') %>" autocomplete="email" maxlength="120"<%- accesibilidad('email') %>>
+          <%- error('email') %>
+        </div>
+      </div>
+    </section>
+
+    <section class="checkout-paso" aria-labelledby="paso-entrega">
+      <h2 id="paso-entrega"><span class="paso-numero" aria-hidden="true">2</span> Entrega</h2>
+      <fieldset class="opciones-checkout"<%- errores.entrega ? ' aria-describedby="error-entrega"' : '' %>>
+        <legend class="visualmente-oculto">¿Cómo querés recibir tu pedido?</legend>
+        <% for (const e of entregas) { %>
+          <label class="opcion-checkout">
+            <input type="radio" name="entrega" value="<%= e.id %>" data-entrega<%= v('entrega') === String(e.id) ? ' checked' : '' %> required>
+            <span class="opcion-checkout-icono" aria-hidden="true"><%- icono(e.tipo === 'retiro' ? 'tienda' : 'camion', { tamano: 22 }) %></span>
+            <span class="opcion-checkout-textos">
+              <strong><%= e.nombre %></strong>
+              <% if (e.descripcion) { %><span><%= e.descripcion %></span><% } %>
+              <% if (e.textoGratis) { %><span class="opcion-checkout-nota"><%= e.textoGratis %></span><% } %>
+            </span>
+            <span class="opcion-checkout-precio<%= e.textoCosto === 'Gratis' ? ' gratis' : '' %>" data-entrega-costo="<%= e.id %>"><%= e.textoCosto %></span>
+          </label>
+        <% } %>
+      </fieldset>
+      <%- error('entrega') %>
+
+      <fieldset class="direccion" data-direccion<%= sinDireccion ? ' hidden disabled' : '' %>>
+        <legend>¿A dónde te lo mandamos?</legend>
+        <div class="campos">
+          <div class="campo campo-ancho">
+            <label for="calle">Calle y número</label>
+            <input id="calle" name="calle" type="text" value="<%= v('calle') %>" autocomplete="address-line1" maxlength="150" required<%- accesibilidad('calle') %>>
+            <%- error('calle') %>
+          </div>
+          <div class="campo">
+            <label for="piso">Piso / depto <span class="opcional">(opcional)</span></label>
+            <input id="piso" name="piso" type="text" value="<%= v('piso') %>" autocomplete="address-line2" maxlength="50">
+          </div>
+          <div class="campo">
+            <label for="cp">Código postal <span class="opcional">(opcional)</span></label>
+            <input id="cp" name="cp" type="text" value="<%= v('cp') %>" autocomplete="postal-code" inputmode="numeric" maxlength="10"<%- accesibilidad('cp') %>>
+            <%- error('cp') %>
+          </div>
+          <div class="campo">
+            <label for="ciudad">Ciudad o localidad</label>
+            <input id="ciudad" name="ciudad" type="text" value="<%= v('ciudad') %>" autocomplete="address-level2" maxlength="80" required<%- accesibilidad('ciudad') %>>
+            <%- error('ciudad') %>
+          </div>
+          <div class="campo">
+            <label for="provincia">Provincia</label>
+            <select id="provincia" name="provincia" autocomplete="address-level1" required<%- accesibilidad('provincia') %>>
+              <option value="">Elegí</option>
+              <% for (const provincia of provincias) { %><option<%= v('provincia') === provincia ? ' selected' : '' %>><%= provincia %></option><% } %>
+            </select>
+            <%- error('provincia') %>
+          </div>
+          <div class="campo campo-ancho">
+            <label for="referencias">Entre calles o referencias <span class="opcional">(opcional)</span></label>
+            <input id="referencias" name="referencias" type="text" value="<%= v('referencias') %>" maxlength="200" placeholder="Portón negro, timbre 2">
+          </div>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="checkout-paso" aria-labelledby="paso-pago">
+      <h2 id="paso-pago"><span class="paso-numero" aria-hidden="true">3</span> Pago</h2>
+      <fieldset class="opciones-checkout"<%- errores.pago ? ' aria-describedby="error-pago"' : '' %>>
+        <legend class="visualmente-oculto">¿Cómo querés pagar?</legend>
+        <% for (const p of pagos) { %>
+          <% const sinEfectivo = p.clave === 'efectivo' && entregaElegida && !entregaElegida.aceptaEfectivo %>
+          <label class="opcion-checkout<%= sinEfectivo ? ' no-disponible' : '' %>" data-opcion-pago="<%= p.clave %>">
+            <input type="radio" name="pago" value="<%= p.clave %>" data-pago<%= v('pago') === p.clave ? ' checked' : '' %> required>
+            <span class="opcion-checkout-icono" aria-hidden="true"><%- icono(p.clave === 'transferencia' ? 'banco' : p.clave === 'efectivo' ? 'billete' : 'tarjeta', { tamano: 22 }) %></span>
+            <span class="opcion-checkout-textos">
+              <strong><%= p.titulo %><% if (p.descuento) { %> <span class="beneficio-off"><%= p.descuento %>% off</span><% } %></strong>
+              <span><%= p.detalle %></span>
+              <% if (p.clave === 'efectivo') { %>
+                <span class="opcion-checkout-nota" data-sin-efectivo<%= sinEfectivo ? '' : ' hidden' %>>No disponible con la entrega que elegiste.</span>
+              <% } %>
+            </span>
+          </label>
+        <% } %>
+      </fieldset>
+      <%- error('pago') %>
+    </section>
+
+    <section class="checkout-paso" aria-labelledby="paso-notas">
+      <h2 id="paso-notas" class="checkout-paso-chico">¿Algo más que tengamos que saber? <span class="opcional">(opcional)</span></h2>
+      <div class="campo">
+        <label class="visualmente-oculto" for="notas">Notas del pedido</label>
+        <textarea id="notas" name="notas" rows="3" maxlength="500" placeholder="Horario en el que estás, si es para regalo, etc."><%= v('notas') %></textarea>
+      </div>
+    </section>
+  </div>
+
+  <aside class="checkout-resumen" aria-labelledby="titulo-resumen">
+    <div class="checkout-resumen-interior">
+      <h2 id="titulo-resumen">Tu pedido</h2>
+      <ul class="resumen-lineas">
+        <% for (const l of lineas) { %>
+          <li class="resumen-linea">
+            <span class="resumen-foto" aria-hidden="true">
+              <% if (l.urlFoto) { %><img src="<%= l.urlFoto %>" alt="" loading="lazy"><% } else { %><span><%= l.nombre.charAt(0) %></span><% } %>
+              <span class="resumen-cantidad"><%= l.cantidad %></span>
+            </span>
+            <span class="resumen-textos">
+              <a href="/producto/<%= l.slug %>"><%= l.nombre %></a>
+              <span><%= l.cantidad %> × <%= formatearPrecio(l.precio) %><%= l.detalle ? ` · ${l.detalle}` : '' %></span>
+            </span>
+            <strong class="resumen-importe"><%= formatearPrecio(l.precio * l.cantidad) %></strong>
+          </li>
+        <% } %>
+      </ul>
+      <a class="enlace resumen-editar" href="/" data-editar-carrito>Modificar el carrito</a>
+      <dl class="resumen-totales">
+        <div><dt>Productos</dt><dd data-total="subtotal"><%= formatearPrecio(totales.subtotal) %></dd></div>
+        <div class="resumen-descuento" data-fila-descuento<%= totales.descuento ? '' : ' hidden' %>>
+          <dt>Descuento <span data-total="porcentaje"><%= totales.descuentoPorcentaje %></span>%</dt>
+          <dd data-total="descuento">−<%= formatearPrecio(totales.descuento) %></dd>
+        </div>
+        <div>
+          <dt>Envío</dt>
+          <dd data-total="envio"><%= !entregaElegida ? 'Elegí la entrega' : totales.envio === null ? 'A coordinar' : totales.envio === 0 ? 'Gratis' : formatearPrecio(totales.envio) %></dd>
+        </div>
+        <div class="resumen-total">
+          <dt>Total</dt>
+          <dd><span data-total="total"><%= formatearPrecio(totales.total) %></span><span class="resumen-mas-envio" data-mas-envio<%= entregaElegida && totales.envio === null ? '' : ' hidden' %>> + envío</span></dd>
+        </div>
+      </dl>
+      <button class="boton boton-grande boton-bloque" type="submit" data-confirmar><%- icono('candado', { tamano: 18 }) %> Confirmar pedido</button>
+      <p class="resumen-nota">Al confirmar, reservamos los productos y te mostramos cómo pagar.</p>
+    </div>
+  </aside>
+</form>
+<script type="application/json" id="datos-checkout"><%- datosCheckout %></script>
+<% } %>
+<%- include('pie') %>

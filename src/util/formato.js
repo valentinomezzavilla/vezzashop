@@ -8,3 +8,11 @@ export function formatearPrecio(centavos) {
 export function plural(cantidad, singular, pluralTexto) {
   return `${cantidad} ${cantidad === 1 ? singular : pluralTexto}`;
 }
+
+const FECHA = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Cordoba', dateStyle: 'short', timeStyle: 'short' });
+
+// La fecha que guarda SQLite (UTC, "2026-11-04 15:30:00") en hora argentina: "4/11/26, 12:30".
+export function formatearFecha(fechaSqlite) {
+  if (!fechaSqlite) return '';
+  return FECHA.format(new Date(`${fechaSqlite.replace(' ', 'T')}Z`));
+}

@@ -16,10 +16,12 @@
   <%# [sección, texto, ícono, texto corto para el menú del celular] %>
   <% const secciones = [
        ['inicio', 'Inicio', 'inicio'],
+       ['pedidos', 'Pedidos', 'recibo'],
        ['productos', 'Productos', 'paquete'],
        ['categorias', 'Categorías', 'carpeta'],
        ['importar', 'Carga masiva', 'planilla', 'Excel'],
        ['diseno', 'Diseño', 'paleta'],
+       ['pagos', 'Envíos y pagos', 'camion', 'Envíos'],
        ['cuenta', 'Cuenta', 'usuario'],
      ] %>
   <div class="app">
@@ -37,6 +39,7 @@
             <%- icono(nombreIcono) %>
             <% if (corto) { %><span class="texto-largo"><%= texto %></span><span class="texto-corto"><%= corto %></span>
             <% } else { %><span><%= texto %></span><% } %>
+            <% if (seccion === 'pedidos' && pedidosNuevos) { %><span class="menu-contador" aria-label="<%= pedidosNuevos %> nuevo<%= pedidosNuevos === 1 ? '' : 's' %>"><%= pedidosNuevos > 99 ? '99+' : pedidosNuevos %></span><% } %>
           </a>
         <% } %>
       </nav>

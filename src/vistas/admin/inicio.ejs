@@ -1,5 +1,5 @@
 <%- include('../parciales/cabecera', { titulo: 'Inicio' }) %>
-<% const { numeros, pasos, hechos, sinStock, pocasUnidades } = resumen %>
+<% const { numeros, pasos, hechos, sinStock, pocasUnidades, pedidos } = resumen %>
 <% const completa = hechos === pasos.length %>
 <header class="encabezado">
   <div>
@@ -20,6 +20,13 @@
     </div>
     <button class="boton boton-secundario boton-chico" type="button" data-copiar="<%= urlMiTienda %>"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar link</span></button>
   </section>
+<% } %>
+
+<% if (pedidos.nuevo) { %>
+  <a class="aviso aviso-info aviso-pedidos" href="/admin/pedidos?filtro=nuevo">
+    <%- icono('recibo', { tamano: 18 }) %>
+    <span><strong>Tenés <%= pedidos.nuevo === 1 ? 'un pedido nuevo' : `${pedidos.nuevo} pedidos nuevos` %>.</strong> Revisalo<%= pedidos.nuevo === 1 ? '' : 's' %> para confirmar el pago y preparar el envío.</span>
+  </a>
 <% } %>
 
 <section class="numeros" aria-label="Tu tienda en números">

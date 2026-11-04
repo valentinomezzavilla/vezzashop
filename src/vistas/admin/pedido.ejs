@@ -1,0 +1,134 @@
+<%- include('../parciales/cabecera', { titulo: `Pedido #${pedido.numero}` }) %>
+<% const cerrado = pedido.estado === 'cancelado' %>
+<a class="volver" href="/admin/pedidos"><%- icono('izquierda', { tamano: 16 }) %> Pedidos</a>
+<header class="encabezado">
+  <div>
+    <h1>Pedido #<%= pedido.numero %> <span class="pastilla pastilla-<%= pedido.estado %>"><%= tituloEstado %></span></h1>
+    <p class="texto-suave"><%= fecha %> · <%= pedido.cliente.nombre %></p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton-secundario" href="<%= urlCliente %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Lo que ve el cliente</a>
+  </div>
+</header>
+
+<div class="editor editor-pedido">
+  <div class="editor-principal">
+    <% if (siguiente) { %>
+      <section class="tarjeta seccion-editor siguiente-paso">
+        <div>
+          <h2>¿Qué sigue?</h2>
+          <p class="ayuda">
+            <% if (pedido.estado === 'nuevo' && pedido.pago === 'transferencia') { %>Cuando te llegue la transferencia de <strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' más el envío' : '' %>, marcalo como pagado.
+            <% } else if (pedido.estado === 'nuevo' && pedido.pago === 'mercadopago') { %>Mandale al cliente el link de pago de Mercado Pago por <strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' más el envío' : '' %>. Cuando pague, marcalo como pagado.
+            <% } else if (pedido.estado === 'nuevo') { %>Paga en efectivo al <%= pedido.entrega.tipo === 'retiro' ? 'retirar' : 'recibir' %>. Prepará el pedido y avisale.
+            <% } else if (pedido.estado === 'pagado') { %>Ya está pago. Preparalo y <%= pedido.entrega.tipo === 'retiro' ? 'avisale que lo puede pasar a buscar' : 'mandalo' %>.
+            <% } else { %>Cuando el cliente lo tenga, marcalo como <%= pedido.entrega.tipo === 'retiro' ? 'retirado' : 'entregado' %>.<% } %>
+          </p>
+        </div>
+        <div class="acciones">
+          <form method="post" action="/admin/pedidos/<%= pedido.id %>/estado">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <input type="hidden" name="estado" value="<%= siguiente.estado %>">
+            <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> <%= siguiente.texto %></button>
+          </form>
+          <a class="boton boton-secundario boton-whatsapp" href="<%= whatsappCliente %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 18 }) %> Escribirle</a>
+        </div>
+      </section>
+    <% } %>
+
+    <section class="tarjeta seccion-editor">
+      <h2>Productos</h2>
+      <div class="tabla-contenedor tabla-sin-borde">
+        <table class="tabla tabla-items">
+          <thead>
+            <tr><th scope="col">Producto</th><th scope="col" class="numero">Cantidad</th><th scope="col" class="numero">Precio</th><th scope="col" class="numero">Subtotal</th></tr>
+          </thead>
+          <tbody>
+            <% for (const item of pedido.items) { %>
+              <tr>
+                <td><span class="celda-fila"><%= item.nombre %></span><span class="ayuda celda-nota"><%= item.detalle ? `${item.detalle} · ` : '' %>SKU <%= item.sku %></span></td>
+                <td class="numero"><%= item.cantidad %></td>
+                <td class="numero precio-celda"><%= formatearPrecio(item.precio) %></td>
+                <td class="numero precio-celda"><%= formatearPrecio(item.precio * item.cantidad) %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <dl class="totales-pedido">
+        <div><dt>Productos</dt><dd><%= formatearPrecio(pedido.subtotal) %></dd></div>
+        <% if (pedido.descuento) { %><div class="totales-descuento"><dt>Descuento <%= pedido.descuentoPorcentaje %>% (<%= pedido.tituloPago.toLowerCase() %>)</dt><dd>−<%= formatearPrecio(pedido.descuento) %></dd></div><% } %>
+        <div><dt>Envío</dt><dd><%= pedido.envio === null ? 'A coordinar' : pedido.envio === 0 ? 'Gratis' : formatearPrecio(pedido.envio) %></dd></div>
+        <div class="totales-final"><dt>Total</dt><dd><%= formatearPrecio(pedido.total) %><%= pedido.envio === null ? ' + envío' : '' %></dd></div>
+      </dl>
+    </section>
+
+    <% if (pedido.notas) { %>
+      <section class="tarjeta seccion-editor">
+        <h2>Nota del cliente</h2>
+        <p class="nota-cliente"><%= pedido.notas %></p>
+      </section>
+    <% } %>
+  </div>
+
+  <aside class="editor-lateral">
+    <section class="tarjeta seccion-editor">
+      <h2>Cliente</h2>
+      <dl class="datos-pedido">
+        <div><dt>Nombre</dt><dd><%= pedido.cliente.nombre %></dd></div>
+        <div><dt>Teléfono</dt><dd><a href="<%= whatsappCliente %>" target="_blank" rel="noopener"><%= pedido.cliente.telefono %></a></dd></div>
+        <% if (pedido.cliente.email) { %><div><dt>Email</dt><dd><a href="mailto:<%= pedido.cliente.email %>"><%= pedido.cliente.email %></a></dd></div><% } %>
+      </dl>
+    </section>
+
+    <section class="tarjeta seccion-editor">
+      <h2>Entrega</h2>
+      <dl class="datos-pedido">
+        <div><dt>Forma</dt><dd><%= pedido.entrega.nombre %></dd></div>
+        <% if (pedido.entrega.tipo === 'domicilio') { %>
+          <div><dt>Dirección</dt><dd><%= direccion %></dd></div>
+          <% if (pedido.direccion.referencias) { %><div><dt>Referencias</dt><dd><%= pedido.direccion.referencias %></dd></div><% } %>
+        <% } %>
+      </dl>
+    </section>
+
+    <section class="tarjeta seccion-editor">
+      <h2>Pago</h2>
+      <dl class="datos-pedido">
+        <div><dt>Forma</dt><dd><%= pedido.tituloPago %></dd></div>
+        <div><dt>Total</dt><dd><strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' + envío' : '' %></dd></div>
+      </dl>
+    </section>
+
+    <% if (!cerrado) { %>
+      <section class="tarjeta seccion-editor">
+        <h2>Cambiar estado</h2>
+        <form method="post" action="/admin/pedidos/<%= pedido.id %>/estado" class="cambiar-estado">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <label class="visualmente-oculto" for="estado">Estado del pedido</label>
+          <select id="estado" name="estado">
+            <% for (const opcion of estados) { %><option value="<%= opcion.estado %>"<%= opcion.estado === pedido.estado ? ' selected' : '' %>><%= opcion.titulo %></option><% } %>
+          </select>
+          <button class="boton boton-secundario boton-chico" type="submit">Guardar</button>
+        </form>
+        <p class="ayuda">Por si te equivocaste de botón.</p>
+      </section>
+
+      <% if (pedido.estado !== 'entregado') { %>
+        <section class="tarjeta seccion-editor zona-peligro">
+          <h2>Cancelar pedido</h2>
+          <p class="ayuda">Los productos vuelven al stock. No se puede deshacer.</p>
+          <details class="confirmar">
+            <summary class="boton boton-peligro-suave boton-chico"><%- icono('cerrar', { tamano: 16 }) %> Cancelar pedido</summary>
+            <form method="post" action="/admin/pedidos/<%= pedido.id %>/cancelar" class="confirmar-cuerpo">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <p>¿Seguro que querés cancelar el pedido #<%= pedido.numero %>?</p>
+              <button class="boton boton-peligro boton-chico" type="submit">Sí, cancelar</button>
+            </form>
+          </details>
+        </section>
+      <% } %>
+    <% } %>
+  </aside>
+</div>
+<%- include('../parciales/pie') %>

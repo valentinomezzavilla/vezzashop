@@ -1,5 +1,5 @@
 <%- include('cabecera', { titulo }) %>
-<% const conCarrito = Boolean(ajustes.whatsapp) %>
+<% const conCarrito = checkoutActivo || Boolean(ajustes.whatsapp) %>
 <nav class="migas" aria-label="Estás en">
   <a href="/">Inicio</a>
   <% if (categoriasProducto.length) { %>
@@ -92,12 +92,14 @@
           <%- icono('bolsa', { tamano: 20 }) %> Agregar al carrito
         </button>
       </div>
-      <a class="boton boton-grande boton-bloque boton-contorno" href="<%= inicial.avisame %>" target="_blank" rel="noopener" data-avisame<%= inicial.hayStock ? ' hidden' : '' %>>
-        <%- icono('campana', { tamano: 20 }) %> Avisame cuando haya stock
-      </a>
-      <a class="enlace-consultar" href="<%= inicial.whatsapp %>" target="_blank" rel="noopener" data-whatsapp>
-        <%- icono('whatsapp', { tamano: 18 }) %> ¿Tenés dudas? Consultanos por WhatsApp
-      </a>
+      <% if (ajustes.whatsapp) { %>
+        <a class="boton boton-grande boton-bloque boton-contorno" href="<%= inicial.avisame %>" target="_blank" rel="noopener" data-avisame<%= inicial.hayStock ? ' hidden' : '' %>>
+          <%- icono('campana', { tamano: 20 }) %> Avisame cuando haya stock
+        </a>
+        <a class="enlace-consultar" href="<%= inicial.whatsapp %>" target="_blank" rel="noopener" data-whatsapp>
+          <%- icono('whatsapp', { tamano: 18 }) %> ¿Tenés dudas? Consultanos por WhatsApp
+        </a>
+      <% } %>
     <% } %>
 
     <p class="sku">SKU <span data-sku><%= inicial.sku %></span></p>

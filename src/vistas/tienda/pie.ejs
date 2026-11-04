@@ -56,10 +56,13 @@
   <div class="sugerencias" id="sugerencias" data-sugerencias aria-live="polite"></div>
 </dialog>
 
-<% if (ajustes.whatsapp) { %>
-  <%# Carrito: vive en el navegador y el pedido se manda por WhatsApp. Los precios se piden frescos al abrirlo. %>
+<% if (checkoutActivo || ajustes.whatsapp) { %>
+  <%# Carrito: vive en el navegador y los precios se piden frescos al abrirlo. Con checkout, sigue en /checkout
+      (ahí se eligen la entrega y el pago); si la tienda todavía no lo configuró, el pedido se manda por WhatsApp. %>
+  <% const descuentos = [ajustes.pagoTransferencia && ajustes.descuentoTransferencia && `${ajustes.descuentoTransferencia}% off con transferencia`,
+                         ajustes.pagoEfectivo && ajustes.descuentoEfectivo && `${ajustes.descuentoEfectivo}% off en efectivo`].filter(Boolean) %>
   <dialog class="panel-carrito" data-carrito aria-labelledby="titulo-carrito"
-          data-whatsapp="<%= ajustes.whatsapp %>" data-descuento="<%= ajustes.descuentoTransferencia %>" data-tienda="<%= tienda.nombre %>">
+          data-whatsapp="<%= ajustes.whatsapp %>" data-tienda="<%= tienda.nombre %>"<%- checkoutActivo ? ' data-checkout' : '' %>>
     <div class="carrito-cabecera">
       <h2 id="titulo-carrito">Tu carrito</h2>
       <button class="boton-icono" type="button" data-cerrar aria-label="Cerrar el carrito"><%- icono('cerrar', { tamano: 22 }) %></button>
@@ -67,15 +70,20 @@
     <div class="carrito-cuerpo" data-carrito-items></div>
     <div class="carrito-pie" data-carrito-pie hidden>
       <dl class="carrito-totales">
-        <div><dt>Total</dt><dd data-carrito-total></dd></div>
-        <% if (ajustes.descuentoTransferencia) { %>
-          <div class="carrito-transferencia"><dt>Con transferencia (<%= ajustes.descuentoTransferencia %>% off)</dt><dd data-carrito-transferencia></dd></div>
-        <% } %>
+        <div><dt>Subtotal</dt><dd data-carrito-total></dd></div>
       </dl>
-      <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="#" target="_blank" rel="noopener" data-carrito-enviar>
-        <%- icono('whatsapp', { tamano: 20 }) %> Enviar pedido por WhatsApp
-      </a>
-      <p class="carrito-nota">Te respondemos por WhatsApp para confirmar el stock, el envío y la forma de pago.</p>
+      <% if (checkoutActivo) { %>
+        <% if (descuentos.length) { %>
+          <p class="carrito-beneficio"><%- icono('etiqueta', { tamano: 16 }) %><span><%= descuentos.join(' · ') %>. Lo elegís en el próximo paso.</span></p>
+        <% } %>
+        <a class="boton boton-grande boton-bloque" href="/checkout" data-carrito-checkout>Iniciar compra <%- icono('derecha', { tamano: 20 }) %></a>
+        <p class="carrito-nota">En el próximo paso elegís cómo recibirlo y cómo pagar.</p>
+      <% } else { %>
+        <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="#" target="_blank" rel="noopener" data-carrito-enviar>
+          <%- icono('whatsapp', { tamano: 20 }) %> Enviar pedido por WhatsApp
+        </a>
+        <p class="carrito-nota">Te respondemos por WhatsApp para confirmar el stock, el envío y la forma de pago.</p>
+      <% } %>
     </div>
   </dialog>
 <% } %>

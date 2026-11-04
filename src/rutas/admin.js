@@ -6,6 +6,8 @@ import path from 'node:path';
 import { autenticar, buscarTienda } from '../tiendas.js';
 import { urlTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
+import { rutasAdminPedidos } from './admin-pedidos.js';
+import { contarPedidosNuevos } from '../pedidos.js';
 import { tokenCsrf, verificarCsrf } from '../csrf.js';
 import { plural } from '../util/formato.js';
 import { interpretarHoja } from '../importacion/interpretar.js';
@@ -14,7 +16,7 @@ import { leerExcel, ErrorDeLectura } from '../importacion/leer-excel.js';
 import { generarPlantilla } from '../importacion/plantilla.js';
 import {
   leerAjustes,
-  guardarAjustes,
+  actualizarAjustes,
   validarAjustes,
   validarEnlace,
   listarBanners,
@@ -92,6 +94,8 @@ export function rutasAdmin({ db, config }) {
     const tienda = req.session.usuario ? buscarTienda(db, req.session.usuario.tiendaId) : null;
     res.locals.urlMiTienda = tienda ? urlTienda(req, config.dominio, tienda.slug) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
+    // Para el número al lado de "Pedidos" en el menú.
+    res.locals.pedidosNuevos = tienda ? contarPedidosNuevos(db, tienda.id) : 0;
     // Para marcar en el menú la sección en la que se está: "/productos" -> "productos", "/importar/x" -> "importar".
     res.locals.seccionActual = req.path.split('/')[1] || null;
     res.locals.aviso = req.session.aviso ?? null;
@@ -129,6 +133,7 @@ export function rutasAdmin({ db, config }) {
 
   router.get('/', (req, res) => res.redirect('/admin/inicio'));
   router.use(rutasAdminTienda({ db, config }));
+  router.use(rutasAdminPedidos({ db, config }));
 
   router.get('/importar', (req, res) => res.render('admin/importar', { error: null }));
 
@@ -233,7 +238,7 @@ export function rutasAdmin({ db, config }) {
         return mostrarDiseno(req, res, { valores: req.body, errores: { logo: error.message }, status: 400 });
       }
     }
-    guardarAjustes(db, tiendaId, { ...ajustes, logo });
+    actualizarAjustes(db, tiendaId, { ...ajustes, logo });
     if (logo !== logoAnterior) await borrarImagen(config.dirSubidas, tiendaId, logoAnterior);
 
     req.session.aviso = { tipo: 'ok', texto: 'Listo, guardamos los cambios. Ya se ven en tu tienda.' };

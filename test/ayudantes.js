@@ -53,9 +53,38 @@ export function pedirConHost(puerto, host, ruta) {
         let cuerpo = '';
         respuesta.setEncoding('utf8');
         respuesta.on('data', (parte) => (cuerpo += parte));
-        respuesta.on('end', () => resolver({ status: respuesta.statusCode, location: respuesta.headers.location, cuerpo }));
+        respuesta.on('end', () => resolver({ status: respuesta.statusCode, location: respuesta.headers.location, headers: respuesta.headers, cuerpo }));
       })
       .on('error', rechazar);
+  });
+}
+
+// POST de un formulario a la vidriera con un Host a elección. campos: objeto o lista de pares [nombre, valor].
+export function enviarConHost(puerto, host, ruta, campos, headers = {}) {
+  const cuerpo = new URLSearchParams(Array.isArray(campos) ? campos : Object.entries(campos)).toString();
+  return new Promise((resolver, rechazar) => {
+    const pedido = http.request(
+      {
+        host: '127.0.0.1',
+        port: puerto,
+        path: ruta,
+        method: 'POST',
+        headers: {
+          host: `${host}:${puerto}`,
+          'content-type': 'application/x-www-form-urlencoded',
+          'content-length': Buffer.byteLength(cuerpo),
+          ...headers,
+        },
+      },
+      (respuesta) => {
+        let texto = '';
+        respuesta.setEncoding('utf8');
+        respuesta.on('data', (parte) => (texto += parte));
+        respuesta.on('end', () => resolver({ status: respuesta.statusCode, location: respuesta.headers.location, headers: respuesta.headers, cuerpo: texto }));
+      },
+    );
+    pedido.on('error', rechazar);
+    pedido.end(cuerpo);
   });
 }
 

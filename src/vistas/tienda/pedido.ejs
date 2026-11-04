@@ -1,0 +1,135 @@
+<%- include('cabecera', { titulo }) %>
+<%
+  const abierto = !['cancelado', 'entregado'].includes(pedido.estado);
+  const esperandoPago = pedido.estado === 'nuevo' && pedido.pago !== 'efectivo';
+  const totalTexto = `${formatearPrecio(pedido.total)}${pedido.envio === null ? ' + envío' : ''}`;
+%>
+<div class="pedido" <%- nuevo ? 'data-pedido-nuevo' : '' %>>
+  <header class="pedido-encabezado">
+    <% if (nuevo) { %>
+      <span class="pedido-check" aria-hidden="true"><%- icono('check', { tamano: 30 }) %></span>
+      <h1>¡Gracias, <%= pedido.cliente.nombre.split(' ')[0] %>! Recibimos tu pedido</h1>
+    <% } else { %>
+      <h1>Tu pedido</h1>
+    <% } %>
+    <p class="pedido-numero">Pedido <strong>#<%= pedido.numero %></strong> · <span class="estado-pedido estado-<%= pedido.estado %>"><%= estado %></span></p>
+    <% if (nuevo) { %>
+      <p class="pedido-guardar">Guardá este link para ver el estado de tu pedido cuando quieras.</p>
+    <% } %>
+  </header>
+
+  <div class="pedido-columnas">
+    <div class="pedido-principal">
+      <% if (pedido.estado === 'cancelado') { %>
+        <section class="pedido-tarjeta">
+          <h2>Este pedido se canceló</h2>
+          <p>Si creés que es un error, escribinos.</p>
+        </section>
+      <% } else if (esperandoPago && pedido.pago === 'transferencia') { %>
+        <section class="pedido-tarjeta pedido-pago" aria-labelledby="titulo-pago">
+          <h2 id="titulo-pago"><%- icono('banco', { tamano: 22 }) %> Pagá con transferencia</h2>
+          <% if (!ajustes.transferenciaAlias && !ajustes.transferenciaCbu) { %>
+            <p>Total a transferir: <strong class="pedido-monto"><%= totalTexto %></strong>. Te pasamos los datos de la cuenta por WhatsApp.</p>
+          <% } else { %>
+            <p>Transferí <strong class="pedido-monto"><%= totalTexto %></strong> a esta cuenta:</p>
+          <% } %>
+          <dl class="datos-cuenta">
+            <% for (const [etiqueta, valor] of [['Alias', ajustes.transferenciaAlias], ['CBU / CVU', ajustes.transferenciaCbu], ['Titular', ajustes.transferenciaTitular], ['Banco', ajustes.transferenciaBanco]]) { %>
+              <% if (valor) { %>
+                <div>
+                  <dt><%= etiqueta %></dt>
+                  <dd><span class="dato-cuenta"><%= valor %></span>
+                    <% if (etiqueta === 'Alias' || etiqueta === 'CBU / CVU') { %>
+                      <button class="boton-copiar" type="button" data-copiar="<%= valor %>" aria-label="Copiar <%= etiqueta %>"><%- icono('copiar', { tamano: 16 }) %><span data-copiar-texto>Copiar</span></button>
+                    <% } %>
+                  </dd>
+                </div>
+              <% } %>
+            <% } %>
+          </dl>
+          <% if (pedido.envio === null) { %><p class="pedido-nota">El costo del envío te lo pasamos por WhatsApp y lo sumás a la transferencia.</p><% } %>
+          <% if (comprobante) { %>
+            <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= comprobante %>" target="_blank" rel="noopener">
+              <%- icono('whatsapp', { tamano: 20 }) %> Enviar el comprobante por WhatsApp
+            </a>
+          <% } else if (ajustes.emailContacto) { %>
+            <p class="pedido-nota">Mandanos el comprobante a <a href="mailto:<%= ajustes.emailContacto %>?subject=Comprobante%20pedido%20%23<%= pedido.numero %>"><%= ajustes.emailContacto %></a>.</p>
+          <% } %>
+          <p class="pedido-nota">Cuando veamos el pago, preparamos tu pedido.</p>
+        </section>
+      <% } else if (esperandoPago && pedido.pago === 'mercadopago') { %>
+        <section class="pedido-tarjeta pedido-pago" aria-labelledby="titulo-pago">
+          <h2 id="titulo-pago"><%- icono('tarjeta', { tamano: 22 }) %> Pagá con Mercado Pago</h2>
+          <p><%= instruccionesMercadopago %></p>
+          <p>Total a pagar: <strong class="pedido-monto"><%= totalTexto %></strong></p>
+          <% if (whatsapp) { %>
+            <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= whatsapp %>" target="_blank" rel="noopener">
+              <%- icono('whatsapp', { tamano: 20 }) %> Pedir el link de pago por WhatsApp
+            </a>
+          <% } %>
+        </section>
+      <% } else if (pedido.estado === 'nuevo' && pedido.pago === 'efectivo') { %>
+        <section class="pedido-tarjeta pedido-pago" aria-labelledby="titulo-pago">
+          <h2 id="titulo-pago"><%- icono('billete', { tamano: 22 }) %> Pagás en efectivo</h2>
+          <p>Tené listos <strong class="pedido-monto"><%= totalTexto %></strong> para cuando <%= pedido.entrega.tipo === 'retiro' ? 'lo retires' : 'lo recibas' %>.</p>
+          <% if (whatsapp) { %>
+            <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= whatsapp %>" target="_blank" rel="noopener">
+              <%- icono('whatsapp', { tamano: 20 }) %> Coordinar la entrega por WhatsApp
+            </a>
+          <% } %>
+        </section>
+      <% } else { %>
+        <section class="pedido-tarjeta">
+          <h2><%= estado %></h2>
+          <p>
+            <% if (pedido.estado === 'pagado') { %>Ya recibimos tu pago. Estamos preparando tu pedido.
+            <% } else if (pedido.estado === 'enviado') { %><%= pedido.entrega.tipo === 'retiro' ? 'Tu pedido ya está listo. Podés pasar a buscarlo.' : 'Tu pedido ya salió. Pronto lo vas a recibir.' %>
+            <% } else { %>¡Que lo disfrutes! Gracias por tu compra.<% } %>
+          </p>
+        </section>
+      <% } %>
+
+      <section class="pedido-tarjeta" aria-labelledby="titulo-entrega">
+        <h2 id="titulo-entrega"><%- icono(pedido.entrega.tipo === 'retiro' ? 'tienda' : 'camion', { tamano: 22 }) %> <%= pedido.entrega.nombre %></h2>
+        <% if (pedido.entrega.descripcion) { %><p><%= pedido.entrega.descripcion %></p><% } %>
+        <% if (pedido.entrega.tipo === 'domicilio') { %>
+          <p class="pedido-dato"><%- icono('ubicacion', { tamano: 18 }) %><span><%= direccion %><% if (pedido.direccion.referencias) { %><br><span class="texto-tenue"><%= pedido.direccion.referencias %></span><% } %></span></p>
+        <% } else if (ajustes.direccion) { %>
+          <p class="pedido-dato"><%- icono('ubicacion', { tamano: 18 }) %><span><%= ajustes.direccion %></span></p>
+        <% } %>
+        <p class="pedido-dato"><%- icono('usuario', { tamano: 18 }) %><span><%= pedido.cliente.nombre %> · <%= pedido.cliente.telefono %><%= pedido.cliente.email ? ` · ${pedido.cliente.email}` : '' %></span></p>
+        <% if (abierto && whatsapp && pedido.estado !== 'nuevo') { %>
+          <a class="enlace-consultar" href="<%= whatsapp %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 18 }) %> ¿Dudas con tu pedido? Escribinos</a>
+        <% } %>
+      </section>
+    </div>
+
+    <aside class="pedido-tarjeta pedido-resumen" aria-labelledby="titulo-detalle">
+      <h2 id="titulo-detalle">Detalle</h2>
+      <ul class="resumen-lineas">
+        <% for (const item of pedido.items) { %>
+          <li class="resumen-linea resumen-linea-sin-foto">
+            <span class="resumen-textos">
+              <span class="resumen-nombre"><%= item.nombre %></span>
+              <span><%= item.cantidad %> × <%= formatearPrecio(item.precio) %><%= item.detalle ? ` · ${item.detalle}` : '' %></span>
+            </span>
+            <strong class="resumen-importe"><%= formatearPrecio(item.precio * item.cantidad) %></strong>
+          </li>
+        <% } %>
+      </ul>
+      <dl class="resumen-totales">
+        <div><dt>Productos</dt><dd><%= formatearPrecio(pedido.subtotal) %></dd></div>
+        <% if (pedido.descuento) { %>
+          <div class="resumen-descuento"><dt>Descuento <%= pedido.descuentoPorcentaje %>% (<%= pedido.tituloPago.toLowerCase() %>)</dt><dd>−<%= formatearPrecio(pedido.descuento) %></dd></div>
+        <% } %>
+        <div><dt>Envío</dt><dd><%= pedido.envio === null ? 'A coordinar' : pedido.envio === 0 ? 'Gratis' : formatearPrecio(pedido.envio) %></dd></div>
+        <div class="resumen-total"><dt>Total</dt><dd><%= totalTexto %></dd></div>
+      </dl>
+      <p class="resumen-nota">Pago: <%= pedido.tituloPago %></p>
+      <% if (pedido.notas) { %><p class="resumen-nota">Tu nota: “<%= pedido.notas %>”</p><% } %>
+    </aside>
+  </div>
+
+  <p class="pedido-volver"><a class="boton boton-contorno" href="/">Seguir comprando</a></p>
+</div>
+<%- include('pie') %>

@@ -15,6 +15,23 @@ import { leerAjustes, listarBanners, colorDeTextoSobre, precioConDescuento, valo
 import { urlImagen } from '../imagenes.js';
 import { formatearPrecio } from '../util/formato.js';
 import { urlPanel } from '../util/dominios.js';
+import { crearLimite } from '../util/limite.js';
+import { estadoCheckout, textoCosto, instruccionesMercadopago } from '../pagos.js';
+import {
+  leerItems,
+  lineasDelCarrito,
+  subtotalDe,
+  calcularTotales,
+  costoEnvio,
+  validarCheckout,
+  crearPedido,
+  ErrorDeStock,
+  leerPedidoPorToken,
+  tituloEstado,
+  direccionEnUnaLinea,
+  resumenEnTexto,
+  PROVINCIAS,
+} from '../pedidos.js';
 
 const POCAS_UNIDADES = 3;
 const MAX_DESTACADOS = 8;
@@ -39,14 +56,18 @@ function indexarCategorias(arbol, indice = new Map()) {
 }
 
 // Precio con transferencia y cuotas de un precio final, según los ajustes de la tienda (null si no aplican).
+// Solo se muestran si la tienda ofrece esa forma de pago: las cuotas son con Mercado Pago.
 function preciosExtra(centavos, ajustes) {
   return {
-    transferencia: ajustes.descuentoTransferencia
+    transferencia: ajustes.pagoTransferencia && ajustes.descuentoTransferencia
       ? formatearPrecio(precioConDescuento(centavos, ajustes.descuentoTransferencia))
       : null,
-    cuota: ajustes.cuotasSinInteres ? formatearPrecio(valorCuota(centavos, ajustes.cuotasSinInteres)) : null,
+    cuota: ajustes.pagoMercadopago && ajustes.cuotasSinInteres ? formatearPrecio(valorCuota(centavos, ajustes.cuotasSinInteres)) : null,
   };
 }
+
+// Pedidos que se pueden hacer desde una misma IP por hora (frena a quien quiera reservar todo el stock).
+const PEDIDOS_POR_HORA = 10;
 
 // "-20%" de un precio promocional sobre el de lista (null si no hay promoción).
 export const porcentajeOff = (precioLista, precioFinal) =>
@@ -109,10 +130,12 @@ function conParametros(req, cambios) {
 // Vidriera de una tienda. Se monta solo cuando el host es el subdominio de una tienda (req.tienda).
 export function rutasTienda({ db, config }) {
   const router = express.Router();
+  const limitePedidos = crearLimite({ maximo: PEDIDOS_POR_HORA, ventanaMs: 60 * 60 * 1000 });
 
   router.use((req, res, next) => {
     const arbol = arbolCategorias(db, req.tienda.id);
     const ajustes = leerAjustes(db, req.tienda.id);
+    const checkout = estadoCheckout(db, req.tienda.id, ajustes);
     const origen = `${req.protocol}://${req.host}`;
     Object.assign(res.locals, {
       tienda: req.tienda,
@@ -128,9 +151,13 @@ export function rutasTienda({ db, config }) {
       preciosExtra: (centavos) => preciosExtra(centavos, ajustes),
       meta: { descripcion: `Comprá online en ${req.tienda.nombre}.`, imagen: null, tipo: 'website' },
       busqueda: '',
+      // Con checkout el carrito termina en /checkout; si no, el pedido se manda por WhatsApp.
+      checkoutActivo: checkout.activo,
+      noIndexar: false,
     });
     req.arbol = arbol;
     req.ajustes = ajustes;
+    req.checkout = checkout;
     next();
   });
 
@@ -311,6 +338,134 @@ export function rutasTienda({ db, config }) {
       relacionados: conFotos(req.tienda.id, relacionados),
       variantesJson: jsonEnScript(variantes),
       datosEstructurados: jsonEnScript(datosEstructurados),
+    });
+  });
+
+  // ---------- Checkout ----------
+  // El carrito vive en el navegador y llega en la URL (?sku=A&cantidad=2&sku=B&cantidad=1). Todo se vuelve
+  // a calcular acá con los precios y el stock de la base: lo que manda el navegador es solo qué y cuánto.
+
+  // Las opciones de entrega y pago listas para mostrar, con lo que necesita el script para recalcular el total.
+  function opcionesCheckout(req, subtotal) {
+    const { entregas, pagos } = req.checkout;
+    return {
+      entregas: entregas.map((e) => {
+        const envio = costoEnvio(e, subtotal);
+        return {
+          ...e,
+          textoCosto: envio === 0 && e.costo > 0 ? 'Gratis' : textoCosto(e),
+          // "Gratis desde $X" solo si todavía no se llegó.
+          textoGratis: e.gratisDesde !== null && envio !== 0 ? `Gratis desde ${formatearPrecio(e.gratisDesde)}` : null,
+        };
+      }),
+      pagos: pagos.map((p) => ({
+        ...p,
+        detalle:
+          p.clave === 'transferencia' ? 'Te mostramos los datos de la cuenta al confirmar el pedido.'
+          : p.clave === 'efectivo' ? 'Pagás cuando retirás o recibís el pedido.'
+          : `Tarjeta de crédito, débito o dinero en cuenta.${req.ajustes.cuotasSinInteres ? ` Hasta ${req.ajustes.cuotasSinInteres} cuotas sin interés.` : ''}`,
+      })),
+    };
+  }
+
+  // sinItems: se entró a /checkout sin productos en la URL (el script usa el carrito guardado en el navegador).
+  function mostrarCheckout(req, res, { lineas, cambios = [], valores = {}, errores = {}, status = 200, sinItems = false }) {
+    const subtotal = subtotalDe(lineas);
+    const { entregas, pagos } = opcionesCheckout(req, subtotal);
+    // Si hay una sola opción, ya viene elegida.
+    const elegida = {
+      entrega: valores.entrega ?? (entregas.length === 1 ? String(entregas[0].id) : ''),
+      pago: valores.pago ?? (pagos.length === 1 ? pagos[0].clave : ''),
+    };
+    const entrega = entregas.find((e) => String(e.id) === elegida.entrega) ?? null;
+    const pago = pagos.find((p) => p.clave === elegida.pago) ?? null;
+    res.locals.noIndexar = true;
+    res.set('Cache-Control', 'private, no-store');
+    res.status(status).render('tienda/checkout', {
+      titulo: 'Finalizar compra',
+      sinWhatsappFlotante: true,
+      lineas: lineas.map((l) => ({ ...l, urlFoto: urlImagen(req.tienda.id, l.foto) })),
+      cambios,
+      valores: { provincia: '', ...valores, ...elegida },
+      errores,
+      entregas,
+      pagos,
+      entregaElegida: entrega,
+      totales: calcularTotales(subtotal, entrega, pago),
+      provincias: PROVINCIAS,
+      datosCheckout: jsonEnScript({
+        subtotal,
+        entregas: entregas.map(({ id, tipo, costo, gratisDesde, aceptaEfectivo }) => ({ id: String(id), tipo, costo, gratisDesde, aceptaEfectivo })),
+        pagos: pagos.map(({ clave, descuento }) => ({ clave, descuento })),
+        carrito: lineas.map(({ sku, cantidad }) => ({ sku, cantidad })),
+        sinItems,
+      }),
+    });
+  }
+
+  router.get('/checkout', (req, res) => {
+    if (!req.checkout.activo) return res.redirect('/');
+    const items = leerItems(req.query);
+    const { lineas, cambios } = lineasDelCarrito(db, req.tienda.id, items);
+    mostrarCheckout(req, res, { lineas, cambios, sinItems: items.length === 0 });
+  });
+
+  router.post('/checkout', express.urlencoded({ extended: false, limit: '64kb' }), (req, res) => {
+    // Un formulario de otro sitio no puede hacer pedidos en nombre de nadie.
+    const origen = req.get('origin');
+    if (origen && origen !== res.locals.origen) return res.status(403).render('tienda/no-encontrado', { titulo: 'No encontrado' });
+    if (!req.checkout.activo) return res.redirect(303, '/');
+    // Campo trampa: lo completan los robots, las personas no lo ven.
+    if (req.body.sitio) return res.redirect(303, '/');
+
+    const items = leerItems(req.body);
+    const { lineas, cambios } = lineasDelCarrito(db, req.tienda.id, items);
+    const { valores, errores, datos } = validarCheckout(req.body, req.checkout);
+    const volver = (extra) => mostrarCheckout(req, res, { lineas, cambios, valores, errores, status: 400, ...extra });
+
+    if (lineas.length === 0) return volver({ cambios: [...cambios, 'Tu carrito está vacío.'] });
+    if (cambios.length > 0 || Object.keys(errores).length > 0) return volver();
+    if (!limitePedidos.puede(req.ip)) {
+      return volver({ cambios: ['Hiciste muchos pedidos seguidos. Esperá un rato o escribinos para terminar la compra.'] });
+    }
+
+    let pedido;
+    try {
+      pedido = crearPedido(db, req.tienda.id, items, datos);
+    } catch (error) {
+      if (!(error instanceof ErrorDeStock)) throw error;
+      // Alguien compró lo mismo mientras tanto: se muestra el carrito actualizado.
+      const actual = lineasDelCarrito(db, req.tienda.id, items);
+      return volver({ lineas: actual.lineas, cambios: error.problemas });
+    }
+    limitePedidos.registrar(req.ip);
+    res.redirect(303, `/pedido/${pedido.token}?nuevo=1`);
+  });
+
+  // El pedido, para el cliente: qué compró, cómo pagar y en qué estado está. El link no se puede adivinar.
+  router.get('/pedido/:token', (req, res, next) => {
+    const pedido = leerPedidoPorToken(db, req.tienda.id, req.params.token);
+    if (!pedido) return next();
+    const { ajustes } = req;
+    const urlPedido = `${res.locals.origen}/pedido/${pedido.token}`;
+    const whatsapp = ajustes.whatsapp
+      ? `https://wa.me/${ajustes.whatsapp}?text=${encodeURIComponent(resumenEnTexto(pedido, { tienda: req.tienda.nombre, urlPedido }))}`
+      : null;
+    const comprobante = ajustes.whatsapp
+      ? `https://wa.me/${ajustes.whatsapp}?text=${encodeURIComponent(`¡Hola ${req.tienda.nombre}! Te mando el comprobante de la transferencia del pedido #${pedido.numero} por ${formatearPrecio(pedido.total)}.`)}`
+      : null;
+    res.locals.noIndexar = true;
+    res.set('Cache-Control', 'private, no-store');
+    res.render('tienda/pedido', {
+      titulo: `Pedido #${pedido.numero}`,
+      pedido,
+      nuevo: req.query.nuevo === '1',
+      estado: tituloEstado(pedido.estado, pedido.entrega.tipo, { paraCliente: true }),
+      direccion: direccionEnUnaLinea(pedido.direccion),
+      instruccionesMercadopago: instruccionesMercadopago(ajustes),
+      whatsapp,
+      comprobante,
+      urlPedido,
     });
   });
 

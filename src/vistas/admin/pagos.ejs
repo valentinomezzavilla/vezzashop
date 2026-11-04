@@ -1,0 +1,190 @@
+<%- include('../parciales/cabecera', { titulo: 'Envíos y pagos' }) %>
+<%
+  const accesibilidad = (campo, conAyuda = false) => {
+    const describe = [conAyuda && `ayuda-${campo}`, errores[campo] && `error-${campo}`].filter(Boolean).join(' ');
+    return (errores[campo] ? ' aria-invalid="true"' : '') + (describe ? ` aria-describedby="${describe}"` : '');
+  };
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const marcado = (campo) => (valores[campo] === true || valores[campo] === '1' ? ' checked' : '');
+%>
+<header class="encabezado">
+  <div>
+    <h1>Envíos y pagos</h1>
+    <p class="texto-suave">Cómo reciben tus clientes lo que compran y cómo te pagan. Lo eligen al finalizar la compra.</p>
+  </div>
+  <% if (urlMiTienda) { %>
+    <a class="boton boton-secundario" href="<%= urlMiTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver mi tienda</a>
+  <% } %>
+</header>
+
+<% if (checkout.activo) { %>
+  <p class="aviso aviso-ok" role="status"><%- icono('check', { tamano: 18 }) %><span>Tu tienda ya vende online: tus clientes eligen la entrega y el pago, y los pedidos llegan a <a href="/admin/pedidos">Pedidos</a>.</span></p>
+<% } else { %>
+  <p class="aviso aviso-info" role="status"><%- icono('alerta', { tamano: 18 }) %><span>
+    Para vender desde la tienda, activá <strong>al menos una forma de entrega y una de pago</strong>.
+    Mientras tanto, el carrito se manda por WhatsApp<%= checkout.entregas.length && checkout.pagos.length ? ' (el efectivo solo sirve con entregas que lo aceptan)' : '' %>.
+  </span></p>
+<% } %>
+
+<section class="ajuste" id="formas-de-entrega">
+  <div class="ajuste-intro">
+    <h2>Formas de entrega</h2>
+    <p class="texto-suave">Retiro en tu local, envío en moto por la ciudad, por correo a todo el país... En este orden se muestran.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (entregas.length) { %>
+      <ul class="lista-entregas">
+        <% entregas.forEach((e, n) => { %>
+          <li class="entrega<%= e.activo ? '' : ' entrega-pausada' %>">
+            <span class="entrega-icono" aria-hidden="true"><%- icono(e.tipo === 'retiro' ? 'tienda' : 'camion', { tamano: 20 }) %></span>
+            <div class="entrega-datos">
+              <strong><%= e.nombre %></strong>
+              <span class="ayuda">
+                <%= tipos[e.tipo].titulo %> · <%= e.textoCosto %><%= e.textoGratis ? ` (${e.textoGratis})` : '' %><%= e.aceptaEfectivo ? ' · acepta efectivo' : '' %>
+              </span>
+              <% if (e.descripcion) { %><span class="ayuda entrega-descripcion"><%= e.descripcion %></span><% } %>
+            </div>
+            <div class="entrega-acciones">
+              <form method="post" action="/admin/pagos/entregas/<%= e.id %>/activar">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <input type="hidden" name="valor" value="<%= e.activo ? '0' : '1' %>">
+                <button class="pastilla<%= e.activo ? ' pastilla-ok' : '' %> pastilla-boton" type="submit"
+                        title="<%= e.activo ? 'Pausar' : 'Activar' %>" aria-label="<%= e.activo ? 'Activa. Pausar' : 'Pausada. Activar' %> <%= e.nombre %>">
+                  <%= e.activo ? 'Activa' : 'Pausada' %>
+                </button>
+              </form>
+              <% for (const [accion, nombreIcono, etiqueta, deshabilitado] of [['subir', 'arriba', 'Subir', n === 0], ['bajar', 'abajo', 'Bajar', n === entregas.length - 1]]) { %>
+                <form method="post" action="/admin/pagos/entregas/<%= e.id %>/<%= accion %>">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="boton-icono" type="submit" aria-label="<%= etiqueta %> <%= e.nombre %>" title="<%= etiqueta %>"<%= deshabilitado ? ' disabled' : '' %>><%- icono(nombreIcono, { tamano: 18 }) %></button>
+                </form>
+              <% } %>
+              <a class="boton-icono" href="/admin/pagos/entregas/<%= e.id %>" aria-label="Editar <%= e.nombre %>" title="Editar"><%- icono('lapiz', { tamano: 18 }) %></a>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p class="estado-vacio-chico"><%- icono('camion', { tamano: 20 }) %> Todavía no hay formas de entrega. Empezá con alguna de estas:</p>
+    <% } %>
+
+    <% if (entregas.length < maxEntregas) { %>
+      <div class="agregar-entrega">
+        <span class="etiqueta"><%= entregas.length ? 'Agregar otra' : 'Agregar' %></span>
+        <div class="acciones">
+          <a class="boton boton-secundario boton-chico" href="/admin/pagos/entregas/nueva?modelo=retiro"><%- icono('tienda', { tamano: 16 }) %> Retiro en el local</a>
+          <a class="boton boton-secundario boton-chico" href="/admin/pagos/entregas/nueva?modelo=moto"><%- icono('camion', { tamano: 16 }) %> Envío en moto (Córdoba Capital)</a>
+          <a class="boton boton-secundario boton-chico" href="/admin/pagos/entregas/nueva?modelo=pais"><%- icono('paquete', { tamano: 16 }) %> Envío a todo el país</a>
+          <a class="boton boton-secundario boton-chico" href="/admin/pagos/entregas/nueva"><%- icono('mas', { tamano: 16 }) %> Otra</a>
+        </div>
+        <span class="ayuda">Se abre el formulario ya completado para que revises el costo antes de guardar.</span>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<form method="post" action="/admin/pagos" class="ajustes" id="formas-de-pago">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Formas de pago</h2>
+      <p class="texto-suave">Las que actives aparecen al finalizar la compra. El descuento se aplica solo sobre los productos, no sobre el envío.</p>
+    </div>
+    <div class="ajuste-campos formas-pago">
+      <% if (Object.keys(errores).length) { %>
+        <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>
+      <% } %>
+
+      <fieldset class="tarjeta forma-pago" data-forma-pago>
+        <legend class="visualmente-oculto">Transferencia bancaria</legend>
+        <label class="interruptor">
+          <input type="checkbox" name="pagoTransferencia" value="1"<%= marcado('pagoTransferencia') %> data-activar-forma>
+          <span class="interruptor-pista" aria-hidden="true"></span>
+          <span class="interruptor-texto"><strong><%- icono('banco', { tamano: 18 }) %> Transferencia bancaria</strong><span class="ayuda">Al confirmar el pedido, el cliente ve tus datos y el monto exacto para transferir.</span></span>
+        </label>
+        <div class="ajuste-campos-dos forma-pago-campos" data-campos-forma>
+          <div class="campo">
+            <label for="transferenciaAlias">Alias</label>
+            <input id="transferenciaAlias" type="text" name="transferenciaAlias" value="<%= valores.transferenciaAlias %>" maxlength="20" placeholder="mi.tienda.mp" autocomplete="off"<%- accesibilidad('transferenciaAlias') %>>
+            <%- error('transferenciaAlias') %>
+          </div>
+          <div class="campo">
+            <label for="transferenciaCbu">CBU o CVU <span class="opcional">(opcional)</span></label>
+            <input id="transferenciaCbu" type="text" name="transferenciaCbu" value="<%= valores.transferenciaCbu %>" maxlength="30" inputmode="numeric" autocomplete="off"<%- accesibilidad('transferenciaCbu') %>>
+            <%- error('transferenciaCbu') %>
+          </div>
+          <div class="campo">
+            <label for="transferenciaTitular">Titular de la cuenta</label>
+            <input id="transferenciaTitular" type="text" name="transferenciaTitular" value="<%= valores.transferenciaTitular %>" maxlength="100" placeholder="Nombre y apellido o razón social">
+          </div>
+          <div class="campo">
+            <label for="transferenciaBanco">Banco o billetera <span class="opcional">(opcional)</span></label>
+            <input id="transferenciaBanco" type="text" name="transferenciaBanco" value="<%= valores.transferenciaBanco %>" maxlength="60" placeholder="Mercado Pago, Galicia, Brubank...">
+          </div>
+          <div class="campo">
+            <label for="descuentoTransferencia">Descuento por pagar con transferencia</label>
+            <div class="campo-con-sufijo">
+              <input id="descuentoTransferencia" type="number" name="descuentoTransferencia" value="<%= valores.descuentoTransferencia %>"
+                     min="0" max="90" step="1" inputmode="numeric"<%- accesibilidad('descuentoTransferencia', true) %>>
+              <span class="sufijo">%</span>
+            </div>
+            <span class="ayuda" id="ayuda-descuentoTransferencia">También se muestra en cada producto: "$X con transferencia". 0 para no hacer descuento.</span>
+            <%- error('descuentoTransferencia') %>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="tarjeta forma-pago" data-forma-pago>
+        <legend class="visualmente-oculto">Efectivo</legend>
+        <label class="interruptor">
+          <input type="checkbox" name="pagoEfectivo" value="1"<%= marcado('pagoEfectivo') %> data-activar-forma>
+          <span class="interruptor-pista" aria-hidden="true"></span>
+          <span class="interruptor-texto"><strong><%- icono('billete', { tamano: 18 }) %> Efectivo</strong><span class="ayuda">Se paga al retirar o al recibir. Solo aparece con las formas de entrega que marques como "acepta efectivo".</span></span>
+        </label>
+        <div class="ajuste-campos-dos forma-pago-campos" data-campos-forma>
+          <div class="campo">
+            <label for="descuentoEfectivo">Descuento por pagar en efectivo</label>
+            <div class="campo-con-sufijo">
+              <input id="descuentoEfectivo" type="number" name="descuentoEfectivo" value="<%= valores.descuentoEfectivo %>"
+                     min="0" max="90" step="1" inputmode="numeric"<%- accesibilidad('descuentoEfectivo') %>>
+              <span class="sufijo">%</span>
+            </div>
+            <%- error('descuentoEfectivo') %>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="tarjeta forma-pago" data-forma-pago>
+        <legend class="visualmente-oculto">Mercado Pago</legend>
+        <label class="interruptor">
+          <input type="checkbox" name="pagoMercadopago" value="1"<%= marcado('pagoMercadopago') %> data-activar-forma>
+          <span class="interruptor-pista" aria-hidden="true"></span>
+          <span class="interruptor-texto"><strong><%- icono('tarjeta', { tamano: 18 }) %> Mercado Pago (tarjetas y cuotas)</strong><span class="ayuda">Le mandás al cliente un link de pago por el total del pedido (desde la app de Mercado Pago: "Cobrar" → "Link de pago").</span></span>
+        </label>
+        <div class="ajuste-campos-dos forma-pago-campos" data-campos-forma>
+          <div class="campo campo-ancho">
+            <label for="mercadopagoInstrucciones">Qué le decimos al cliente <span class="opcional">(opcional)</span></label>
+            <textarea id="mercadopagoInstrucciones" name="mercadopagoInstrucciones" rows="2" maxlength="300" placeholder="<%= instruccionesMercadopago %>"<%- accesibilidad('mercadopagoInstrucciones') %>><%= valores.mercadopagoInstrucciones %></textarea>
+            <%- error('mercadopagoInstrucciones') %>
+          </div>
+          <div class="campo">
+            <label for="cuotasSinInteres">Cuotas sin interés</label>
+            <div class="campo-con-sufijo">
+              <input id="cuotasSinInteres" type="number" name="cuotasSinInteres" value="<%= valores.cuotasSinInteres %>"
+                     min="0" max="24" step="1" inputmode="numeric"<%- accesibilidad('cuotasSinInteres', true) %>>
+              <span class="sufijo">cuotas</span>
+            </div>
+            <span class="ayuda" id="ayuda-cuotasSinInteres">Muestra "6 cuotas sin interés de $X" en cada producto. 0 para no mostrarlo.</span>
+            <%- error('cuotasSinInteres') %>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="barra-guardar">
+        <span class="ayuda" data-sin-guardar hidden><%- icono('alerta', { tamano: 16 }) %> Tenés cambios sin guardar</span>
+        <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar formas de pago</button>
+      </div>
+    </div>
+  </section>
+</form>
+<%- include('../parciales/pie') %>

@@ -79,6 +79,31 @@ if (vistaPrevia && color) {
   color.addEventListener('input', pintar);
   franja.addEventListener('input', pintar);
   pintar();
+
+  // El logo elegido se ve en la cabecera de la vista previa con el tamaño que va a tener en la tienda.
+  const cabecera = vistaPrevia.querySelector('[data-vista-cabecera]');
+  const logo = document.querySelector('[data-previsualizar="logo"]');
+  const quitar = document.querySelector('[name="quitarLogo"]');
+  const original = [...cabecera.childNodes].map((nodo) => nodo.cloneNode(true));
+  const nombreTienda = () => {
+    const nombre = document.createElement('span');
+    nombre.className = 'vista-previa-nombre';
+    nombre.textContent = document.querySelector('.lateral-tienda')?.textContent ?? '';
+    return nombre;
+  };
+  logo?.addEventListener('change', () => {
+    const archivo = logo.files[0];
+    if (!archivo || !archivo.type.startsWith('image/')) return;
+    const imagen = document.createElement('img');
+    imagen.className = 'vista-previa-logo';
+    imagen.alt = '';
+    imagen.src = URL.createObjectURL(archivo);
+    cabecera.replaceChildren(imagen);
+    if (quitar) quitar.checked = false;
+  });
+  quitar?.addEventListener('change', () => {
+    cabecera.replaceChildren(...(quitar.checked ? [nombreTienda()] : original.map((nodo) => nodo.cloneNode(true))));
+  });
 }
 
 // ---------- Cambios sin guardar ----------
@@ -210,4 +235,35 @@ if (formProducto) {
     for (const input of filas.querySelectorAll(`[data-campo="${campo}"]`)) input.value = valor;
     avisarCambio();
   });
+}
+
+// ---------- Forma de entrega: costo a coordinar ----------
+// Si el costo se coordina después, los montos no se usan: se deshabilitan para que quede claro.
+
+const aCoordinar = document.querySelector('[data-a-coordinar]');
+if (aCoordinar) {
+  const montos = document.querySelectorAll('[data-costo], [data-gratis-desde]');
+  const tipos = document.querySelectorAll('[data-form-entrega] input[name="tipo"]');
+  const actualizar = () => {
+    for (const campo of montos) campo.disabled = aCoordinar.checked;
+  };
+  aCoordinar.addEventListener('change', actualizar);
+  // Un retiro casi siempre es gratis: si se elige y el costo está vacío, se completa con 0.
+  for (const tipo of tipos) {
+    tipo.addEventListener('change', () => {
+      const costo = document.querySelector('[data-costo]');
+      if (tipo.checked && tipo.value === 'retiro' && costo.value.trim() === '' && !aCoordinar.checked) costo.value = '0';
+    });
+  }
+  actualizar();
+}
+
+// ---------- Menú del celular: la sección activa a la vista ----------
+// En pantallas chicas el menú se desliza de costado; si la sección actual quedó afuera, se la muestra.
+
+const activa = document.querySelector('.lateral-menu a.activo');
+const menu = activa?.closest('.lateral-menu');
+if (menu && menu.scrollWidth > menu.clientWidth) {
+  const desde = activa.getBoundingClientRect().left - menu.getBoundingClientRect().left + menu.scrollLeft;
+  menu.scrollLeft = desde - (menu.clientWidth - activa.offsetWidth) / 2;
 }

@@ -18,7 +18,20 @@ const AJUSTES_POR_DEFECTO = {
   tiktok: '',
   emailContacto: '',
   direccion: '',
+  // Formas de pago (sección Envíos y pagos del panel).
+  pagoTransferencia: false,
+  transferenciaAlias: '',
+  transferenciaCbu: '',
+  transferenciaTitular: '',
+  transferenciaBanco: '',
+  pagoEfectivo: false,
+  descuentoEfectivo: 0,
+  pagoMercadopago: false,
+  mercadopagoInstrucciones: '',
 };
+
+// Ajustes que en la base son 0/1.
+const BOOLEANOS = new Set(['pagoTransferencia', 'pagoEfectivo', 'pagoMercadopago']);
 
 // Las claves de AJUSTES_POR_DEFECTO, como columnas de ajustes_tienda.
 const COLUMNAS = {
@@ -34,12 +47,28 @@ const COLUMNAS = {
   tiktok: 'tiktok',
   emailContacto: 'email_contacto',
   direccion: 'direccion',
+  pagoTransferencia: 'pago_transferencia',
+  transferenciaAlias: 'transferencia_alias',
+  transferenciaCbu: 'transferencia_cbu',
+  transferenciaTitular: 'transferencia_titular',
+  transferenciaBanco: 'transferencia_banco',
+  pagoEfectivo: 'pago_efectivo',
+  descuentoEfectivo: 'descuento_efectivo',
+  pagoMercadopago: 'pago_mercadopago',
+  mercadopagoInstrucciones: 'mercadopago_instrucciones',
 };
 
 export function leerAjustes(db, tiendaId) {
   const seleccion = Object.entries(COLUMNAS).map(([clave, columna]) => `${columna} AS ${clave}`).join(', ');
   const fila = db.prepare(`SELECT ${seleccion} FROM ajustes_tienda WHERE tienda_id = ?`).get(tiendaId);
-  return { ...AJUSTES_POR_DEFECTO, ...fila };
+  const ajustes = { ...AJUSTES_POR_DEFECTO, ...fila };
+  for (const clave of BOOLEANOS) ajustes[clave] = Boolean(ajustes[clave]);
+  return ajustes;
+}
+
+// Guarda solo algunos ajustes y deja el resto como estaba: cada sección del panel guarda los suyos.
+export function actualizarAjustes(db, tiendaId, cambios) {
+  guardarAjustes(db, tiendaId, { ...leerAjustes(db, tiendaId), ...cambios });
 }
 
 export function guardarAjustes(db, tiendaId, ajustes) {
@@ -48,12 +77,12 @@ export function guardarAjustes(db, tiendaId, ajustes) {
   db.prepare(
     `INSERT INTO ajustes_tienda (tienda_id, ${columnas.join(', ')}) VALUES (?, ${columnas.map(() => '?').join(', ')})
      ON CONFLICT (tienda_id) DO UPDATE SET ${columnas.map((c) => `${c} = excluded.${c}`).join(', ')}`,
-  ).run(tiendaId, ...claves.map((clave) => ajustes[clave]));
+  ).run(tiendaId, ...claves.map((clave) => (BOOLEANOS.has(clave) ? Number(Boolean(ajustes[clave])) : ajustes[clave])));
 }
 
 const texto = (valor) => String(valor ?? '').trim();
 
-function entero(valor, minimo, maximo, mensaje) {
+export function entero(valor, minimo, maximo, mensaje) {
   const limpio = texto(valor);
   if (limpio === '') return { valor: 0 };
   const numero = Number(limpio);
@@ -78,7 +107,7 @@ function redSocial(red, valor) {
 }
 
 // Valida lo que llega del formulario de Diseño. Devuelve { ajustes, errores }, errores = { campo: mensaje }.
-// El logo no viene acá: se maneja aparte porque es un archivo.
+// El logo no viene acá: se maneja aparte porque es un archivo. Los descuentos y las cuotas son de Envíos y pagos.
 export function validarAjustes(campos) {
   const errores = {};
   const ajustes = {};
@@ -89,15 +118,6 @@ export function validarAjustes(campos) {
 
   ajustes.franjaTexto = texto(campos.franjaTexto).replace(/\s+/g, ' ');
   if (ajustes.franjaTexto.length > LARGO_FRANJA) errores.franjaTexto = `Máximo ${LARGO_FRANJA} caracteres`;
-
-  const descuento = entero(campos.descuentoTransferencia, 0, 90, 'Tiene que ser un número entero entre 0 y 90');
-  if (descuento.error) errores.descuentoTransferencia = descuento.error;
-  else ajustes.descuentoTransferencia = descuento.valor;
-
-  const cuotas = entero(campos.cuotasSinInteres, 0, 24, 'Tiene que ser un número entero entre 0 y 24');
-  if (cuotas.error) errores.cuotasSinInteres = cuotas.error;
-  else if (cuotas.valor === 1) errores.cuotasSinInteres = 'Poné 0 para no mostrar cuotas, o 2 o más';
-  else ajustes.cuotasSinInteres = cuotas.valor;
 
   if (esOrden(texto(campos.ordenCatalogo))) ajustes.ordenCatalogo = texto(campos.ordenCatalogo);
   else errores.ordenCatalogo = 'Elegí un orden de la lista';

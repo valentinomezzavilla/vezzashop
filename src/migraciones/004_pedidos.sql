@@ -1,0 +1,77 @@
+-- Checkout: formas de pago, formas de entrega y pedidos.
+
+-- Formas de pago de cada tienda (van con el resto de sus ajustes).
+ALTER TABLE ajustes_tienda ADD COLUMN pago_transferencia INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ajustes_tienda ADD COLUMN transferencia_alias TEXT NOT NULL DEFAULT '';
+ALTER TABLE ajustes_tienda ADD COLUMN transferencia_cbu TEXT NOT NULL DEFAULT '';
+ALTER TABLE ajustes_tienda ADD COLUMN transferencia_titular TEXT NOT NULL DEFAULT '';
+ALTER TABLE ajustes_tienda ADD COLUMN transferencia_banco TEXT NOT NULL DEFAULT '';
+ALTER TABLE ajustes_tienda ADD COLUMN pago_efectivo INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ajustes_tienda ADD COLUMN descuento_efectivo INTEGER NOT NULL DEFAULT 0 CHECK (descuento_efectivo BETWEEN 0 AND 90);
+ALTER TABLE ajustes_tienda ADD COLUMN pago_mercadopago INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ajustes_tienda ADD COLUMN mercadopago_instrucciones TEXT NOT NULL DEFAULT '';
+
+-- Hasta ahora el descuento por transferencia y las cuotas se mostraban siempre. Ahora se muestran si la forma
+-- de pago está activa: las tiendas que ya los usaban las dejan activas, para que nada cambie en su vidriera.
+UPDATE ajustes_tienda SET pago_transferencia = 1 WHERE descuento_transferencia > 0;
+UPDATE ajustes_tienda SET pago_mercadopago = 1 WHERE cuotas_sin_interes > 0;
+
+-- Formas de entrega: retiro en un local o envío a domicilio (en moto por la ciudad, por correo a todo el país...).
+CREATE TABLE metodos_entrega (
+  id INTEGER PRIMARY KEY,
+  tienda_id INTEGER NOT NULL REFERENCES tiendas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('retiro', 'domicilio')),
+  nombre TEXT NOT NULL,
+  descripcion TEXT NOT NULL DEFAULT '',
+  costo_centavos INTEGER CHECK (costo_centavos >= 0),          -- NULL: el costo se coordina después
+  gratis_desde_centavos INTEGER CHECK (gratis_desde_centavos > 0),
+  acepta_efectivo INTEGER NOT NULL DEFAULT 0,
+  activo INTEGER NOT NULL DEFAULT 1,
+  orden INTEGER NOT NULL
+);
+CREATE INDEX metodos_entrega_por_tienda ON metodos_entrega (tienda_id, orden);
+
+-- Pedidos hechos desde la vidriera. Guardan una copia de todo (productos, precios, forma de entrega):
+-- si después cambia el catálogo, el pedido sigue diciendo lo que se compró.
+CREATE TABLE pedidos (
+  id INTEGER PRIMARY KEY,
+  tienda_id INTEGER NOT NULL REFERENCES tiendas(id),
+  numero INTEGER NOT NULL,                       -- correlativo de cada tienda: #1, #2...
+  token TEXT NOT NULL UNIQUE,                    -- para el link que ve el cliente (no se puede adivinar)
+  estado TEXT NOT NULL DEFAULT 'nuevo' CHECK (estado IN ('nuevo', 'pagado', 'enviado', 'entregado', 'cancelado')),
+  cliente_nombre TEXT NOT NULL,
+  cliente_telefono TEXT NOT NULL,
+  cliente_email TEXT NOT NULL DEFAULT '',
+  entrega_tipo TEXT NOT NULL CHECK (entrega_tipo IN ('retiro', 'domicilio')),
+  entrega_nombre TEXT NOT NULL,
+  entrega_descripcion TEXT NOT NULL DEFAULT '',
+  direccion_calle TEXT NOT NULL DEFAULT '',
+  direccion_piso TEXT NOT NULL DEFAULT '',
+  direccion_ciudad TEXT NOT NULL DEFAULT '',
+  direccion_provincia TEXT NOT NULL DEFAULT '',
+  direccion_cp TEXT NOT NULL DEFAULT '',
+  direccion_referencias TEXT NOT NULL DEFAULT '',
+  pago TEXT NOT NULL CHECK (pago IN ('transferencia', 'efectivo', 'mercadopago')),
+  notas TEXT NOT NULL DEFAULT '',
+  subtotal_centavos INTEGER NOT NULL,
+  descuento_porcentaje INTEGER NOT NULL DEFAULT 0,
+  descuento_centavos INTEGER NOT NULL DEFAULT 0,
+  envio_centavos INTEGER,                        -- NULL: el envío se coordina después
+  total_centavos INTEGER NOT NULL,
+  creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+  actualizado_en TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (tienda_id, numero)
+);
+CREATE INDEX pedidos_por_estado ON pedidos (tienda_id, estado);
+
+CREATE TABLE pedido_items (
+  id INTEGER PRIMARY KEY,
+  pedido_id INTEGER NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+  sku TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  detalle TEXT NOT NULL DEFAULT '',
+  slug TEXT NOT NULL DEFAULT '',
+  precio_centavos INTEGER NOT NULL,
+  cantidad INTEGER NOT NULL CHECK (cantidad > 0)
+);
+CREATE INDEX items_por_pedido ON pedido_items (pedido_id);

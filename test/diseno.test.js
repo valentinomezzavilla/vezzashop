@@ -62,8 +62,6 @@ async function tiendaConPanel(slug) {
 const AJUSTES = {
   colorPrincipal: '#0a3d62',
   franjaTexto: 'Envío gratis desde $100.000',
-  descuentoTransferencia: '15',
-  cuotasSinInteres: '6',
   ordenCatalogo: 'precio-mayor',
   whatsapp: '+54 9 351 123-4567',
   instagram: '@mitienda',
@@ -78,20 +76,16 @@ test('validarAjustes normaliza WhatsApp y redes, y rechaza valores inválidos', 
   assert.deepEqual(errores, {});
   assert.equal(ajustes.whatsapp, '5493511234567');
   assert.equal(ajustes.instagram, 'https://www.instagram.com/mitienda');
-  assert.equal(ajustes.descuentoTransferencia, 15);
+  assert.equal('descuentoTransferencia' in ajustes, false, 'los descuentos ahora son de Envíos y pagos');
 
   const malos = validarAjustes({
     ...AJUSTES,
     colorPrincipal: 'rojo',
-    descuentoTransferencia: '150',
-    cuotasSinInteres: '1',
     ordenCatalogo: 'constructor',
     whatsapp: '123',
     tiktok: 'no vale con espacios',
   }).errores;
-  assert.deepEqual(Object.keys(malos).sort(), [
-    'colorPrincipal', 'cuotasSinInteres', 'descuentoTransferencia', 'ordenCatalogo', 'tiktok', 'whatsapp',
-  ]);
+  assert.deepEqual(Object.keys(malos).sort(), ['colorPrincipal', 'ordenCatalogo', 'tiktok', 'whatsapp']);
 });
 
 test('validarEnlace acepta páginas de la tienda y links https, y rechaza el resto', () => {
@@ -130,6 +124,12 @@ test('lo que se guarda en Diseño se ve en la vidriera', async () => {
   const respuesta = await nav.enviarArchivos('/admin/diseno', { ...AJUSTES, logo: { contenido: PNG, nombre: 'logo.png' } });
   assert.equal(respuesta.status, 302);
   assert.match(await (await nav.pedir('/admin/diseno')).text(), /guardamos los cambios/);
+  // El descuento por transferencia y las cuotas se configuran en Envíos y pagos.
+  const pagos = await nav.enviar('/admin/pagos', {
+    pagoTransferencia: '1', transferenciaAlias: 'mi.tienda.mp', descuentoTransferencia: '15',
+    pagoMercadopago: '1', cuotasSinInteres: '6', descuentoEfectivo: '0',
+  });
+  assert.equal(pagos.status, 302);
 
   const { cuerpo } = await vidriera('disenada');
   assert.match(cuerpo, /--acento: #0a3d62; --acento-texto: #ffffff;/);

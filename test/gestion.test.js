@@ -343,14 +343,14 @@ test('cuenta: cambiar el nombre de la tienda y la clave', async () => {
 test('inicio: muestra los pasos que faltan y las alertas de stock', async () => {
   const { nav } = await tiendaConPanel('inicio');
   let html = await (await nav.pedir('/admin/inicio')).text();
-  assert.match(html, /0 de 7 pasos listos/);
+  assert.match(html, /0 de 8 pasos listos/);
   assert.match(html, /Todo en orden/);
 
   await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto(REMERA)), { desde: '/admin/productos/nuevo' });
   await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto({ nombre: 'Gorra', variantes: [{ sku: 'G', precio: '1', stock: '0' }] })), { desde: '/admin/productos/nuevo' });
   await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto({ nombre: 'Taza', variantes: [{ sku: 'T', precio: '1', stock: '2' }] })), { desde: '/admin/productos/nuevo' });
   html = await (await nav.pedir('/admin/inicio')).text();
-  assert.match(html, /1 de 7 pasos listos/);
+  assert.match(html, /1 de 8 pasos listos/);
   assert.match(html, /3 productos visibles sin foto/);
   const [, sinStock, pocas] = html.split(/<h3 class="alertas-titulo[^>]*>/);
   assert.match(sinStock, /Gorra/);

@@ -1,0 +1,113 @@
+<%- include('../parciales/cabecera', { titulo: metodo ? metodo.nombre : 'Nueva forma de entrega' }) %>
+<%
+  const f = formulario;
+  const accesibilidad = (campo, conAyuda = false) => {
+    const describe = [conAyuda && `ayuda-${campo}`, errores[campo] && `error-${campo}`].filter(Boolean).join(' ');
+    return (errores[campo] ? ' aria-invalid="true"' : '') + (describe ? ` aria-describedby="${describe}"` : '');
+  };
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+%>
+<a class="volver" href="/admin/pagos"><%- icono('izquierda', { tamano: 16 }) %> Envíos y pagos</a>
+<header class="encabezado">
+  <div>
+    <h1><%= metodo ? 'Editar forma de entrega' : 'Nueva forma de entrega' %></h1>
+    <p class="texto-suave">Así la ve el cliente al finalizar la compra.</p>
+  </div>
+</header>
+
+<% if (Object.keys(errores).length) { %>
+  <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>
+<% } %>
+
+<div class="editor editor-entrega">
+  <form method="post" action="<%= metodo ? `/admin/pagos/entregas/${metodo.id}` : '/admin/pagos/entregas/nueva' %>" class="editor-principal" id="form-entrega" data-form-entrega>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <section class="tarjeta seccion-editor">
+      <fieldset class="campo tipos-entrega">
+        <legend class="etiqueta">Tipo</legend>
+        <% for (const [clave, tipo] of Object.entries(tipos)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="tipo" value="<%= clave %>"<%= f.tipo === clave ? ' checked' : '' %>>
+            <span><%- icono(clave === 'retiro' ? 'tienda' : 'camion', { tamano: 20 }) %> <strong><%= tipo.titulo %></strong></span>
+            <span class="ayuda"><%= tipo.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('tipo') %>
+      </fieldset>
+
+      <div class="campo">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" type="text" name="nombre" value="<%= f.nombre %>" maxlength="80" required placeholder="Envío en moto en Córdoba Capital"<%- accesibilidad('nombre') %>>
+        <%- error('nombre') %>
+      </div>
+
+      <div class="campo">
+        <label for="descripcion">Detalle <span class="opcional">(opcional)</span></label>
+        <textarea id="descripcion" name="descripcion" rows="2" maxlength="200" placeholder="Llega en 24 a 48 hs hábiles. / Lunes a viernes de 10 a 18 hs."<%- accesibilidad('descripcion', true) %>><%= f.descripcion %></textarea>
+        <span class="ayuda" id="ayuda-descripcion">Zona, demora, días y horarios, dónde retirar... Se muestra debajo del nombre.</span>
+        <%- error('descripcion') %>
+      </div>
+    </section>
+
+    <section class="tarjeta seccion-editor">
+      <h2>Costo</h2>
+      <div class="ajuste-campos-dos">
+        <div class="campo">
+          <label for="costo">Costo para el cliente</label>
+          <div class="campo-con-sufijo campo-con-prefijo">
+            <span class="sufijo">$</span>
+            <input id="costo" type="text" name="costo" value="<%= f.costo %>" inputmode="decimal" placeholder="4500" data-costo<%= f.aCoordinar ? ' disabled' : '' %><%- accesibilidad('costo', true) %>>
+          </div>
+          <span class="ayuda" id="ayuda-costo">0 si es gratis.</span>
+          <%- error('costo') %>
+        </div>
+        <div class="campo">
+          <label for="gratisDesde">Gratis desde <span class="opcional">(opcional)</span></label>
+          <div class="campo-con-sufijo campo-con-prefijo">
+            <span class="sufijo">$</span>
+            <input id="gratisDesde" type="text" name="gratisDesde" value="<%= f.gratisDesde %>" inputmode="decimal" placeholder="100000" data-gratis-desde<%= f.aCoordinar ? ' disabled' : '' %><%- accesibilidad('gratisDesde', true) %>>
+          </div>
+          <span class="ayuda" id="ayuda-gratisDesde">Si la compra llega a este monto, el envío no se cobra.</span>
+          <%- error('gratisDesde') %>
+        </div>
+      </div>
+      <label class="interruptor">
+        <input type="checkbox" name="aCoordinar" value="1"<%= f.aCoordinar ? ' checked' : '' %> data-a-coordinar>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>El costo se coordina después</strong><span class="ayuda">Para envíos que dependen del destino (por ejemplo, por correo). El cliente ve "A coordinar" y se lo pasás por WhatsApp.</span></span>
+      </label>
+    </section>
+  </form>
+
+  <aside class="editor-lateral">
+    <section class="tarjeta seccion-editor">
+      <label class="interruptor">
+        <input type="checkbox" name="activo" value="1" form="form-entrega"<%= f.activo ? ' checked' : '' %>>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>Activa</strong><span class="ayuda">Si la apagás, no se ofrece, pero no se borra.</span></span>
+      </label>
+      <label class="interruptor">
+        <input type="checkbox" name="aceptaEfectivo" value="1" form="form-entrega"<%= f.aceptaEfectivo ? ' checked' : '' %>>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>Acepta pago en efectivo</strong><span class="ayuda">Si tenés activado el efectivo, el cliente puede pagar así al retirar o recibir.</span></span>
+      </label>
+      <button class="boton boton-bloque" type="submit" form="form-entrega"><%- icono('check', { tamano: 18 }) %> <%= metodo ? 'Guardar cambios' : 'Agregar forma de entrega' %></button>
+    </section>
+
+    <% if (metodo) { %>
+      <section class="tarjeta seccion-editor zona-peligro">
+        <h2>Borrar</h2>
+        <p class="ayuda">Los pedidos que ya la usaron no cambian. Si solo querés dejar de ofrecerla, apagá "Activa".</p>
+        <details class="confirmar">
+          <summary class="boton boton-peligro-suave boton-chico"><%- icono('basura', { tamano: 16 }) %> Borrar</summary>
+          <form method="post" action="/admin/pagos/entregas/<%= metodo.id %>/borrar" class="confirmar-cuerpo">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <p>¿Seguro que querés borrar "<%= metodo.nombre %>"?</p>
+            <button class="boton boton-peligro boton-chico" type="submit">Sí, borrar</button>
+          </form>
+        </details>
+      </section>
+    <% } %>
+  </aside>
+</div>
+<%- include('../parciales/pie') %>

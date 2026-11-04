@@ -27,6 +27,7 @@ export function crearApp({ db, config }) {
     urlMiTienda: null,
     nombreTienda: null,
     seccionActual: null,
+    pedidosNuevos: 0,
   });
 
   app.use(express.static(path.join(import.meta.dirname, 'publico')));

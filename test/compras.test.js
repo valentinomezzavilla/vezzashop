@@ -118,10 +118,12 @@ test('el carrito pide precios y stock frescos, solo de productos visibles', asyn
   assert.deepEqual(await json('/api/carrito'), { variantes: [] });
 });
 
-test('la ficha tiene carrito solo si la tienda tiene WhatsApp', async () => {
+test('sin checkout, la ficha tiene carrito solo si la tienda tiene WhatsApp', async () => {
   const conWhatsapp = (await pedir('/producto/camion-de-juguete')).cuerpo;
   assert.match(conWhatsapp, /data-agregar/);
-  assert.match(conWhatsapp, /<dialog class="panel-carrito"[^>]*data-whatsapp="5493511234567" data-descuento="10"/);
+  assert.match(conWhatsapp, /<dialog class="panel-carrito"[^>]*data-whatsapp="5493511234567"/);
+  assert.match(conWhatsapp, /Enviar pedido por WhatsApp/, 'sin formas de entrega y pago, el pedido se manda por WhatsApp');
+  assert.doesNotMatch(conWhatsapp, /Con transferencia \(/, 'el carrito no da por hecho cómo se va a pagar');
   assert.match(conWhatsapp, /data-avisame hidden/, 'con stock no se ofrece el aviso');
 
   const sinStock = (await pedir('/producto/gorra-sin-stock')).cuerpo;

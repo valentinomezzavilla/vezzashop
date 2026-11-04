@@ -72,38 +72,13 @@
       <div class="vista-previa" data-vista-previa aria-hidden="true">
         <span class="vista-previa-titulo">Vista previa</span>
         <div class="vista-previa-franja" data-vista-franja><%= valores.franjaTexto || 'Tu anuncio va acá' %></div>
+        <%# El logo con el mismo tamaño máximo que tiene en la cabecera de la tienda. %>
+        <div class="vista-previa-cabecera" data-vista-cabecera>
+          <% if (urlLogo) { %><img class="vista-previa-logo" src="<%= urlLogo %>" alt=""><% } else { %><span class="vista-previa-nombre"><%= nombreTienda %></span><% } %>
+        </div>
         <div class="vista-previa-cuerpo">
           <span class="vista-previa-boton">Botón de ejemplo</span>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="ajuste">
-    <div class="ajuste-intro">
-      <h2>Precios</h2>
-      <p class="texto-suave">Mostrá cuánto se ahorra pagando por transferencia y en cuántas cuotas se puede pagar.</p>
-    </div>
-    <div class="tarjeta ajuste-campos ajuste-campos-dos">
-      <div class="campo">
-        <label for="descuentoTransferencia">Descuento por transferencia</label>
-        <div class="campo-con-sufijo">
-          <input id="descuentoTransferencia" type="number" name="descuentoTransferencia" value="<%= valores.descuentoTransferencia %>"
-                 min="0" max="90" step="1" inputmode="numeric"<%- accesibilidad('descuentoTransferencia') %>>
-          <span class="sufijo">%</span>
-        </div>
-        <span class="ayuda" id="ayuda-descuentoTransferencia">Muestra "$X con transferencia". Poné 0 para no mostrarlo.</span>
-        <%- error('descuentoTransferencia') %>
-      </div>
-      <div class="campo">
-        <label for="cuotasSinInteres">Cuotas sin interés</label>
-        <div class="campo-con-sufijo">
-          <input id="cuotasSinInteres" type="number" name="cuotasSinInteres" value="<%= valores.cuotasSinInteres %>"
-                 min="0" max="24" step="1" inputmode="numeric"<%- accesibilidad('cuotasSinInteres') %>>
-          <span class="sufijo">cuotas</span>
-        </div>
-        <span class="ayuda" id="ayuda-cuotasSinInteres">Muestra "6 cuotas sin interés de $X" en cada producto. Poné 0 para no mostrarlo.</span>
-        <%- error('cuotasSinInteres') %>
       </div>
     </div>
   </section>

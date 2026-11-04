@@ -37,7 +37,7 @@ function prepararPanel(dialogo) {
   });
 }
 
-// ---------- Carrito (vive en el navegador; el pedido se manda por WhatsApp) ----------
+// ---------- Carrito (vive en el navegador; termina en /checkout o, si la tienda no lo usa, en WhatsApp) ----------
 
 const carrito = (() => {
   const CLAVE = 'carrito';
@@ -82,6 +82,7 @@ const carrito = (() => {
       fijar(items().filter((i) => i.sku !== sku));
     },
     vaciar: () => fijar([]),
+    reemplazar: (nuevos) => fijar(nuevos.map(({ sku, cantidad }) => ({ sku, cantidad }))),
   };
 })();
 
@@ -94,7 +95,7 @@ function panelCarrito() {
   const contador = $('[data-contador-carrito]');
   const lista = $('[data-carrito-items]', dialogo);
   const pie = $('[data-carrito-pie]', dialogo);
-  const descuento = Number(dialogo.dataset.descuento) || 0;
+  const conCheckout = 'checkout' in dialogo.dataset;
 
   function actualizarContador() {
     const n = carrito.cantidadTotal();
@@ -108,7 +109,7 @@ function panelCarrito() {
     lista.replaceChildren(
       el('div', { class: 'carrito-vacio' },
         el('p', { class: 'carrito-vacio-titulo', texto: 'Tu carrito está vacío' }),
-        el('p', { texto: 'Agregá productos y mandanos el pedido por WhatsApp.' }),
+        el('p', { texto: conCheckout ? 'Agregá productos para hacer tu pedido.' : 'Agregá productos y mandanos el pedido por WhatsApp.' }),
         el('button', { class: 'boton', type: 'button', texto: 'Ver productos', onclick: () => (dialogo.close(), location.assign('/')) })),
     );
   }
@@ -146,11 +147,9 @@ function panelCarrito() {
       el('ul', { class: 'carrito-lista' }, ...lineas.map(lineaCarrito)),
     );
     const total = lineas.reduce((suma, l) => suma + l.precioFinal * l.cantidad, 0);
-    const conDescuento = Math.round((total * (100 - descuento)) / 100);
     $('[data-carrito-total]', dialogo).textContent = pesos(total);
-    const transferencia = $('[data-carrito-transferencia]', dialogo);
-    if (transferencia) transferencia.textContent = pesos(conDescuento);
-    $('[data-carrito-enviar]', dialogo).href = mensajeWhatsapp(lineas, total, conDescuento);
+    if (conCheckout) $('[data-carrito-checkout]', dialogo).href = urlCheckout(lineas);
+    else $('[data-carrito-enviar]', dialogo).href = mensajeWhatsapp(lineas, total);
     pie.hidden = false;
   }
 
@@ -186,7 +185,7 @@ function panelCarrito() {
       el('strong', { class: 'carrito-subtotal', texto: pesos(l.precioFinal * l.cantidad) }));
   }
 
-  function mensajeWhatsapp(lineas, total, conDescuento) {
+  function mensajeWhatsapp(lineas, total) {
     const renglones = lineas.map((l) =>
       `• ${l.cantidad} × ${l.nombre}${l.detalle ? ` (${l.detalle})` : ''} — ${pesos(l.precioFinal * l.cantidad)}\n   SKU ${l.sku}`);
     const texto = [
@@ -195,7 +194,6 @@ function panelCarrito() {
       ...renglones,
       '',
       `Total: ${pesos(total)}`,
-      descuento ? `Con transferencia (${descuento}% off): ${pesos(conDescuento)}` : null,
       '',
       '¿Me confirmás el stock y cómo seguimos con el pago y el envío?',
     ].filter((r) => r !== null).join('\n');
@@ -203,15 +201,135 @@ function panelCarrito() {
   }
 
   botonAbrir.addEventListener('click', () => abrir());
+  // Si se cambia el carrito estando en el checkout, el checkout se vuelve a armar con lo nuevo al cerrar el panel.
+  let alAbrir = '';
+  dialogo.addEventListener('close', () => {
+    if (location.pathname !== '/checkout' || JSON.stringify(carrito.items()) === alAbrir) return;
+    location.assign(carrito.items().length ? urlCheckout(carrito.items()) : '/checkout');
+  });
   document.addEventListener('carrito-cambio', actualizarContador);
   window.addEventListener('storage', (evento) => evento.key === 'carrito' && actualizarContador());
   actualizarContador();
 
   function abrir() {
+    alAbrir = JSON.stringify(carrito.items());
     dialogo.showModal();
     dibujar();
   }
   return { abrir };
+}
+
+// /checkout?sku=A&cantidad=2&sku=B&cantidad=1
+function urlCheckout(lineas) {
+  const parametros = new URLSearchParams();
+  for (const { sku, cantidad } of lineas) {
+    parametros.append('sku', sku);
+    parametros.append('cantidad', String(cantidad));
+  }
+  return `/checkout?${parametros}`;
+}
+
+// ---------- Checkout: total en vivo según la entrega y el pago elegidos ----------
+
+function checkout(panel) {
+  const datosScript = document.getElementById('datos-checkout');
+  if (!datosScript) return;
+  const datos = JSON.parse(datosScript.textContent);
+  // Se entró a /checkout sin productos en el link: se arma con el carrito guardado, si hay.
+  if (datos.sinItems) {
+    if (carrito.items().length) location.replace(urlCheckout(carrito.items()));
+    return;
+  }
+  // Lo que quedó en el checkout (con el stock de ahora) pasa a ser el carrito.
+  if (JSON.stringify(carrito.items()) !== JSON.stringify(datos.carrito)) carrito.reemplazar(datos.carrito);
+
+  const formulario = $('[data-checkout-formulario]');
+  if (!formulario) return;
+  const direccion = $('[data-direccion]', formulario);
+  const total = (clave) => $(`[data-total="${clave}"]`, formulario);
+  const elegido = (nombre) => $(`input[name="${nombre}"]:checked`, formulario)?.value;
+
+  function actualizar() {
+    const entrega = datos.entregas.find((e) => e.id === elegido('entrega'));
+    // El efectivo solo con las entregas que lo aceptan.
+    const efectivo = $('[data-opcion-pago="efectivo"]', formulario);
+    if (efectivo) {
+      const noDisponible = Boolean(entrega && !entrega.aceptaEfectivo);
+      const radio = $('input', efectivo);
+      radio.disabled = noDisponible;
+      if (noDisponible) radio.checked = false;
+      efectivo.classList.toggle('no-disponible', noDisponible);
+      $('[data-sin-efectivo]', efectivo).hidden = !noDisponible;
+    }
+    const pago = datos.pagos.find((p) => p.clave === elegido('pago'));
+
+    // La dirección solo cuando hay que mandarlo. Deshabilitada no se valida ni se envía.
+    const conDireccion = entrega ? entrega.tipo === 'domicilio' : datos.entregas.some((e) => e.tipo === 'domicilio');
+    direccion.hidden = !conDireccion;
+    direccion.disabled = !conDireccion;
+
+    const porcentaje = pago?.descuento ?? 0;
+    const descuento = Math.round((datos.subtotal * porcentaje) / 100);
+    const envio = !entrega || entrega.costo === null ? null
+      : entrega.gratisDesde !== null && datos.subtotal >= entrega.gratisDesde ? 0 : entrega.costo;
+    total('porcentaje').textContent = String(porcentaje);
+    total('descuento').textContent = `−${pesos(descuento)}`;
+    $('[data-fila-descuento]', formulario).hidden = descuento === 0;
+    total('envio').textContent = !entrega ? 'Elegí la entrega' : envio === null ? 'A coordinar' : envio === 0 ? 'Gratis' : pesos(envio);
+    total('total').textContent = pesos(datos.subtotal - descuento + (envio ?? 0));
+    $('[data-mas-envio]', formulario).hidden = !(entrega && envio === null);
+  }
+  formulario.addEventListener('change', (evento) => {
+    if (evento.target.matches('[data-entrega], [data-pago]')) actualizar();
+  });
+  actualizar();
+
+  // "Modificar el carrito" abre el panel del carrito en vez de irse.
+  $('[data-editar-carrito]', formulario)?.addEventListener('click', (evento) => {
+    evento.preventDefault();
+    panel.abrir();
+  });
+
+  const boton = $('[data-confirmar]', formulario);
+  formulario.addEventListener('submit', (evento) => {
+    if (!formulario.checkValidity()) {
+      // Marca lo que falta en el primer campo con problemas, con el mensaje del navegador.
+      evento.preventDefault();
+      formulario.reportValidity();
+      return;
+    }
+    // Evita pedidos duplicados por doble clic.
+    setTimeout(() => (boton.disabled = true), 0);
+    boton.setAttribute('aria-busy', 'true');
+  });
+  // Si se vuelve a la página con "atrás", el botón tiene que andar de nuevo.
+  window.addEventListener('pageshow', () => {
+    boton.disabled = false;
+    boton.removeAttribute('aria-busy');
+  });
+}
+
+// ---------- Pedido confirmado ----------
+
+function paginaDePedido() {
+  if ($('[data-pedido-nuevo]')) {
+    carrito.vaciar();
+    // Sin el ?nuevo=1: si después se vuelve a abrir el link, no se vacía un carrito nuevo.
+    history.replaceState(null, '', location.pathname);
+  }
+  for (const boton of $$('[data-copiar]')) {
+    const texto = $('[data-copiar-texto]', boton);
+    boton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(boton.dataset.copiar);
+        texto.textContent = '¡Copiado!';
+        anunciar('Copiado');
+      } catch {
+        texto.textContent = 'Copialo a mano';
+      }
+      setTimeout(() => (texto.textContent = 'Copiar'), 2000);
+    });
+  }
 }
 
 // ---------- Ficha: variantes, cantidad, agregar al carrito ----------
@@ -256,11 +374,13 @@ function fichaDeProducto(panel) {
     e.stock.textContent = variante.stock.texto;
     e.stock.className = `stock ${variante.stock.clase}`;
     e.sku.textContent = variante.sku;
-    if (e.whatsapp) e.whatsapp.href = variante.whatsapp;
+    if (e.whatsapp && variante.whatsapp) e.whatsapp.href = variante.whatsapp;
     if (e.comprar) {
       e.comprar.hidden = !variante.hayStock;
-      e.avisame.hidden = variante.hayStock;
-      e.avisame.href = variante.avisame;
+      if (e.avisame) {
+        e.avisame.hidden = variante.hayStock;
+        e.avisame.href = variante.avisame;
+      }
       e.cantidad.max = variante.disponibles;
       e.cantidad.value = Math.min(Math.max(Number(e.cantidad.value) || 1, 1), Math.max(variante.disponibles, 1));
       e['barra-precio'].textContent = variante.precio;
@@ -573,6 +693,8 @@ function menuMovil() {
 
 const panel = panelCarrito();
 fichaDeProducto(panel);
+checkout(panel);
+paginaDePedido();
 botonCompartir();
 buscador();
 selectorDeOrden();

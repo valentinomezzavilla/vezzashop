@@ -1,5 +1,7 @@
 // Datos del tablero de Inicio del panel: qué le falta a la tienda, números y alertas de stock.
 import { leerAjustes, listarBanners } from './diseno.js';
+import { estadoCheckout } from './pagos.js';
+import { contarPedidosPorFiltro } from './pedidos.js';
 
 const POCAS_UNIDADES = 3;
 const COLOR_POR_DEFECTO = '#1a1a1a';
@@ -38,7 +40,16 @@ export function resumenTienda(db, tiendaId) {
     { clave: 'color', hecho: ajustes.colorPrincipal !== COLOR_POR_DEFECTO, titulo: 'Elegí el color de tu marca', detalle: 'Para la franja de anuncios y los botones.', enlace: '/admin/diseno', accion: 'Elegir color' },
     { clave: 'banners', hecho: listarBanners(db, tiendaId).length > 0, titulo: 'Agregá un banner de bienvenida', detalle: 'La imagen grande de la portada.', enlace: '/admin/diseno#banners', accion: 'Agregar banner' },
     { clave: 'whatsapp', hecho: Boolean(ajustes.whatsapp), titulo: 'Conectá tu WhatsApp', detalle: 'Para que te consulten desde cada producto.', enlace: '/admin/diseno', accion: 'Agregar WhatsApp' },
+    {
+      clave: 'checkout',
+      hecho: estadoCheckout(db, tiendaId, ajustes).activo,
+      titulo: 'Activá la compra online',
+      detalle: 'Elegí cómo entregás y cómo cobrás, y te compran desde la tienda.',
+      enlace: '/admin/pagos',
+      accion: 'Configurar envíos y pagos',
+    },
   ];
+  const pedidos = contarPedidosPorFiltro(db, tiendaId);
 
   const sinStock = db
     .prepare(
@@ -56,5 +67,5 @@ export function resumenTienda(db, tiendaId) {
     .all(tiendaId, POCAS_UNIDADES)
     .map((v) => ({ ...v, valores: [v.valor1, v.valor2, v.valor3].filter((x) => x !== null).join(' / ') }));
 
-  return { numeros, pasos, hechos: pasos.filter((p) => p.hecho).length, sinStock, pocasUnidades };
+  return { numeros, pasos, hechos: pasos.filter((p) => p.hecho).length, sinStock, pocasUnidades, pedidos };
 }

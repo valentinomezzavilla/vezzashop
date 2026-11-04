@@ -6,7 +6,7 @@
   <% const tituloPagina = titulo === tienda.nombre ? tienda.nombre : `${titulo} · ${tienda.nombre}` %>
   <title><%= tituloPagina %></title>
   <meta name="description" content="<%= meta.descripcion %>">
-  <link rel="canonical" href="<%= urlActual %>">
+  <% if (noIndexar) { %><meta name="robots" content="noindex"><% } else { %><link rel="canonical" href="<%= urlActual %>"><% } %>
   <meta name="theme-color" content="<%= ajustes.colorPrincipal %>">
   <%# Vista previa al compartir el link (WhatsApp, Instagram, Facebook). Las imágenes tienen que ser absolutas. %>
   <meta property="og:site_name" content="<%= tienda.nombre %>">
@@ -65,7 +65,7 @@
 
     <div class="cabecera-acciones">
       <a class="boton-icono" href="/buscar" data-abrir-buscador aria-label="Buscar productos"><%- icono('lupa', { tamano: 22 }) %></a>
-      <% if (ajustes.whatsapp) { %>
+      <% if (checkoutActivo || ajustes.whatsapp) { %>
         <button class="boton-icono boton-carrito" type="button" data-abrir-carrito hidden aria-label="Carrito">
           <%- icono('bolsa', { tamano: 22 }) %>
           <span class="contador-carrito" data-contador-carrito hidden>0</span>
