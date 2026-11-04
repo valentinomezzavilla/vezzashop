@@ -30,6 +30,12 @@ export function crearApp({ db, config }) {
     pedidosNuevos: 0,
   });
 
+  // Para el chequeo de salud de Coolify/Docker: va primero para responder con cualquier host y sin crear sesión.
+  app.get('/salud', (req, res) => {
+    db.prepare('SELECT 1').get();
+    res.type('text').send('ok');
+  });
+
   app.use(express.static(path.join(import.meta.dirname, 'publico')));
   // Imágenes subidas por los clientes. Cada archivo tiene un nombre nuevo, así que se pueden cachear para siempre.
   app.use('/subidas', express.static(config.dirSubidas, { immutable: true, maxAge: '365d', index: false }));

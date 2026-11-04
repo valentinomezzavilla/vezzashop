@@ -127,8 +127,8 @@ reconoce por el contenido del archivo; los SVG no se aceptan porque pueden traer
 producción, `data/` tiene que estar en un volumen persistente.
 
 Para producción hace falta un solo dominio, con dos registros DNS apuntando al servidor:
-`vezzashop.com` y `*.vezzashop.com`. El certificado HTTPS de `*.vezzashop.com` necesita un comodín:
-lo más simple es usar Cloudflare con el proxy activado, o configurar el DNS challenge en el proxy.
+`vezzashop.com` y `*.vezzashop.com`. El certificado HTTPS de `*.vezzashop.com` necesita un comodín
+(DNS challenge en el proxy). Ver [Publicar en Coolify](#publicar-en-coolify).
 Detrás del proxy, `NODE_ENV=production` hace que se respete el host original (`trust proxy`).
 
 ## Envíos y pagos
@@ -148,6 +148,60 @@ tiene al menos una forma de entrega y una de pago activas (si no, el carrito sig
 
 Los pedidos guardan una copia de lo comprado (productos, precios, entrega, dirección), así no cambian si después
 cambia el catálogo. Cancelar un pedido devuelve el stock de lo que todavía existe.
+
+## Publicar en Coolify
+
+El repo trae un `Dockerfile` (Node 24 Alpine, corre sin root y responde `ok` en `/salud` para el chequeo de
+salud). En los ejemplos el dominio es `vezzashop.com`: cambialo por el tuyo.
+
+1. **DNS:** dos registros `A`, `vezzashop.com` y `*.vezzashop.com`, con la IP del servidor. Si usás Cloudflare,
+   dejalos en **solo DNS** (nube gris). Con el proxy de Cloudflare todas las visitas llegan con la IP de
+   Cloudflare y el límite de pedidos por IP del checkout las cuenta juntas.
+2. **Certificado comodín (una sola vez por servidor):** el certificado de `*.vezzashop.com` solo se consigue con el
+   DNS challenge. Seguí la guía de Coolify
+   ([DNS challenge](https://coolify.io/docs/knowledge-base/proxy/traefik/dns-challenge) y
+   [certificados comodín](https://coolify.io/docs/core/networking/proxy/traefik/wildcard-certs)): token de la API
+   de tu DNS en **Servers → Proxy → Configuration**, **Restart Proxy**, y una *Dynamic Configuration* que pida
+   `vezzashop.com` con `*.vezzashop.com` como SAN.
+3. **Nueva aplicación:** **+ New → Public Repository**, URL `https://github.com/valentinomezzavilla/vezzashop`,
+   rama `master`, **Build Pack: Dockerfile**, **Ports Exposes: `3000`**. Si el repo pasa a ser privado,
+   usá **Private Repository (with GitHub App)**.
+4. **Domains:** `https://vezzashop.com` (el panel).
+5. **Environment Variables:**
+   - `SECRETO_SESION`: generalo con el comando de [Configuración](#configuración). No lo marques como
+     variable de build.
+   - `DOMINIO=vezzashop.com`
+   - `NODE_ENV=production` y `PUERTO=3000` ya vienen en la imagen.
+6. **Persistent Storage → + Add → Volume Mount**, destino **`/app/data`**. Ahí van la base, las imágenes y los
+   Excel. **Sin el volumen, cada deploy borra todo.**
+7. **Healthcheck:** activalo con path `/salud` y puerto `3000`.
+8. **Subdominios de las tiendas:** el campo Domains no alcanza para `*.vezzashop.com`. Guardá una vez para
+   que Coolify genere las etiquetas y destildá **Readonly labels**. Después agregá al final de
+   **Container Labels** (Traefik v3, el de las instalaciones nuevas):
+
+   ```ini
+   traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+   traefik.http.routers.tiendas-http.rule=HostRegexp(`^[a-z0-9-]+\.vezzashop\.com$`)
+   traefik.http.routers.tiendas-http.entryPoints=http
+   traefik.http.routers.tiendas-http.middlewares=redirect-to-https
+   traefik.http.routers.tiendas-http.service=tiendas
+   traefik.http.routers.tiendas-https.rule=HostRegexp(`^[a-z0-9-]+\.vezzashop\.com$`)
+   traefik.http.routers.tiendas-https.entryPoints=https
+   traefik.http.routers.tiendas-https.tls=true
+   traefik.http.routers.tiendas-https.tls.certresolver=letsencrypt
+   traefik.http.routers.tiendas-https.service=tiendas
+   traefik.http.services.tiendas.loadbalancer.server.port=3000
+   ```
+
+   Con las etiquetas en manual, Coolify ya no las actualiza solo: si cambiás el dominio, revisalas a mano.
+9. **Deploy.** Después, en la **Terminal** de la aplicación, creá la primera tienda:
+   `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com`.
+10. Probá `https://vezzashop.com/admin` y el subdominio de la tienda. Entrá siempre por **https**: en
+    producción la cookie de sesión solo viaja por HTTPS, y por http el login no anda.
+
+Para desplegar solo con cada push a `master`: con la GitHub App es automático; con repo público, copiá la
+URL de la pestaña **Webhooks** de la aplicación en GitHub (Settings → Webhooks). Si no, usá **Redeploy**.
+Las migraciones de la base se aplican solas al arrancar.
 
 ## Estructura
 
