@@ -34,7 +34,7 @@
       <input type="hidden" name="filtro" value="<%= filtro %>">
       <label class="visualmente-oculto" for="q">Buscar productos</label>
       <%- icono('lupa', { tamano: 18 }) %>
-      <input id="q" type="search" name="q" value="<%= busqueda %>" placeholder="Buscar por nombre, marca o SKU">
+      <input id="q" type="search" name="q" value="<%= busqueda %>" placeholder="Buscar producto o SKU">
     </form>
   </div>
 
@@ -70,15 +70,15 @@
                 </span>
               </a>
             </td>
-            <td class="precio-celda">
+            <td class="precio-celda" data-etiqueta="Precio">
               <%= formatearPrecio(p.precioMinimo) %><% if (p.precioMaximo !== p.precioMinimo) { %> – <%= formatearPrecio(p.precioMaximo) %><% } %>
             </td>
-            <td class="numero">
+            <td class="numero" data-etiqueta="Stock">
               <% if (p.stock === 0) { %><span class="sin-stock">Sin stock</span>
               <% } else { %><%= p.stock %><% if (p.variantesSinStock) { %><span class="ayuda celda-nota"><%= p.variantesSinStock %> sin stock</span><% } %><% } %>
             </td>
-            <td><span class="pastilla<%= p.visible ? ' pastilla-ok' : '' %>"><%= p.visible ? 'Visible' : 'Oculto' %></span></td>
-            <td>
+            <td data-etiqueta="Estado"><span class="pastilla<%= p.visible ? ' pastilla-ok' : '' %>"><%= p.visible ? 'Visible' : 'Oculto' %></span></td>
+            <td class="celda-acciones">
               <div class="acciones-fila">
                 <form method="post" action="/admin/productos/<%= p.id %>/destacado">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">

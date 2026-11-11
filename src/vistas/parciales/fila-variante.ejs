@@ -5,14 +5,14 @@
       <input type="text" name="valor<%= n + 1 %>" value="<%= v.valores[n] ?? '' %>" maxlength="60" aria-label="<%= atributos[n] || `Variante ${n + 1}` %>" data-valor="<%= n %>">
     </td>
   <% } %>
-  <td>
+  <td class="celda-sku" data-etiqueta="SKU">
     <input type="hidden" name="varianteId" value="<%= v.id %>">
     <input type="text" name="sku" value="<%= v.sku %>" maxlength="64" aria-label="SKU" class="entrada-sku" data-campo="sku">
   </td>
-  <td><input type="text" name="precio" value="<%= v.precio %>" inputmode="decimal" aria-label="Precio" class="entrada-precio" data-campo="precio"></td>
-  <td><input type="text" name="precioPromocional" value="<%= v.precioPromocional %>" inputmode="decimal" aria-label="Precio de oferta" class="entrada-precio" data-campo="precioPromocional"></td>
-  <td><input type="text" name="stock" value="<%= v.stock %>" inputmode="numeric" aria-label="Stock" class="entrada-stock" data-campo="stock"></td>
-  <td>
+  <td data-etiqueta="Precio"><input type="text" name="precio" value="<%= v.precio %>" inputmode="decimal" aria-label="Precio" class="entrada-precio" data-campo="precio"></td>
+  <td data-etiqueta="Oferta"><input type="text" name="precioPromocional" value="<%= v.precioPromocional %>" inputmode="decimal" aria-label="Precio de oferta" class="entrada-precio" data-campo="precioPromocional"></td>
+  <td data-etiqueta="Stock"><input type="text" name="stock" value="<%= v.stock %>" inputmode="numeric" aria-label="Stock" class="entrada-stock" data-campo="stock"></td>
+  <td class="celda-quitar">
     <button class="boton-icono boton-icono-chico boton-icono-peligro" type="button" data-quitar-fila aria-label="Quitar esta variante" title="Quitar variante">
       <%- icono('cerrar', { tamano: 16 }) %>
     </button>

@@ -147,6 +147,7 @@ if (formProducto) {
       for (const celda of formProducto.querySelectorAll(`[data-columna-valor="${n}"]`)) {
         celda.hidden = !nombre;
         if (celda.tagName === 'TH') celda.textContent = nombre || `Variante ${n + 1}`;
+        else celda.dataset.etiqueta = nombre || `Variante ${n + 1}`; // etiqueta visible en el celular (ver admin.css)
         celda.querySelector('input')?.setAttribute('aria-label', nombre || `Variante ${n + 1}`);
       }
       const etiqueta = document.querySelector(`[data-generador-etiqueta="${n}"]`);
