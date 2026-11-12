@@ -41,35 +41,35 @@ export function rutasAdminTienda({ db, config }) {
 
   // ---------- Inicio ----------
 
-  router.get('/inicio', (req, res) => {
-    const tienda = buscarTienda(db, req.session.usuario.tiendaId);
-    res.render('admin/inicio', { resumen: resumenTienda(db, tienda.id), tienda });
+  router.get('/inicio', async (req, res) => {
+    const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
+    res.render('admin/inicio', { resumen: await resumenTienda(db, tienda.id), tienda });
   });
 
   // ---------- Productos ----------
 
-  router.get('/productos', (req, res) => {
+  router.get('/productos', async (req, res) => {
     const { tiendaId } = req.session.usuario;
     const filtro = esFiltro(req.query.filtro) ? req.query.filtro : 'todos';
     const busqueda = String(req.query.q ?? '').slice(0, 100);
     res.render('admin/productos', {
-      productos: listarProductosAdmin(db, tiendaId, { busqueda, filtro }).map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto) })),
-      cuentas: contarPorFiltro(db, tiendaId),
+      productos: (await listarProductosAdmin(db, tiendaId, { busqueda, filtro })).map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto) })),
+      cuentas: await contarPorFiltro(db, tiendaId),
       filtros: FILTROS,
       filtro,
       busqueda,
     });
   });
 
-  function mostrarEditor(req, res, { producto = null, formulario, errores = {}, status = 200 }) {
+  async function mostrarEditor(req, res, { producto = null, formulario, errores = {}, status = 200 }) {
     const { tiendaId } = req.session.usuario;
-    const tienda = buscarTienda(db, tiendaId);
+    const tienda = await buscarTienda(db, tiendaId);
     res.status(status).render('admin/producto', {
       producto,
       formulario,
       errores,
-      categorias: aplanar(arbolCategoriasAdmin(db, tiendaId)),
-      fotos: producto ? listarFotos(db, tiendaId, producto.id).map((f) => ({ ...f, url: urlImagen(tiendaId, f.archivo) })) : [],
+      categorias: aplanar(await arbolCategoriasAdmin(db, tiendaId)),
+      fotos: producto ? (await listarFotos(db, tiendaId, producto.id)).map((f) => ({ ...f, url: urlImagen(tiendaId, f.archivo) })) : [],
       urlEnTienda: producto ? `${urlTienda(req, config.dominio, tienda.slug)}/producto/${producto.slug}` : null,
       maxAtributos: MAX_ATRIBUTOS,
       maxFotos: MAX_FOTOS,
@@ -81,19 +81,19 @@ export function rutasAdminTienda({ db, config }) {
 
   router.get('/productos/nuevo', (req, res) => mostrarEditor(req, res, { formulario: formularioDesdeProducto(null) }));
 
-  router.post('/productos/nuevo', verificarCsrf, (req, res) => {
+  router.post('/productos/nuevo', verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const { datos, formulario, errores } = validarProducto(db, tiendaId, null, req.body);
+    const { datos, formulario, errores } = await validarProducto(db, tiendaId, null, req.body);
     if (hayErrores(errores)) return mostrarEditor(req, res, { formulario, errores, status: 400 });
-    const nuevoId = guardarProducto(db, tiendaId, null, datos);
+    const nuevoId = await guardarProducto(db, tiendaId, null, datos);
     avisar(req, 'ok', 'Creamos el producto. Ahora podés sumarle fotos.');
     res.redirect(`/admin/productos/${nuevoId}`);
   });
 
   // Carga el producto de la tienda; si no existe (o es de otra tienda) sigue de largo hasta el 404.
-  const cargarProducto = (req, res, next) => {
+  const cargarProducto = async (req, res, next) => {
     const productoId = id(req.params.productoId);
-    req.producto = productoId === null ? null : leerProducto(db, req.session.usuario.tiendaId, productoId);
+    req.producto = productoId === null ? null : await leerProducto(db, req.session.usuario.tiendaId, productoId);
     next(req.producto ? undefined : 'route');
   };
 
@@ -101,18 +101,18 @@ export function rutasAdminTienda({ db, config }) {
     mostrarEditor(req, res, { producto: req.producto, formulario: formularioDesdeProducto(req.producto) });
   });
 
-  router.post('/productos/:productoId', cargarProducto, verificarCsrf, (req, res) => {
+  router.post('/productos/:productoId', cargarProducto, verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const { datos, formulario, errores } = validarProducto(db, tiendaId, req.producto.id, req.body);
+    const { datos, formulario, errores } = await validarProducto(db, tiendaId, req.producto.id, req.body);
     if (hayErrores(errores)) return mostrarEditor(req, res, { producto: req.producto, formulario, errores, status: 400 });
-    guardarProducto(db, tiendaId, req.producto.id, datos);
+    await guardarProducto(db, tiendaId, req.producto.id, datos);
     avisar(req, 'ok', 'Guardamos los cambios del producto.');
     res.redirect(`/admin/productos/${req.producto.id}`);
   });
 
   router.post('/productos/:productoId/borrar', cargarProducto, verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const fotos = borrarProducto(db, tiendaId, req.producto.id) ?? [];
+    const fotos = (await borrarProducto(db, tiendaId, req.producto.id)) ?? [];
     for (const archivo of fotos) await borrarImagen(config.dirSubidas, tiendaId, archivo);
     avisar(req, 'ok', `Borramos "${req.producto.nombre}".`);
     res.redirect('/admin/productos');
@@ -122,9 +122,9 @@ export function rutasAdminTienda({ db, config }) {
   // El chequeo del campo va primero: "/fotos" también entra acá y tiene que seguir de largo antes del CSRF,
   // porque su formulario es multipart y todavía no se leyó.
   const soloMarcas = (req, res, next) => next(['visible', 'destacado'].includes(req.params.campo) ? undefined : 'route');
-  router.post('/productos/:productoId/:campo', soloMarcas, cargarProducto, verificarCsrf, (req, res) => {
+  router.post('/productos/:productoId/:campo', soloMarcas, cargarProducto, verificarCsrf, async (req, res) => {
     const valor = req.body.valor === '1';
-    cambiarMarca(db, req.session.usuario.tiendaId, req.producto.id, req.params.campo, valor);
+    await cambiarMarca(db, req.session.usuario.tiendaId, req.producto.id, req.params.campo, valor);
     const textos = {
       visible: valor ? 'ya se ve en la tienda' : 'quedó oculto',
       destacado: valor ? 'aparece en Destacados' : 'ya no está en Destacados',
@@ -158,7 +158,7 @@ export function rutasAdminTienda({ db, config }) {
         avisar(req, 'error', 'Elegí al menos una foto.', 'fotos');
         return volverAFotos(req, res);
       }
-      const lugar = MAX_FOTOS - listarFotos(db, tiendaId, req.producto.id).length;
+      const lugar = MAX_FOTOS - (await listarFotos(db, tiendaId, req.producto.id)).length;
       if (archivos.length > lugar) {
         avisar(req, 'error', lugar ? `Podés agregar ${plural(lugar, 'foto más', 'fotos más')}.` : `Ya tiene ${MAX_FOTOS} fotos, el máximo.`, 'fotos');
         return volverAFotos(req, res);
@@ -173,7 +173,7 @@ export function rutasAdminTienda({ db, config }) {
         avisar(req, 'error', `No subimos nada: ${error.message}`, 'fotos');
         return volverAFotos(req, res);
       }
-      for (const archivo of guardadas) agregarFoto(db, tiendaId, req.producto.id, archivo);
+      for (const archivo of guardadas) await agregarFoto(db, tiendaId, req.producto.id, archivo);
       avisar(req, 'ok', guardadas.length === 1 ? 'Agregamos la foto.' : `Agregamos ${guardadas.length} fotos.`, 'fotos');
       volverAFotos(req, res);
     },
@@ -186,49 +186,49 @@ export function rutasAdminTienda({ db, config }) {
     const { accion } = req.params;
     if (accion !== 'borrar' && !Object.hasOwn(ACCIONES_FOTO, accion)) return next();
     if (fotoId !== null && accion === 'borrar') {
-      const archivo = borrarFoto(db, tiendaId, req.producto.id, fotoId);
+      const archivo = await borrarFoto(db, tiendaId, req.producto.id, fotoId);
       if (archivo) {
         await borrarImagen(config.dirSubidas, tiendaId, archivo);
         avisar(req, 'ok', 'Borramos la foto.', 'fotos');
       }
     } else if (fotoId !== null) {
-      moverFoto(db, tiendaId, req.producto.id, fotoId, ACCIONES_FOTO[accion]);
+      await moverFoto(db, tiendaId, req.producto.id, fotoId, ACCIONES_FOTO[accion]);
     }
     volverAFotos(req, res);
   });
 
   // ---------- Categorías ----------
 
-  function mostrarCategorias(req, res, { error = null, valores = {}, editando = null, status = 200 } = {}) {
-    const arbol = arbolCategoriasAdmin(db, req.session.usuario.tiendaId);
+  async function mostrarCategorias(req, res, { error = null, valores = {}, editando = null, status = 200 } = {}) {
+    const arbol = await arbolCategoriasAdmin(db, req.session.usuario.tiendaId);
     res.status(status).render('admin/categorias', { categorias: aplanar(arbol), error, valores, editando });
   }
 
   router.get('/categorias', (req, res) => mostrarCategorias(req, res));
 
-  router.post('/categorias', verificarCsrf, (req, res) => {
+  router.post('/categorias', verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const { datos, error } = validarCategoria(db, tiendaId, null, req.body);
+    const { datos, error } = await validarCategoria(db, tiendaId, null, req.body);
     if (error) return mostrarCategorias(req, res, { error, valores: req.body, status: 400 });
-    crearCategoria(db, tiendaId, datos);
+    await crearCategoria(db, tiendaId, datos);
     avisar(req, 'ok', `Creamos la categoría "${datos.nombre}".`);
     res.redirect('/admin/categorias');
   });
 
-  router.post('/categorias/:categoriaId', verificarCsrf, (req, res, next) => {
+  router.post('/categorias/:categoriaId', verificarCsrf, async (req, res, next) => {
     const { tiendaId } = req.session.usuario;
     const categoriaId = id(req.params.categoriaId);
     if (categoriaId === null) return next();
-    const { datos, error } = validarCategoria(db, tiendaId, categoriaId, req.body);
+    const { datos, error } = await validarCategoria(db, tiendaId, categoriaId, req.body);
     if (error) return mostrarCategorias(req, res, { error, valores: req.body, editando: categoriaId, status: 400 });
-    if (!editarCategoria(db, tiendaId, categoriaId, datos)) return next();
+    if (!(await editarCategoria(db, tiendaId, categoriaId, datos))) return next();
     avisar(req, 'ok', `Guardamos "${datos.nombre}".`);
     res.redirect('/admin/categorias');
   });
 
-  router.post('/categorias/:categoriaId/borrar', verificarCsrf, (req, res, next) => {
+  router.post('/categorias/:categoriaId/borrar', verificarCsrf, async (req, res, next) => {
     const categoriaId = id(req.params.categoriaId);
-    const borradas = categoriaId === null ? 0 : borrarCategoria(db, req.session.usuario.tiendaId, categoriaId);
+    const borradas = categoriaId === null ? 0 : await borrarCategoria(db, req.session.usuario.tiendaId, categoriaId);
     if (!borradas) return next();
     avisar(req, 'ok', borradas === 1 ? 'Borramos la categoría.' : `Borramos la categoría y ${plural(borradas - 1, 'subcategoría', 'subcategorías')}.`);
     res.redirect('/admin/categorias');
@@ -236,8 +236,8 @@ export function rutasAdminTienda({ db, config }) {
 
   // ---------- Cuenta ----------
 
-  function mostrarCuenta(req, res, { errores = {}, status = 200 } = {}) {
-    const tienda = buscarTienda(db, req.session.usuario.tiendaId);
+  async function mostrarCuenta(req, res, { errores = {}, status = 200 } = {}) {
+    const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
     res.status(status).render('admin/cuenta', {
       tienda,
       email: req.session.usuario.email,
@@ -249,8 +249,8 @@ export function rutasAdminTienda({ db, config }) {
 
   router.get('/cuenta', (req, res) => mostrarCuenta(req, res));
 
-  router.post('/cuenta/tienda', verificarCsrf, (req, res) => {
-    const error = renombrarTienda(db, req.session.usuario.tiendaId, req.body.nombre);
+  router.post('/cuenta/tienda', verificarCsrf, async (req, res) => {
+    const error = await renombrarTienda(db, req.session.usuario.tiendaId, req.body.nombre);
     if (error) return mostrarCuenta(req, res, { errores: { nombre: error }, status: 400 });
     avisar(req, 'ok', 'Cambiamos el nombre de la tienda.');
     res.redirect('/admin/cuenta');

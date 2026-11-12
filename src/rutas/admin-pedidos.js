@@ -56,34 +56,34 @@ export function rutasAdminPedidos({ db, config }) {
 
   // ---------- Pedidos ----------
 
-  router.get('/pedidos', (req, res) => {
+  router.get('/pedidos', async (req, res) => {
     const { tiendaId } = req.session.usuario;
     const filtro = esFiltroPedidos(req.query.filtro) ? req.query.filtro : 'abiertos';
     const busqueda = String(req.query.q ?? '').slice(0, 100);
-    const ajustes = leerAjustes(db, tiendaId);
+    const ajustes = await leerAjustes(db, tiendaId);
     res.render('admin/pedidos', {
-      pedidos: listarPedidos(db, tiendaId, { filtro, busqueda }).map((p) => ({
+      pedidos: (await listarPedidos(db, tiendaId, { filtro, busqueda })).map((p) => ({
         ...p,
         fecha: formatearFecha(p.creadoEn),
         tituloEstado: tituloEstado(p.estado, p.entrega.tipo),
       })),
-      cuentas: contarPedidosPorFiltro(db, tiendaId),
+      cuentas: await contarPedidosPorFiltro(db, tiendaId),
       filtros: FILTROS_PEDIDOS,
       filtro,
       busqueda,
-      checkoutActivo: estadoCheckout(db, tiendaId, ajustes).activo,
+      checkoutActivo: (await estadoCheckout(db, tiendaId, ajustes)).activo,
     });
   });
 
-  const cargarPedido = (req, res, next) => {
+  const cargarPedido = async (req, res, next) => {
     const pedidoId = id(req.params.pedidoId);
-    req.pedido = pedidoId === null ? null : leerPedido(db, req.session.usuario.tiendaId, pedidoId);
+    req.pedido = pedidoId === null ? null : await leerPedido(db, req.session.usuario.tiendaId, pedidoId);
     next(req.pedido ? undefined : 'route');
   };
 
-  router.get('/pedidos/:pedidoId', cargarPedido, (req, res) => {
+  router.get('/pedidos/:pedidoId', cargarPedido, async (req, res) => {
     const { pedido } = req;
-    const tienda = buscarTienda(db, req.session.usuario.tiendaId);
+    const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
     const urlCliente = `${urlTienda(req, config.dominio, tienda.slug)}/pedido/${pedido.token}`;
     const saludo = `¡Hola ${pedido.cliente.nombre.split(' ')[0]}! Te escribimos de ${tienda.nombre} por tu pedido #${pedido.numero}.`;
     res.render('admin/pedido', {
@@ -98,17 +98,17 @@ export function rutasAdminPedidos({ db, config }) {
     });
   });
 
-  router.post('/pedidos/:pedidoId/estado', cargarPedido, verificarCsrf, (req, res) => {
+  router.post('/pedidos/:pedidoId/estado', cargarPedido, verificarCsrf, async (req, res) => {
     const { pedido } = req;
-    if (cambiarEstado(db, req.session.usuario.tiendaId, pedido.id, req.body.estado)) {
+    if (await cambiarEstado(db, req.session.usuario.tiendaId, pedido.id, req.body.estado)) {
       avisar(req, 'ok', `El pedido #${pedido.numero} quedó como "${tituloEstado(req.body.estado, pedido.entrega.tipo)}".`);
     }
     res.redirect(`/admin/pedidos/${pedido.id}`);
   });
 
-  router.post('/pedidos/:pedidoId/cancelar', cargarPedido, verificarCsrf, (req, res) => {
+  router.post('/pedidos/:pedidoId/cancelar', cargarPedido, verificarCsrf, async (req, res) => {
     const { pedido } = req;
-    if (cancelarPedido(db, req.session.usuario.tiendaId, pedido.id)) {
+    if (await cancelarPedido(db, req.session.usuario.tiendaId, pedido.id)) {
       avisar(req, 'ok', `Cancelamos el pedido #${pedido.numero} y devolvimos los productos al stock.`);
     }
     res.redirect(`/admin/pedidos/${pedido.id}`);
@@ -116,14 +116,14 @@ export function rutasAdminPedidos({ db, config }) {
 
   // ---------- Envíos y pagos ----------
 
-  function mostrarPagos(req, res, { valores = null, errores = {}, status = 200 } = {}) {
+  async function mostrarPagos(req, res, { valores = null, errores = {}, status = 200 } = {}) {
     const { tiendaId } = req.session.usuario;
-    const ajustes = leerAjustes(db, tiendaId);
-    const checkout = estadoCheckout(db, tiendaId, ajustes);
+    const ajustes = await leerAjustes(db, tiendaId);
+    const checkout = await estadoCheckout(db, tiendaId, ajustes);
     res.status(status).render('admin/pagos', {
       valores: valores ?? ajustes,
       errores,
-      entregas: listarMetodosEntrega(db, tiendaId).map((e) => ({
+      entregas: (await listarMetodosEntrega(db, tiendaId)).map((e) => ({
         ...e,
         textoCosto: textoCosto(e),
         textoGratis: e.gratisDesde === null ? null : `gratis desde ${formatearPrecio(e.gratisDesde)}`,
@@ -138,14 +138,14 @@ export function rutasAdminPedidos({ db, config }) {
 
   router.get('/pagos', (req, res) => mostrarPagos(req, res));
 
-  router.post('/pagos', verificarCsrf, (req, res) => {
+  router.post('/pagos', verificarCsrf, async (req, res) => {
     const { ajustes, errores } = validarPagos(req.body);
     if (Object.keys(errores).length > 0) {
       // Los interruptores vienen como "1" o no vienen: se pasan a booleanos para volver a mostrarlos.
       const valores = { ...req.body, ...ajustes };
       return mostrarPagos(req, res, { valores, errores, status: 400 });
     }
-    actualizarAjustes(db, req.session.usuario.tiendaId, ajustes);
+    await actualizarAjustes(db, req.session.usuario.tiendaId, ajustes);
     avisar(req, 'ok', 'Guardamos las formas de pago.');
     res.redirect('/admin/pagos#formas-de-pago');
   });
@@ -154,32 +154,32 @@ export function rutasAdminPedidos({ db, config }) {
     res.status(status).render('admin/entrega', { metodo, formulario, errores, tipos: TIPOS_ENTREGA });
   }
 
-  router.get('/pagos/entregas/nueva', (req, res) => {
+  router.get('/pagos/entregas/nueva', async (req, res) => {
     const clave = String(req.query.modelo);
     const modelo = Object.hasOwn(MODELOS_ENTREGA, clave) ? { ...MODELOS_ENTREGA[clave] } : null;
     // El retiro se arma con la dirección que ya cargó la tienda, si la tiene.
     if (modelo?.tipo === 'retiro') {
-      const { direccion } = leerAjustes(db, req.session.usuario.tiendaId);
+      const { direccion } = await leerAjustes(db, req.session.usuario.tiendaId);
       if (direccion) modelo.descripcion = `${direccion}. ${modelo.descripcion}`;
     }
     mostrarEntrega(req, res, { formulario: formularioEntrega(modelo) });
   });
 
-  router.post('/pagos/entregas/nueva', verificarCsrf, (req, res) => {
+  router.post('/pagos/entregas/nueva', verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
     const { datos, formulario, errores } = validarMetodoEntrega(req.body);
-    if (contarMetodosEntrega(db, tiendaId) >= MAX_METODOS_ENTREGA) {
+    if ((await contarMetodosEntrega(db, tiendaId)) >= MAX_METODOS_ENTREGA) {
       errores.nombre = `Podés tener hasta ${MAX_METODOS_ENTREGA} formas de entrega. Borrá alguna para agregar otra.`;
     }
     if (Object.keys(errores).length > 0) return mostrarEntrega(req, res, { formulario, errores, status: 400 });
-    crearMetodoEntrega(db, tiendaId, datos);
+    await crearMetodoEntrega(db, tiendaId, datos);
     avisar(req, 'ok', `Agregamos "${datos.nombre}".`);
     res.redirect('/admin/pagos');
   });
 
-  const cargarEntrega = (req, res, next) => {
+  const cargarEntrega = async (req, res, next) => {
     const entregaId = id(req.params.entregaId);
-    req.metodo = entregaId === null ? null : leerMetodoEntrega(db, req.session.usuario.tiendaId, entregaId);
+    req.metodo = entregaId === null ? null : await leerMetodoEntrega(db, req.session.usuario.tiendaId, entregaId);
     next(req.metodo ? undefined : 'route');
   };
 
@@ -187,28 +187,28 @@ export function rutasAdminPedidos({ db, config }) {
     mostrarEntrega(req, res, { metodo: req.metodo, formulario: formularioEntrega(req.metodo) });
   });
 
-  router.post('/pagos/entregas/:entregaId', cargarEntrega, verificarCsrf, (req, res) => {
+  router.post('/pagos/entregas/:entregaId', cargarEntrega, verificarCsrf, async (req, res) => {
     const { datos, formulario, errores } = validarMetodoEntrega(req.body);
     if (Object.keys(errores).length > 0) return mostrarEntrega(req, res, { metodo: req.metodo, formulario, errores, status: 400 });
-    editarMetodoEntrega(db, req.session.usuario.tiendaId, req.metodo.id, datos);
+    await editarMetodoEntrega(db, req.session.usuario.tiendaId, req.metodo.id, datos);
     avisar(req, 'ok', `Guardamos "${datos.nombre}".`);
     res.redirect('/admin/pagos');
   });
 
-  router.post('/pagos/entregas/:entregaId/:accion', cargarEntrega, verificarCsrf, (req, res, next) => {
+  router.post('/pagos/entregas/:entregaId/:accion', cargarEntrega, verificarCsrf, async (req, res, next) => {
     const { tiendaId } = req.session.usuario;
     const { metodo } = req;
     switch (req.params.accion) {
       case 'activar':
-        activarMetodoEntrega(db, tiendaId, metodo.id, req.body.valor === '1');
+        await activarMetodoEntrega(db, tiendaId, metodo.id, req.body.valor === '1');
         avisar(req, 'ok', req.body.valor === '1' ? `"${metodo.nombre}" ya se ofrece en la tienda.` : `"${metodo.nombre}" quedó pausada.`);
         break;
       case 'subir':
       case 'bajar':
-        moverMetodoEntrega(db, tiendaId, metodo.id, req.params.accion === 'subir' ? -1 : 1);
+        await moverMetodoEntrega(db, tiendaId, metodo.id, req.params.accion === 'subir' ? -1 : 1);
         break;
       case 'borrar':
-        borrarMetodoEntrega(db, tiendaId, metodo.id);
+        await borrarMetodoEntrega(db, tiendaId, metodo.id);
         avisar(req, 'ok', `Borramos "${metodo.nombre}". Los pedidos que ya la usaron no cambian.`);
         break;
       default:

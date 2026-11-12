@@ -8,6 +8,8 @@ import { slugificar } from './util/slug.js';
 
 export const MAX_LINEAS = 50;
 export const MAX_POR_LINEA = 50;
+// Primer número del par de pg_advisory_xact_lock(<este>, <id de tienda>): un candado por tienda para crear pedidos.
+const CANDADO_PEDIDOS = 727_002;
 
 export const PROVINCIAS = [
   'Buenos Aires', 'Ciudad de Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos',
@@ -59,8 +61,8 @@ export function leerItems(campos) {
 
 // Las líneas del carrito con los precios y el stock de ahora. Lo que ya no está o no tiene stock suficiente
 // se ajusta, y se avisa qué cambió.
-export function lineasDelCarrito(db, tiendaId, items) {
-  const porSku = new Map(variantesParaCarrito(db, tiendaId, items.map((i) => i.sku)).map((v) => [v.sku, v]));
+export async function lineasDelCarrito(db, tiendaId, items) {
+  const porSku = new Map((await variantesParaCarrito(db, tiendaId, items.map((i) => i.sku))).map((v) => [v.sku, v]));
   const lineas = [];
   const cambios = [];
   for (const item of items) {
@@ -163,16 +165,19 @@ export function validarCheckout(campos, { entregas, pagos }) {
 // Crea el pedido y descuenta el stock, todo junto. Si algo ya no tiene stock suficiente no crea nada
 // y tira ErrorDeStock. Los precios salen de la base, nunca de lo que mandó el navegador.
 export function crearPedido(db, tiendaId, items, datos) {
-  return enTransaccion(db, () => {
-    const { lineas, cambios } = lineasDelCarrito(db, tiendaId, items);
+  return enTransaccion(db, async (tx) => {
+    // Un pedido por vez en cada tienda: el número sale de max(numero) + 1, y dos pedidos simultáneos leerían el mismo.
+    // El candado se suelta solo al terminar la transacción. El stock no lo necesita: el UPDATE de abajo es atómico.
+    await tx.prepare('SELECT pg_advisory_xact_lock(?, ?)').get(CANDADO_PEDIDOS, tiendaId);
+    const { lineas, cambios } = await lineasDelCarrito(tx, tiendaId, items);
     if (cambios.length > 0) throw new ErrorDeStock(cambios);
     if (lineas.length === 0) throw new ErrorDeStock(['Tu carrito está vacío.']);
 
-    const descontar = db.prepare(
-      `UPDATE variantes SET stock = stock - ?, actualizado_en = datetime('now') WHERE tienda_id = ? AND sku = ? AND stock >= ?`,
+    const descontar = tx.prepare(
+      `UPDATE variantes SET stock = stock - ?, actualizado_en = ahora() WHERE tienda_id = ? AND sku = ? AND stock >= ?`,
     );
     for (const linea of lineas) {
-      if (descontar.run(linea.cantidad, tiendaId, linea.sku, linea.cantidad).changes !== 1) {
+      if ((await descontar.run(linea.cantidad, tiendaId, linea.sku, linea.cantidad)).changes !== 1) {
         throw new ErrorDeStock([`De ${linea.nombre} ya no hay stock suficiente.`]);
       }
     }
@@ -180,13 +185,13 @@ export function crearPedido(db, tiendaId, items, datos) {
     const totales = calcularTotales(subtotalDe(lineas), datos.entrega, datos.pago);
     const token = randomBytes(18).toString('base64url');
     const { cliente, entrega, direccion } = datos;
-    const pedido = db
+    const pedido = await tx
       .prepare(
         `INSERT INTO pedidos (tienda_id, numero, token, cliente_nombre, cliente_telefono, cliente_email,
            entrega_tipo, entrega_nombre, entrega_descripcion,
            direccion_calle, direccion_piso, direccion_ciudad, direccion_provincia, direccion_cp, direccion_referencias,
            pago, notas, subtotal_centavos, descuento_porcentaje, descuento_centavos, envio_centavos, total_centavos)
-         VALUES (?, (SELECT ifnull(max(numero), 0) + 1 FROM pedidos WHERE tienda_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, (SELECT coalesce(max(numero), 0) + 1 FROM pedidos WHERE tienda_id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING id, numero, token`,
       )
       .get(
@@ -195,22 +200,22 @@ export function crearPedido(db, tiendaId, items, datos) {
         direccion.calle, direccion.piso, direccion.ciudad, direccion.provincia, direccion.cp, direccion.referencias,
         datos.pago.clave, datos.notas, totales.subtotal, totales.descuentoPorcentaje, totales.descuento, totales.envio, totales.total,
       );
-    const insertarItem = db.prepare(
+    const insertarItem = tx.prepare(
       'INSERT INTO pedido_items (pedido_id, sku, nombre, detalle, slug, precio_centavos, cantidad) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
-    for (const l of lineas) insertarItem.run(pedido.id, l.sku, l.nombre, l.detalle, l.slug, l.precio, l.cantidad);
+    for (const l of lineas) await insertarItem.run(pedido.id, l.sku, l.nombre, l.detalle, l.slug, l.precio, l.cantidad);
     return { id: pedido.id, numero: pedido.numero, token: pedido.token };
   });
 }
 
 // ---------- Lectura ----------
 
-const SELECCION_PEDIDO = `SELECT id, numero, token, estado, creado_en AS creadoEn, actualizado_en AS actualizadoEn,
+const SELECCION_PEDIDO = `SELECT id, numero, token, estado, creado_en AS "creadoEn", actualizado_en AS "actualizadoEn",
   cliente_nombre, cliente_telefono, cliente_email, entrega_tipo, entrega_nombre, entrega_descripcion,
   direccion_calle, direccion_piso, direccion_ciudad, direccion_provincia, direccion_cp, direccion_referencias,
-  pago, notas, subtotal_centavos AS subtotal, descuento_porcentaje AS descuentoPorcentaje, descuento_centavos AS descuento,
+  pago, notas, subtotal_centavos AS subtotal, descuento_porcentaje AS "descuentoPorcentaje", descuento_centavos AS descuento,
   envio_centavos AS envio, total_centavos AS total,
-  (SELECT ifnull(sum(cantidad), 0) FROM pedido_items i WHERE i.pedido_id = pedidos.id) AS unidades
+  (SELECT coalesce(sum(cantidad), 0) FROM pedido_items i WHERE i.pedido_id = pedidos.id) AS unidades
   FROM pedidos`;
 
 function filaAPedido(f) {
@@ -239,22 +244,22 @@ function filaAPedido(f) {
   };
 }
 
-function conItems(db, pedido) {
+async function conItems(db, pedido) {
   if (!pedido) return null;
-  pedido.items = db
+  pedido.items = await db
     .prepare('SELECT sku, nombre, detalle, slug, precio_centavos AS precio, cantidad FROM pedido_items WHERE pedido_id = ? ORDER BY id')
     .all(pedido.id);
   return pedido;
 }
 
-export function leerPedido(db, tiendaId, id) {
-  const fila = db.prepare(`${SELECCION_PEDIDO} WHERE tienda_id = ? AND id = ?`).get(tiendaId, id);
+export async function leerPedido(db, tiendaId, id) {
+  const fila = await db.prepare(`${SELECCION_PEDIDO} WHERE tienda_id = ? AND id = ?`).get(tiendaId, id);
   return conItems(db, fila ? filaAPedido(fila) : null);
 }
 
-export function leerPedidoPorToken(db, tiendaId, token) {
+export async function leerPedidoPorToken(db, tiendaId, token) {
   if (typeof token !== 'string' || !/^[\w-]{10,40}$/.test(token)) return null;
-  const fila = db.prepare(`${SELECCION_PEDIDO} WHERE tienda_id = ? AND token = ?`).get(tiendaId, token);
+  const fila = await db.prepare(`${SELECCION_PEDIDO} WHERE tienda_id = ? AND token = ?`).get(tiendaId, token);
   return conItems(db, fila ? filaAPedido(fila) : null);
 }
 
@@ -266,59 +271,59 @@ export const FILTROS_PEDIDOS = {
   enviado: { titulo: 'Enviados', donde: "estado = 'enviado'" },
   entregado: { titulo: 'Entregados', donde: "estado = 'entregado'" },
   cancelado: { titulo: 'Cancelados', donde: "estado = 'cancelado'" },
-  todos: { titulo: 'Todos', donde: '1' },
+  todos: { titulo: 'Todos', donde: 'true' },
 };
 export const esFiltroPedidos = (valor) => typeof valor === 'string' && Object.hasOwn(FILTROS_PEDIDOS, valor);
 
-export function listarPedidos(db, tiendaId, { filtro = 'abiertos', busqueda = '' } = {}) {
+export async function listarPedidos(db, tiendaId, { filtro = 'abiertos', busqueda = '' } = {}) {
   const parametros = [tiendaId];
   let donde = `tienda_id = ? AND ${FILTROS_PEDIDOS[filtro].donde}`;
   const limpio = busqueda.trim().replace(/^#/, '');
   if (limpio) {
-    donde += ' AND (numero = ? OR slugificar(cliente_nombre) LIKE ? OR cliente_telefono LIKE ? OR cliente_email LIKE ?)';
+    donde += ' AND (numero = ? OR slugificar(cliente_nombre) LIKE ? OR cliente_telefono ILIKE ? OR cliente_email ILIKE ?)';
     const patron = `%${limpio}%`;
     parametros.push(Number.parseInt(limpio, 10) || -1, `%${slugificar(limpio)}%`, patron, patron);
   }
-  return db.prepare(`${SELECCION_PEDIDO} WHERE ${donde} ORDER BY numero DESC LIMIT 200`).all(...parametros).map(filaAPedido);
+  return (await db.prepare(`${SELECCION_PEDIDO} WHERE ${donde} ORDER BY numero DESC LIMIT 200`).all(...parametros)).map(filaAPedido);
 }
 
-export function contarPedidosPorFiltro(db, tiendaId) {
+export async function contarPedidosPorFiltro(db, tiendaId) {
   const columnas = Object.entries(FILTROS_PEDIDOS).map(([clave, f]) => `sum(CASE WHEN ${f.donde} THEN 1 ELSE 0 END) AS "${clave}"`);
-  const fila = db.prepare(`SELECT ${columnas.join(', ')} FROM pedidos WHERE tienda_id = ?`).get(tiendaId);
+  const fila = await db.prepare(`SELECT ${columnas.join(', ')} FROM pedidos WHERE tienda_id = ?`).get(tiendaId);
   return Object.fromEntries(Object.keys(FILTROS_PEDIDOS).map((clave) => [clave, fila[clave] ?? 0]));
 }
 
-export const contarPedidosNuevos = (db, tiendaId) =>
-  db.prepare("SELECT count(*) AS n FROM pedidos WHERE tienda_id = ? AND estado = 'nuevo'").get(tiendaId).n;
+export const contarPedidosNuevos = async (db, tiendaId) =>
+  (await db.prepare("SELECT count(*) AS n FROM pedidos WHERE tienda_id = ? AND estado = 'nuevo'").get(tiendaId)).n;
 
 // ---------- Cambios de estado ----------
 
 // Pasa un pedido a otro estado (salvo cancelar, que tiene su propia función). Un pedido cancelado no vuelve atrás.
-export function cambiarEstado(db, tiendaId, id, estado) {
+export async function cambiarEstado(db, tiendaId, id, estado) {
   if (!esEstado(estado) || estado === 'cancelado') return false;
   return (
-    db
+    (await db
       .prepare(
-        `UPDATE pedidos SET estado = ?, actualizado_en = datetime('now')
+        `UPDATE pedidos SET estado = ?, actualizado_en = ahora()
          WHERE tienda_id = ? AND id = ? AND estado <> 'cancelado'`,
       )
-      .run(estado, tiendaId, id).changes > 0
+      .run(estado, tiendaId, id)).changes > 0
   );
 }
 
 // Cancela el pedido y devuelve el stock de lo que todavía existe en el catálogo.
 export function cancelarPedido(db, tiendaId, id) {
-  return enTransaccion(db, () => {
-    const cancelado = db
+  return enTransaccion(db, async (tx) => {
+    const cancelado = (await tx
       .prepare(
-        `UPDATE pedidos SET estado = 'cancelado', actualizado_en = datetime('now')
+        `UPDATE pedidos SET estado = 'cancelado', actualizado_en = ahora()
          WHERE tienda_id = ? AND id = ? AND estado NOT IN ('cancelado', 'entregado')`,
       )
-      .run(tiendaId, id).changes > 0;
+      .run(tiendaId, id)).changes > 0;
     if (!cancelado) return false;
-    const devolver = db.prepare(`UPDATE variantes SET stock = stock + ?, actualizado_en = datetime('now') WHERE tienda_id = ? AND sku = ?`);
-    for (const item of db.prepare('SELECT sku, cantidad FROM pedido_items WHERE pedido_id = ?').all(id)) {
-      devolver.run(item.cantidad, tiendaId, item.sku);
+    const devolver = tx.prepare(`UPDATE variantes SET stock = stock + ?, actualizado_en = ahora() WHERE tienda_id = ? AND sku = ?`);
+    for (const item of await tx.prepare('SELECT sku, cantidad FROM pedido_items WHERE pedido_id = ?').all(id)) {
+      await devolver.run(item.cantidad, tiendaId, item.sku);
     }
     return true;
   });

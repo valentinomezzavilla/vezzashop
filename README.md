@@ -26,7 +26,9 @@ Los productos **destacados** aparecen en una sección propia arriba de la portad
 
 ## Requisitos
 
-- Node.js 24 o más nuevo (usa el SQLite que viene con Node; no hay que instalar una base de datos).
+- Node.js 22 o más nuevo.
+- PostgreSQL en producción (en Coolify se crea con un clic). Para desarrollar y correr los tests no hace falta instalar nada:
+  sin `DATABASE_URL` se usa PGlite, un Postgres que corre dentro de Node y guarda sus datos en `data/pglite`.
 
 ## Instalación
 
@@ -51,6 +53,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 En el servidor, poné también `DOMINIO` con tu dominio (por ejemplo `vezzashop.com`). En tu compu
 dejalo vacío y se usa `localhost`.
 
+`DATABASE_URL` es la conexión a PostgreSQL (`postgres://usuario:clave@host:5432/base`) y en producción es
+obligatoria. En tu compu dejala vacía y se usa PGlite. Las migraciones (`src/migraciones/*.sql`) se aplican solas al arrancar.
+
 ## Comandos
 
 | Comando | Qué hace |
@@ -58,7 +63,7 @@ dejalo vacío y se usa `localhost`.
 | `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com` | Da de alta un cliente: crea la tienda y su usuario, y muestra la clave **una sola vez**. |
 | `npm run dev` | Levanta el servidor y lo reinicia cuando cambia el código. Panel en http://localhost:3000/admin y cada tienda en http://&lt;slug&gt;.localhost:3000 |
 | `npm start` | Levanta el servidor (para producción). |
-| `npm test` | Corre todos los tests. |
+| `npm test` | Corre todos los tests (con PGlite, sin instalar nada). Para probar contra un PostgreSQL de verdad: `PRUEBAS_DATABASE_URL=postgres://usuario:clave@host:5432/base npm test` (cada prueba usa su propio esquema y lo borra al terminar). |
 
 ## Carga masiva desde Excel
 
@@ -124,7 +129,7 @@ En el panel, **Diseño**: cada cliente configura cómo se ve su vidriera.
 
 Las imágenes (JPG, PNG o WEBP, hasta 5 MB) se guardan en `data/subidas/<id de tienda>/`. El tipo se
 reconoce por el contenido del archivo; los SVG no se aceptan porque pueden traer scripts. En
-producción, `data/` tiene que estar en un volumen persistente.
+producción, `data/` tiene que estar en un volumen persistente (la base de datos no: está en PostgreSQL).
 
 Para producción hace falta un solo dominio, con dos registros DNS apuntando al servidor:
 `vezzashop.com` y `*.vezzashop.com`. El certificado HTTPS de `*.vezzashop.com` necesita un comodín
@@ -163,19 +168,24 @@ salud). En los ejemplos el dominio es `vezzashop.com`: cambialo por el tuyo.
    [certificados comodín](https://coolify.io/docs/core/networking/proxy/traefik/wildcard-certs)): token de la API
    de tu DNS en **Servers → Proxy → Configuration**, **Restart Proxy**, y una *Dynamic Configuration* que pida
    `vezzashop.com` con `*.vezzashop.com` como SAN.
-3. **Nueva aplicación:** **+ New → Public Repository**, URL `https://github.com/valentinomezzavilla/vezzashop`,
+3. **Base de datos:** **+ New → Database → PostgreSQL** (versión 16 o más nueva) en el mismo proyecto y servidor.
+   Dejá las opciones por defecto, iniciala y copiá la **Postgres URL (internal)**: es el valor de `DATABASE_URL` del paso 6.
+   Después, en la pestaña **Backups** del recurso, programá copias automáticas (idealmente a un S3 externo).
+4. **Nueva aplicación:** **+ New → Public Repository**, URL `https://github.com/valentinomezzavilla/vezzashop`,
    rama `master`, **Build Pack: Dockerfile**, **Ports Exposes: `3000`**. Si el repo pasa a ser privado,
    usá **Private Repository (with GitHub App)**.
-4. **Domains:** `https://vezzashop.com` (el panel).
-5. **Environment Variables:**
+5. **Domains:** `https://vezzashop.com` (el panel).
+6. **Environment Variables:**
    - `SECRETO_SESION`: generalo con el comando de [Configuración](#configuración). No lo marques como
      variable de build.
    - `DOMINIO=vezzashop.com`
+   - `DATABASE_URL`: la **Postgres URL (internal)** del recurso del paso 3. Si la base y la aplicación están en el
+     mismo servidor de Coolify, usá la interna (no sale a internet).
    - `NODE_ENV=production` y `PUERTO=3000` ya vienen en la imagen.
-6. **Persistent Storage → + Add → Volume Mount**, destino **`/app/data`**. Ahí van la base, las imágenes y los
-   Excel. **Sin el volumen, cada deploy borra todo.**
-7. **Healthcheck:** activalo con path `/salud` y puerto `3000`.
-8. **Subdominios de las tiendas:** el campo Domains no alcanza para `*.vezzashop.com`. Guardá una vez para
+7. **Persistent Storage → + Add → Volume Mount**, destino **`/app/data`**. Ahí van las imágenes y los Excel
+   pendientes. **Sin el volumen, cada deploy borra las imágenes subidas.**
+8. **Healthcheck:** activalo con path `/salud` y puerto `3000`.
+9. **Subdominios de las tiendas:** el campo Domains no alcanza para `*.vezzashop.com`. Guardá una vez para
    que Coolify genere las etiquetas y destildá **Readonly labels**. Después agregá al final de
    **Container Labels** (Traefik v3, el de las instalaciones nuevas):
 
@@ -194,9 +204,9 @@ salud). En los ejemplos el dominio es `vezzashop.com`: cambialo por el tuyo.
    ```
 
    Con las etiquetas en manual, Coolify ya no las actualiza solo: si cambiás el dominio, revisalas a mano.
-9. **Deploy.** Después, en la **Terminal** de la aplicación, creá la primera tienda:
+10. **Deploy.** Después, en la **Terminal** de la aplicación, creá la primera tienda:
    `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com`.
-10. Probá `https://vezzashop.com/admin` y el subdominio de la tienda. Entrá siempre por **https**: en
+11. Probá `https://vezzashop.com/admin` y el subdominio de la tienda. Entrá siempre por **https**: en
     producción la cookie de sesión solo viaja por HTTPS, y por http el login no anda.
 
 Para desplegar solo con cada push a `master`: con la GitHub App es automático; con repo público, copiá la
@@ -210,11 +220,11 @@ src/
   servidor.js            arranque
   app.js                 Express: sesiones, vistas, rutas
   config.js              lectura del .env
-  db.js                  SQLite + migraciones (src/migraciones/*.sql)
+  db.js                  PostgreSQL (pg en producción, PGlite en desarrollo y tests) + migraciones (src/migraciones/*.sql)
   tiendas.js             alta de tiendas y login
   claves.js              hash de claves (scrypt)
   csrf.js                protección de formularios
-  almacen-sesiones.js    sesiones guardadas en SQLite
+  almacen-sesiones.js    sesiones guardadas en la base de datos
   productos.js           productos desde el panel: listado, validación, guardado y fotos
   categorias.js          árbol de categorías del panel, alta, edición y borrado
   inicio.js              datos del tablero de Inicio
@@ -254,4 +264,4 @@ Etapas siguientes, en orden sugerido:
 5. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
 6. Achicar las fotos al subirlas (hoy se guardan tal cual) y foto por color en las variantes.
 7. Para producción: límite de intentos de login, recuperar clave, cerrar otras sesiones al cambiar la clave,
-   copias de seguridad de la base.
+   programar las copias de seguridad de la base en Coolify (pestaña Backups del recurso PostgreSQL).

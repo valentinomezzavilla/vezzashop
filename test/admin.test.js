@@ -19,7 +19,7 @@ let dirImportaciones;
 
 before(async () => {
   dirImportaciones = mkdtempSync(path.join(tmpdir(), 'importaciones-'));
-  db = abrirBase(':memory:');
+  db = await abrirBase(':memory:');
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',

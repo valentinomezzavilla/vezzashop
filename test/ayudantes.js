@@ -88,14 +88,15 @@ export function enviarConHost(puerto, host, ruta, campos, headers = {}) {
   });
 }
 
-export function crearTiendaVacia(db, slug) {
-  return Number(db.prepare('INSERT INTO tiendas (nombre, slug) VALUES (?, ?)').run(slug, slug).lastInsertRowid);
+export async function crearTiendaVacia(db, slug) {
+  const { rows } = await db.prepare('INSERT INTO tiendas (nombre, slug) VALUES (?, ?) RETURNING id').run(slug, slug);
+  return rows[0].id;
 }
 
-function rutaCategoria(db, id) {
+async function rutaCategoria(db, id) {
   const partes = [];
   for (let actual = id; actual !== null; ) {
-    const categoria = db.prepare('SELECT nombre, padre_id FROM categorias WHERE id = ?').get(actual);
+    const categoria = await db.prepare('SELECT nombre, padre_id FROM categorias WHERE id = ?').get(actual);
     partes.unshift(categoria.nombre);
     actual = categoria.padre_id;
   }
@@ -103,31 +104,30 @@ function rutaCategoria(db, id) {
 }
 
 // Foto del catálogo de una tienda, ordenada, para comparar con valores literales.
-export function leerCatalogo(db, tiendaId) {
-  const productos = db
+export async function leerCatalogo(db, tiendaId) {
+  const productos = await db
     .prepare('SELECT * FROM productos WHERE tienda_id = ? ORDER BY nombre')
     .all(tiendaId);
-  return productos.map((p) => {
+  const catalogo = [];
+  for (const p of productos) {
     const atributos = [p.atributo1, p.atributo2, p.atributo3].filter((a) => a !== null);
-    return {
+    const categorias = [];
+    for (const f of await db.prepare('SELECT categoria_id FROM producto_categorias WHERE producto_id = ?').all(p.id)) {
+      categorias.push(await rutaCategoria(db, f.categoria_id));
+    }
+    catalogo.push({
       nombre: p.nombre,
       descripcion: p.descripcion,
       visible: p.visible,
       atributos,
-      categorias: db
-        .prepare('SELECT categoria_id FROM producto_categorias WHERE producto_id = ?')
-        .all(p.id)
-        .map((f) => rutaCategoria(db, f.categoria_id))
-        .sort(),
-      variantes: db
-        .prepare('SELECT * FROM variantes WHERE producto_id = ? ORDER BY sku')
-        .all(p.id)
-        .map((v) => ({
-          sku: v.sku,
-          valores: [v.valor1, v.valor2, v.valor3].slice(0, atributos.length),
-          precio: v.precio_centavos,
-          stock: v.stock,
-        })),
-    };
-  });
+      categorias: categorias.sort(),
+      variantes: (await db.prepare('SELECT * FROM variantes WHERE producto_id = ? ORDER BY sku').all(p.id)).map((v) => ({
+        sku: v.sku,
+        valores: [v.valor1, v.valor2, v.valor3].slice(0, atributos.length),
+        precio: v.precio_centavos,
+        stock: v.stock,
+      })),
+    });
+  }
+  return catalogo;
 }

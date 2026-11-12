@@ -27,29 +27,30 @@ export function listarProductosAdmin(db, tiendaId, { busqueda = '', filtro = 'to
   const parametros = [tiendaId];
   let condicionBusqueda = '';
   if (texto) {
-    condicionBusqueda = `AND (p.nombre LIKE ? ESCAPE '\\' OR p.marca LIKE ? ESCAPE '\\'
-      OR exists (SELECT 1 FROM variantes b WHERE b.producto_id = p.id AND b.sku LIKE ? ESCAPE '\\'))`;
+    // ILIKE: sin importar mayúsculas (el LIKE de Postgres sí las distingue).
+    condicionBusqueda = `AND (p.nombre ILIKE ? ESCAPE '\\' OR p.marca ILIKE ? ESCAPE '\\'
+      OR exists (SELECT 1 FROM variantes b WHERE b.producto_id = p.id AND b.sku ILIKE ? ESCAPE '\\'))`;
     const patron = `%${escaparLike(texto)}%`;
     parametros.push(patron, patron, patron);
   }
   return db
     .prepare(
       `SELECT p.id, p.slug, p.nombre, p.marca, p.visible, p.destacado, ${PRIMERA_FOTO} AS foto,
-              count(v.id) AS variantes, ifnull(sum(v.stock), 0) AS stock,
-              sum(v.stock = 0) AS variantesSinStock,
-              min(v.precio_centavos) AS precioMinimo, max(v.precio_centavos) AS precioMaximo
+              count(v.id) AS variantes, coalesce(sum(v.stock), 0) AS stock,
+              coalesce(sum(CASE WHEN v.stock = 0 THEN 1 ELSE 0 END), 0) AS "variantesSinStock",
+              min(v.precio_centavos) AS "precioMinimo", max(v.precio_centavos) AS "precioMaximo"
        FROM productos p LEFT JOIN variantes v ON v.producto_id = p.id
        WHERE p.tienda_id = ? ${(esFiltro(filtro) ? FILTROS[filtro] : FILTROS.todos).sql} ${condicionBusqueda}
        GROUP BY p.id
-       ORDER BY p.nombre COLLATE NOCASE`,
+       ORDER BY lower(p.nombre), p.id`,
     )
     .all(...parametros);
 }
 
-export function contarPorFiltro(db, tiendaId) {
+export async function contarPorFiltro(db, tiendaId) {
   const cuentas = {};
   for (const [clave, filtro] of Object.entries(FILTROS)) {
-    cuentas[clave] = db.prepare(`SELECT count(*) AS n FROM productos p WHERE p.tienda_id = ? ${filtro.sql}`).get(tiendaId).n;
+    cuentas[clave] = (await db.prepare(`SELECT count(*) AS n FROM productos p WHERE p.tienda_id = ? ${filtro.sql}`).get(tiendaId)).n;
   }
   return cuentas;
 }
@@ -61,8 +62,8 @@ export function precioParaEditar(centavos) {
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: decimales, maximumFractionDigits: 2 }).format(centavos / 100);
 }
 
-export function leerProducto(db, tiendaId, id) {
-  const p = db
+export async function leerProducto(db, tiendaId, id) {
+  const p = await db
     .prepare(
       `SELECT id, slug, nombre, descripcion, marca, visible, destacado, atributo1, atributo2, atributo3
        FROM productos WHERE id = ? AND tienda_id = ?`,
@@ -79,12 +80,12 @@ export function leerProducto(db, tiendaId, id) {
     visible: Boolean(p.visible),
     destacado: Boolean(p.destacado),
     atributos,
-    variantes: db
+    variantes: (await db
       .prepare(
-        `SELECT id, sku, valor1, valor2, valor3, precio_centavos AS precio, precio_promocional_centavos AS precioPromocional, stock
+        `SELECT id, sku, valor1, valor2, valor3, precio_centavos AS precio, precio_promocional_centavos AS "precioPromocional", stock
          FROM variantes WHERE producto_id = ? ORDER BY id`,
       )
-      .all(p.id)
+      .all(p.id))
       .map((v) => ({
         id: v.id,
         sku: v.sku,
@@ -93,9 +94,9 @@ export function leerProducto(db, tiendaId, id) {
         precioPromocional: v.precioPromocional,
         stock: v.stock,
       })),
-    categoriaIds: db
+    categoriaIds: (await db
       .prepare('SELECT categoria_id AS id FROM producto_categorias WHERE producto_id = ?')
-      .all(p.id)
+      .all(p.id))
       .map((f) => f.id),
   };
 }
@@ -129,7 +130,7 @@ const texto = (valor) => String(valor ?? '').trim();
 // Interpreta y valida el formulario de un producto.
 // Devuelve { datos, formulario, errores }: datos listos para guardar (si no hay errores), el formulario
 // tal como vino (para volver a mostrarlo) y errores = { campo: mensaje, filas: { indice: [mensajes] } }.
-export function validarProducto(db, tiendaId, productoId, campos) {
+export async function validarProducto(db, tiendaId, productoId, campos) {
   const errores = { filas: {} };
   const errorFila = (i, mensaje) => (errores.filas[i] ??= []).push(mensaje);
 
@@ -139,7 +140,7 @@ export function validarProducto(db, tiendaId, productoId, campos) {
   else if (nombre.length > 150) errores.nombre = 'Máximo 150 caracteres';
   else if (!slug) errores.nombre = 'El nombre tiene que tener al menos una letra o número';
   else {
-    const otro = db.prepare('SELECT id FROM productos WHERE tienda_id = ? AND slug = ? AND id IS NOT ?').get(tiendaId, slug, productoId);
+    const otro = await db.prepare('SELECT id FROM productos WHERE tienda_id = ? AND slug = ? AND id IS DISTINCT FROM ?').get(tiendaId, slug, productoId);
     if (otro) errores.nombre = 'Ya tenés otro producto con este nombre';
   }
 
@@ -176,20 +177,23 @@ export function validarProducto(db, tiendaId, productoId, campos) {
   const vacia = (f) => !f.sku && !f.precio && !f.precioPromocional && (!f.stock || f.stock === '0') && f.valores.every((v) => !v);
 
   const idsPropios = new Set(
-    productoId === null ? [] : db.prepare('SELECT id FROM variantes WHERE producto_id = ?').all(productoId).map((f) => f.id),
+    productoId === null ? [] : (await db.prepare('SELECT id FROM variantes WHERE producto_id = ?').all(productoId)).map((f) => f.id),
   );
-  const buscarSku = db.prepare('SELECT producto_id AS productoId FROM variantes WHERE tienda_id = ? AND sku = ?');
+  const buscarSku = db.prepare('SELECT producto_id AS "productoId" FROM variantes WHERE tienda_id = ? AND sku = ?');
   const skus = new Map();
   const combinaciones = new Map();
   const variantes = [];
 
-  filasFormulario.forEach((fila, i) => {
-    if (vacia(fila)) return;
+  for (const [i, fila] of filasFormulario.entries()) {
+    if (vacia(fila)) continue;
     const variante = { id: null, sku: fila.sku, valores: fila.valores, precio: null, precioPromocional: null, stock: 0 };
 
     if (fila.id) {
       const id = Number(fila.id);
-      if (!idsPropios.has(id)) return errorFila(i, 'Esta variante no es de este producto. Recargá la página');
+      if (!idsPropios.has(id)) {
+        errorFila(i, 'Esta variante no es de este producto. Recargá la página');
+        continue;
+      }
       variante.id = id;
     }
 
@@ -198,7 +202,7 @@ export function validarProducto(db, tiendaId, productoId, campos) {
     else if (skus.has(fila.sku.toLowerCase())) errorFila(i, `El SKU "${fila.sku}" está repetido`);
     else {
       skus.set(fila.sku.toLowerCase(), i);
-      const duenio = buscarSku.get(tiendaId, fila.sku);
+      const duenio = await buscarSku.get(tiendaId, fila.sku);
       if (duenio && duenio.productoId !== productoId) errorFila(i, `El SKU "${fila.sku}" ya lo usa otro producto`);
     }
 
@@ -237,14 +241,14 @@ export function validarProducto(db, tiendaId, productoId, campos) {
       else combinaciones.set(clave, i);
     }
     variantes.push(variante);
-  });
+  }
 
   if (variantes.length === 0) errores.variantes = 'Cargá al menos una variante con su SKU y su precio';
   else if (atributos.length === 0 && variantes.length > 1) {
     errores.variantes = 'Para tener varias variantes, poné qué cambia entre ellas (por ejemplo Talle o Color)';
   }
 
-  const categoriasValidas = new Set(db.prepare('SELECT id FROM categorias WHERE tienda_id = ?').all(tiendaId).map((c) => c.id));
+  const categoriasValidas = new Set((await db.prepare('SELECT id FROM categorias WHERE tienda_id = ?').all(tiendaId)).map((c) => c.id));
   const categoriaIds = [...new Set(lista(campos.categorias).map(Number))].filter((id) => categoriasValidas.has(id));
 
   const formulario = {
@@ -269,69 +273,68 @@ const atributosSQL = (atributos) => Array.from({ length: MAX_ATRIBUTOS }, (_, n)
 
 // Guarda un producto ya validado. Devuelve su id.
 export function guardarProducto(db, tiendaId, productoId, datos) {
-  return enTransaccion(db, () => {
+  return enTransaccion(db, async (tx) => {
     const columnas = [datos.slug, datos.nombre, datos.descripcion, datos.marca, ...atributosSQL(datos.atributos), Number(datos.visible), Number(datos.destacado)];
     let id = productoId;
     if (id === null) {
-      id = Number(
-        db
-          .prepare(
-            `INSERT INTO productos (slug, nombre, descripcion, marca, atributo1, atributo2, atributo3, visible, destacado, tienda_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(...columnas, tiendaId).lastInsertRowid,
-      );
+      const { rows } = await tx
+        .prepare(
+          `INSERT INTO productos (slug, nombre, descripcion, marca, atributo1, atributo2, atributo3, visible, destacado, tienda_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        )
+        .run(...columnas, tiendaId);
+      id = rows[0].id;
     } else {
-      db.prepare(
+      await tx.prepare(
         `UPDATE productos SET slug = ?, nombre = ?, descripcion = ?, marca = ?, atributo1 = ?, atributo2 = ?, atributo3 = ?,
-         visible = ?, destacado = ?, actualizado_en = datetime('now') WHERE id = ? AND tienda_id = ?`,
+         visible = ?, destacado = ?, actualizado_en = ahora() WHERE id = ? AND tienda_id = ?`,
       ).run(...columnas, id, tiendaId);
     }
 
     const conservadas = new Set(datos.variantes.filter((v) => v.id !== null).map((v) => v.id));
-    for (const { id: varianteId } of db.prepare('SELECT id FROM variantes WHERE producto_id = ?').all(id)) {
-      if (!conservadas.has(varianteId)) db.prepare('DELETE FROM variantes WHERE id = ?').run(varianteId);
+    for (const { id: varianteId } of await tx.prepare('SELECT id FROM variantes WHERE producto_id = ?').all(id)) {
+      if (!conservadas.has(varianteId)) await tx.prepare('DELETE FROM variantes WHERE id = ?').run(varianteId);
     }
     // Primero un SKU provisorio en las que se actualizan, por si dos variantes intercambian sus SKU.
-    const provisorio = db.prepare("UPDATE variantes SET sku = '~' || id WHERE id = ?");
-    for (const varianteId of conservadas) provisorio.run(varianteId);
+    const provisorio = tx.prepare("UPDATE variantes SET sku = '~' || id WHERE id = ?");
+    for (const varianteId of conservadas) await provisorio.run(varianteId);
 
-    const actualizar = db.prepare(
+    const actualizar = tx.prepare(
       `UPDATE variantes SET sku = ?, valor1 = ?, valor2 = ?, valor3 = ?, precio_centavos = ?, precio_promocional_centavos = ?,
-       stock = ?, actualizado_en = datetime('now') WHERE id = ?`,
+       stock = ?, actualizado_en = ahora() WHERE id = ?`,
     );
-    const insertar = db.prepare(
+    const insertar = tx.prepare(
       `INSERT INTO variantes (tienda_id, producto_id, sku, valor1, valor2, valor3, precio_centavos, precio_promocional_centavos, stock)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const v of datos.variantes) {
       const valores = [...atributosSQL(v.valores)];
-      if (v.id === null) insertar.run(tiendaId, id, v.sku, ...valores, v.precio, v.precioPromocional, v.stock);
-      else actualizar.run(v.sku, ...valores, v.precio, v.precioPromocional, v.stock, v.id);
+      if (v.id === null) await insertar.run(tiendaId, id, v.sku, ...valores, v.precio, v.precioPromocional, v.stock);
+      else await actualizar.run(v.sku, ...valores, v.precio, v.precioPromocional, v.stock, v.id);
     }
 
-    db.prepare('DELETE FROM producto_categorias WHERE producto_id = ?').run(id);
-    const asignar = db.prepare('INSERT INTO producto_categorias (producto_id, categoria_id) VALUES (?, ?)');
-    for (const categoriaId of datos.categoriaIds) asignar.run(id, categoriaId);
+    await tx.prepare('DELETE FROM producto_categorias WHERE producto_id = ?').run(id);
+    const asignar = tx.prepare('INSERT INTO producto_categorias (producto_id, categoria_id) VALUES (?, ?)');
+    for (const categoriaId of datos.categoriaIds) await asignar.run(id, categoriaId);
     return id;
   });
 }
 
 // Borra el producto con sus variantes y fotos. Devuelve los archivos de las fotos para borrarlos, o null si no es de la tienda.
 export function borrarProducto(db, tiendaId, id) {
-  return enTransaccion(db, () => {
-    const producto = db.prepare('SELECT id FROM productos WHERE id = ? AND tienda_id = ?').get(id, tiendaId);
+  return enTransaccion(db, async (tx) => {
+    const producto = await tx.prepare('SELECT id FROM productos WHERE id = ? AND tienda_id = ?').get(id, tiendaId);
     if (!producto) return null;
-    const fotos = db.prepare('SELECT archivo FROM producto_fotos WHERE producto_id = ?').all(id).map((f) => f.archivo);
-    db.prepare('DELETE FROM productos WHERE id = ?').run(id);
+    const fotos = (await tx.prepare('SELECT archivo FROM producto_fotos WHERE producto_id = ?').all(id)).map((f) => f.archivo);
+    await tx.prepare('DELETE FROM productos WHERE id = ?').run(id);
     return fotos;
   });
 }
 
 // Cambia visible o destacado. Devuelve false si el producto no es de la tienda.
-export function cambiarMarca(db, tiendaId, id, campo, valor) {
+export async function cambiarMarca(db, tiendaId, id, campo, valor) {
   if (campo !== 'visible' && campo !== 'destacado') throw new Error(`Campo inválido: ${campo}`);
-  return db.prepare(`UPDATE productos SET ${campo} = ? WHERE id = ? AND tienda_id = ?`).run(Number(valor), id, tiendaId).changes > 0;
+  return (await db.prepare(`UPDATE productos SET ${campo} = ? WHERE id = ? AND tienda_id = ?`).run(Number(valor), id, tiendaId)).changes > 0;
 }
 
 export function listarFotos(db, tiendaId, productoId) {
@@ -340,17 +343,17 @@ export function listarFotos(db, tiendaId, productoId) {
     .all(productoId, tiendaId);
 }
 
-export function agregarFoto(db, tiendaId, productoId, archivo) {
-  db.prepare(
+export async function agregarFoto(db, tiendaId, productoId, archivo) {
+  await db.prepare(
     `INSERT INTO producto_fotos (tienda_id, producto_id, archivo, orden)
-     VALUES (?, ?, ?, (SELECT ifnull(max(orden), 0) + 1 FROM producto_fotos WHERE producto_id = ?))`,
+     VALUES (?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM producto_fotos WHERE producto_id = ?))`,
   ).run(tiendaId, productoId, archivo, productoId);
 }
 
 // Mueve una foto un lugar (-1 antes, +1 después) o al principio ('principal').
 export function moverFoto(db, tiendaId, productoId, fotoId, movimiento) {
-  enTransaccion(db, () => {
-    const fotos = listarFotos(db, tiendaId, productoId);
+  return enTransaccion(db, async (tx) => {
+    const fotos = await listarFotos(tx, tiendaId, productoId);
     const i = fotos.findIndex((f) => f.id === fotoId);
     if (i === -1) return;
     if (movimiento === 'principal') fotos.unshift(...fotos.splice(i, 1));
@@ -359,16 +362,16 @@ export function moverFoto(db, tiendaId, productoId, fotoId, movimiento) {
       if (j < 0 || j >= fotos.length) return;
       [fotos[i], fotos[j]] = [fotos[j], fotos[i]];
     }
-    const actualizar = db.prepare('UPDATE producto_fotos SET orden = ? WHERE id = ?');
-    fotos.forEach((foto, n) => actualizar.run(n + 1, foto.id));
+    const actualizar = tx.prepare('UPDATE producto_fotos SET orden = ? WHERE id = ?');
+    for (const [n, foto] of fotos.entries()) await actualizar.run(n + 1, foto.id);
   });
 }
 
 // Devuelve el archivo de la foto borrada, o null si no es de este producto.
-export function borrarFoto(db, tiendaId, productoId, fotoId) {
+export async function borrarFoto(db, tiendaId, productoId, fotoId) {
   return (
-    db
+    (await db
       .prepare('DELETE FROM producto_fotos WHERE id = ? AND producto_id = ? AND tienda_id = ? RETURNING archivo')
-      .get(fotoId, productoId, tiendaId)?.archivo ?? null
+      .get(fotoId, productoId, tiendaId))?.archivo ?? null
   );
 }

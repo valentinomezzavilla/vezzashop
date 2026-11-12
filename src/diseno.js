@@ -58,23 +58,23 @@ const COLUMNAS = {
   mercadopagoInstrucciones: 'mercadopago_instrucciones',
 };
 
-export function leerAjustes(db, tiendaId) {
-  const seleccion = Object.entries(COLUMNAS).map(([clave, columna]) => `${columna} AS ${clave}`).join(', ');
-  const fila = db.prepare(`SELECT ${seleccion} FROM ajustes_tienda WHERE tienda_id = ?`).get(tiendaId);
+export async function leerAjustes(db, tiendaId) {
+  const seleccion = Object.entries(COLUMNAS).map(([clave, columna]) => `${columna} AS "${clave}"`).join(', ');
+  const fila = await db.prepare(`SELECT ${seleccion} FROM ajustes_tienda WHERE tienda_id = ?`).get(tiendaId);
   const ajustes = { ...AJUSTES_POR_DEFECTO, ...fila };
   for (const clave of BOOLEANOS) ajustes[clave] = Boolean(ajustes[clave]);
   return ajustes;
 }
 
 // Guarda solo algunos ajustes y deja el resto como estaba: cada sección del panel guarda los suyos.
-export function actualizarAjustes(db, tiendaId, cambios) {
-  guardarAjustes(db, tiendaId, { ...leerAjustes(db, tiendaId), ...cambios });
+export async function actualizarAjustes(db, tiendaId, cambios) {
+  await guardarAjustes(db, tiendaId, { ...(await leerAjustes(db, tiendaId)), ...cambios });
 }
 
-export function guardarAjustes(db, tiendaId, ajustes) {
+export async function guardarAjustes(db, tiendaId, ajustes) {
   const claves = Object.keys(COLUMNAS);
   const columnas = claves.map((clave) => COLUMNAS[clave]);
-  db.prepare(
+  await db.prepare(
     `INSERT INTO ajustes_tienda (tienda_id, ${columnas.join(', ')}) VALUES (?, ${columnas.map(() => '?').join(', ')})
      ON CONFLICT (tienda_id) DO UPDATE SET ${columnas.map((c) => `${c} = excluded.${c}`).join(', ')}`,
   ).run(tiendaId, ...claves.map((clave) => (BOOLEANOS.has(clave) ? Number(Boolean(ajustes[clave])) : ajustes[clave])));
@@ -167,38 +167,38 @@ export const valorCuota = (centavos, cuotas) => Math.round(centavos / cuotas);
 export function listarBanners(db, tiendaId) {
   return db
     .prepare(
-      `SELECT id, imagen, imagen_movil AS imagenMovil, enlace, texto_alternativo AS textoAlternativo
+      `SELECT id, imagen, imagen_movil AS "imagenMovil", enlace, texto_alternativo AS "textoAlternativo"
        FROM banners WHERE tienda_id = ? ORDER BY orden, id`,
     )
     .all(tiendaId);
 }
 
-export function agregarBanner(db, tiendaId, { imagen, imagenMovil, enlace, textoAlternativo }) {
-  db.prepare(
+export async function agregarBanner(db, tiendaId, { imagen, imagenMovil, enlace, textoAlternativo }) {
+  await db.prepare(
     `INSERT INTO banners (tienda_id, imagen, imagen_movil, enlace, texto_alternativo, orden)
-     VALUES (?, ?, ?, ?, ?, (SELECT ifnull(max(orden), 0) + 1 FROM banners WHERE tienda_id = ?))`,
+     VALUES (?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM banners WHERE tienda_id = ?))`,
   ).run(tiendaId, imagen, imagenMovil, enlace, textoAlternativo, tiendaId);
 }
 
 // Intercambia el banner con el anterior (-1) o el siguiente (+1).
 export function moverBanner(db, tiendaId, id, direccion) {
-  return enTransaccion(db, () => {
-    const banners = db.prepare('SELECT id, orden FROM banners WHERE tienda_id = ? ORDER BY orden, id').all(tiendaId);
+  return enTransaccion(db, async (tx) => {
+    const banners = await tx.prepare('SELECT id, orden FROM banners WHERE tienda_id = ? ORDER BY orden, id').all(tiendaId);
     const i = banners.findIndex((b) => b.id === id);
     const j = i + direccion;
     if (i === -1 || j < 0 || j >= banners.length) return;
-    const actualizar = db.prepare('UPDATE banners SET orden = ? WHERE id = ?');
+    const actualizar = tx.prepare('UPDATE banners SET orden = ? WHERE id = ?');
     // Se renumeran todos, por si había órdenes repetidos.
     [banners[i], banners[j]] = [banners[j], banners[i]];
-    banners.forEach((banner, n) => actualizar.run(n + 1, banner.id));
+    for (const [n, banner] of banners.entries()) await actualizar.run(n + 1, banner.id);
   });
 }
 
 // Devuelve el banner borrado (para borrar sus archivos) o null si no es de esta tienda.
-export function borrarBanner(db, tiendaId, id) {
+export async function borrarBanner(db, tiendaId, id) {
   return (
-    db
-      .prepare('DELETE FROM banners WHERE id = ? AND tienda_id = ? RETURNING imagen, imagen_movil AS imagenMovil')
-      .get(id, tiendaId) ?? null
+    (await db
+      .prepare('DELETE FROM banners WHERE id = ? AND tienda_id = ? RETURNING imagen, imagen_movil AS "imagenMovil"')
+      .get(id, tiendaId)) ?? null
   );
 }

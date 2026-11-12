@@ -26,7 +26,7 @@ let dirSubidas;
 
 before(async () => {
   dirSubidas = mkdtempSync(path.join(tmpdir(), 'subidas-'));
-  db = abrirBase(':memory:');
+  db = await abrirBase(':memory:');
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',
@@ -53,7 +53,7 @@ async function tiendaConPanel(slug) {
     ['B-1', 'Buzo', 30000, 3, 'Talle', 'M'],
     ['A-1', 'Ambo', 12000, 5, null, null],
   ]);
-  aplicarImportacion(db, tienda.id, productos);
+  await aplicarImportacion(db, tienda.id, productos);
   const nav = crearNavegador(`http://127.0.0.1:${puerto}`);
   assert.equal((await nav.enviar('/admin/ingresar', { email: `${slug}@ejemplo.com`, clave })).status, 302);
   return { nav, tiendaId: tienda.id };

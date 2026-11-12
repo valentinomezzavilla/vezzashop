@@ -130,18 +130,18 @@ function filaAMetodo(fila) {
   };
 }
 
-const SELECCION_METODO = `SELECT id, tipo, nombre, descripcion, costo_centavos AS costo, gratis_desde_centavos AS gratisDesde,
-  acepta_efectivo AS aceptaEfectivo, activo FROM metodos_entrega`;
+const SELECCION_METODO = `SELECT id, tipo, nombre, descripcion, costo_centavos AS costo, gratis_desde_centavos AS "gratisDesde",
+  acepta_efectivo AS "aceptaEfectivo", activo FROM metodos_entrega`;
 
-export function listarMetodosEntrega(db, tiendaId, { soloActivos = false } = {}) {
-  return db
+export async function listarMetodosEntrega(db, tiendaId, { soloActivos = false } = {}) {
+  return (await db
     .prepare(`${SELECCION_METODO} WHERE tienda_id = ?${soloActivos ? ' AND activo = 1' : ''} ORDER BY orden, id`)
-    .all(tiendaId)
+    .all(tiendaId))
     .map(filaAMetodo);
 }
 
-export function leerMetodoEntrega(db, tiendaId, id) {
-  const fila = db.prepare(`${SELECCION_METODO} WHERE tienda_id = ? AND id = ?`).get(tiendaId, id);
+export async function leerMetodoEntrega(db, tiendaId, id) {
+  const fila = await db.prepare(`${SELECCION_METODO} WHERE tienda_id = ? AND id = ?`).get(tiendaId, id);
   return fila ? filaAMetodo(fila) : null;
 }
 
@@ -226,59 +226,59 @@ export function validarMetodoEntrega(campos) {
   };
 }
 
-export function contarMetodosEntrega(db, tiendaId) {
-  return db.prepare('SELECT count(*) AS n FROM metodos_entrega WHERE tienda_id = ?').get(tiendaId).n;
+export async function contarMetodosEntrega(db, tiendaId) {
+  return (await db.prepare('SELECT count(*) AS n FROM metodos_entrega WHERE tienda_id = ?').get(tiendaId)).n;
 }
 
-export function crearMetodoEntrega(db, tiendaId, datos) {
-  return Number(
-    db
-      .prepare(
-        `INSERT INTO metodos_entrega (tienda_id, tipo, nombre, descripcion, costo_centavos, gratis_desde_centavos, acepta_efectivo, activo, orden)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT ifnull(max(orden), 0) + 1 FROM metodos_entrega WHERE tienda_id = ?))`,
-      )
-      .run(tiendaId, datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
-        Number(datos.aceptaEfectivo), Number(datos.activo), tiendaId).lastInsertRowid,
-  );
+export async function crearMetodoEntrega(db, tiendaId, datos) {
+  const { rows } = await db
+    .prepare(
+      `INSERT INTO metodos_entrega (tienda_id, tipo, nombre, descripcion, costo_centavos, gratis_desde_centavos, acepta_efectivo, activo, orden)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM metodos_entrega WHERE tienda_id = ?))
+       RETURNING id`,
+    )
+    .run(tiendaId, datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
+      Number(datos.aceptaEfectivo), Number(datos.activo), tiendaId);
+  return rows[0].id;
 }
 
-export function editarMetodoEntrega(db, tiendaId, id, datos) {
+export async function editarMetodoEntrega(db, tiendaId, id, datos) {
   return (
-    db
+    (await db
       .prepare(
         `UPDATE metodos_entrega SET tipo = ?, nombre = ?, descripcion = ?, costo_centavos = ?, gratis_desde_centavos = ?,
          acepta_efectivo = ?, activo = ? WHERE id = ? AND tienda_id = ?`,
       )
       .run(datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
-        Number(datos.aceptaEfectivo), Number(datos.activo), id, tiendaId).changes > 0
+        Number(datos.aceptaEfectivo), Number(datos.activo), id, tiendaId)).changes > 0
   );
 }
 
-export function activarMetodoEntrega(db, tiendaId, id, activo) {
-  return db.prepare('UPDATE metodos_entrega SET activo = ? WHERE id = ? AND tienda_id = ?').run(Number(activo), id, tiendaId).changes > 0;
+export async function activarMetodoEntrega(db, tiendaId, id, activo) {
+  return (await db.prepare('UPDATE metodos_entrega SET activo = ? WHERE id = ? AND tienda_id = ?').run(Number(activo), id, tiendaId)).changes > 0;
 }
 
-export function borrarMetodoEntrega(db, tiendaId, id) {
-  return db.prepare('DELETE FROM metodos_entrega WHERE id = ? AND tienda_id = ?').run(id, tiendaId).changes > 0;
+export async function borrarMetodoEntrega(db, tiendaId, id) {
+  return (await db.prepare('DELETE FROM metodos_entrega WHERE id = ? AND tienda_id = ?').run(id, tiendaId)).changes > 0;
 }
 
 // Intercambia la forma de entrega con la anterior (-1) o la siguiente (+1).
 export function moverMetodoEntrega(db, tiendaId, id, direccion) {
-  enTransaccion(db, () => {
-    const metodos = db.prepare('SELECT id FROM metodos_entrega WHERE tienda_id = ? ORDER BY orden, id').all(tiendaId);
+  return enTransaccion(db, async (tx) => {
+    const metodos = await tx.prepare('SELECT id FROM metodos_entrega WHERE tienda_id = ? ORDER BY orden, id').all(tiendaId);
     const i = metodos.findIndex((m) => m.id === id);
     const j = i + direccion;
     if (i === -1 || j < 0 || j >= metodos.length) return;
     [metodos[i], metodos[j]] = [metodos[j], metodos[i]];
-    const actualizar = db.prepare('UPDATE metodos_entrega SET orden = ? WHERE id = ?');
-    metodos.forEach((metodo, n) => actualizar.run(n + 1, metodo.id));
+    const actualizar = tx.prepare('UPDATE metodos_entrega SET orden = ? WHERE id = ?');
+    for (const [n, metodo] of metodos.entries()) await actualizar.run(n + 1, metodo.id);
   });
 }
 
 // La tienda vende desde su vidriera si ofrece al menos una forma de entrega y una de pago que se puedan combinar
 // (el efectivo solo sirve con entregas que lo aceptan).
-export function estadoCheckout(db, tiendaId, ajustes) {
-  const entregas = listarMetodosEntrega(db, tiendaId, { soloActivos: true });
+export async function estadoCheckout(db, tiendaId, ajustes) {
+  const entregas = await listarMetodosEntrega(db, tiendaId, { soloActivos: true });
   const pagos = formasDePagoActivas(ajustes);
   const combinable = entregas.some((entrega) => pagos.some((pago) => pago.clave !== 'efectivo' || entrega.aceptaEfectivo));
   return { entregas, pagos, activo: combinable };

@@ -20,7 +20,7 @@ const mismosAtributos = (a, b) => a.length === b.length && a.every((x, i) => x.t
 const columnasAtributos = (lista) => [lista[0] ?? null, lista[1] ?? null, lista[2] ?? null];
 const aEnteroSQL = (booleano) => (booleano === null ? null : Number(booleano));
 
-function analizar(db, tiendaId, productos) {
+async function analizar(db, tiendaId, productos) {
   const buscarProducto = db.prepare(
     'SELECT id, nombre, atributo1, atributo2, atributo3 FROM productos WHERE tienda_id = ? AND slug = ?',
   );
@@ -35,7 +35,7 @@ function analizar(db, tiendaId, productos) {
   const plan = [];
 
   for (const producto of productos) {
-    const existente = buscarProducto.get(tiendaId, producto.slug);
+    const existente = await buscarProducto.get(tiendaId, producto.slug);
     const atributosExistentes = existente
       ? [existente.atributo1, existente.atributo2, existente.atributo3].filter((a) => a !== null)
       : [];
@@ -43,7 +43,7 @@ function analizar(db, tiendaId, productos) {
     if (
       existente &&
       producto.atributos.length > 0 &&
-      contarVariantes.get(existente.id).n > 0 &&
+      (await contarVariantes.get(existente.id)).n > 0 &&
       !mismosAtributos(atributosExistentes, producto.atributos)
     ) {
       errores.push({
@@ -58,7 +58,7 @@ function analizar(db, tiendaId, productos) {
 
     const variantes = [];
     for (const variante of producto.variantes) {
-      const varianteExistente = buscarVariante.get(tiendaId, variante.sku);
+      const varianteExistente = await buscarVariante.get(tiendaId, variante.sku);
       if (varianteExistente && varianteExistente.slug !== producto.slug) {
         errores.push({
           fila: variante.fila,
@@ -89,84 +89,83 @@ function analizar(db, tiendaId, productos) {
   return { resumen, errores, plan };
 }
 
-export function previsualizar(db, tiendaId, productos) {
-  const { resumen, errores } = analizar(db, tiendaId, productos);
+export async function previsualizar(db, tiendaId, productos) {
+  const { resumen, errores } = await analizar(db, tiendaId, productos);
   return { resumen, errores };
 }
 
-function obtenerCategoria(db, tiendaId, ruta) {
-  const buscar = db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND ifnull(padre_id, 0) = ? AND slug = ?');
-  const crear = db.prepare('INSERT INTO categorias (tienda_id, padre_id, nombre, slug) VALUES (?, ?, ?, ?)');
+async function obtenerCategoria(db, tiendaId, ruta) {
+  const buscar = db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND coalesce(padre_id, 0) = ? AND slug = ?');
+  const crear = db.prepare('INSERT INTO categorias (tienda_id, padre_id, nombre, slug) VALUES (?, ?, ?, ?) RETURNING id');
   let padreId = null;
   for (const nombre of ruta) {
     const slug = slugificar(nombre);
-    const existente = buscar.get(tiendaId, padreId ?? 0, slug);
-    padreId = existente ? existente.id : Number(crear.run(tiendaId, padreId, nombre, slug).lastInsertRowid);
+    const existente = await buscar.get(tiendaId, padreId ?? 0, slug);
+    padreId = existente ? existente.id : (await crear.run(tiendaId, padreId, nombre, slug)).rows[0].id;
   }
   return padreId;
 }
 
 export function aplicarImportacion(db, tiendaId, productos) {
-  return enTransaccion(db, () => {
-    const { resumen, errores, plan } = analizar(db, tiendaId, productos);
+  return enTransaccion(db, async (tx) => {
+    const { resumen, errores, plan } = await analizar(tx, tiendaId, productos);
     if (errores.length > 0) throw new ErrorDeImportacion(errores);
 
-    const insertarProducto = db.prepare(
+    const insertarProducto = tx.prepare(
       `INSERT INTO productos (tienda_id, slug, nombre, descripcion, marca, atributo1, atributo2, atributo3, visible)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     );
-    const actualizarProducto = db.prepare(
+    const actualizarProducto = tx.prepare(
       `UPDATE productos SET descripcion = coalesce(?, descripcion), marca = coalesce(?, marca),
-       visible = coalesce(?, visible), actualizado_en = datetime('now') WHERE id = ?`,
+       visible = coalesce(?, visible), actualizado_en = ahora() WHERE id = ?`,
     );
-    const actualizarAtributos = db.prepare(
+    const actualizarAtributos = tx.prepare(
       'UPDATE productos SET atributo1 = ?, atributo2 = ?, atributo3 = ? WHERE id = ?',
     );
-    const borrarCategorias = db.prepare('DELETE FROM producto_categorias WHERE producto_id = ?');
-    const asignarCategoria = db.prepare(
-      'INSERT OR IGNORE INTO producto_categorias (producto_id, categoria_id) VALUES (?, ?)',
+    const borrarCategorias = tx.prepare('DELETE FROM producto_categorias WHERE producto_id = ?');
+    const asignarCategoria = tx.prepare(
+      'INSERT INTO producto_categorias (producto_id, categoria_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
     );
-    const insertarVariante = db.prepare(
+    const insertarVariante = tx.prepare(
       `INSERT INTO variantes (tienda_id, producto_id, sku, valor1, valor2, valor3, precio_centavos,
        precio_promocional_centavos, stock, peso_kg, alto_cm, ancho_cm, profundidad_cm)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
-    const actualizarVariante = db.prepare(
+    const actualizarVariante = tx.prepare(
       `UPDATE variantes SET precio_centavos = coalesce(?, precio_centavos),
        precio_promocional_centavos = coalesce(?, precio_promocional_centavos), stock = coalesce(?, stock),
        peso_kg = coalesce(?, peso_kg), alto_cm = coalesce(?, alto_cm), ancho_cm = coalesce(?, ancho_cm),
-       profundidad_cm = coalesce(?, profundidad_cm), actualizado_en = datetime('now') WHERE id = ?`,
+       profundidad_cm = coalesce(?, profundidad_cm), actualizado_en = ahora() WHERE id = ?`,
     );
-    const actualizarValores = db.prepare('UPDATE variantes SET valor1 = ?, valor2 = ?, valor3 = ? WHERE id = ?');
+    const actualizarValores = tx.prepare('UPDATE variantes SET valor1 = ?, valor2 = ?, valor3 = ? WHERE id = ?');
 
     for (const producto of plan) {
       let productoId = producto.id;
       if (productoId === null) {
-        productoId = Number(
-          insertarProducto.run(
-            tiendaId,
-            producto.slug,
-            producto.nombre,
-            producto.descripcion ?? '',
-            producto.marca ?? '',
-            ...columnasAtributos(producto.atributos),
-            aEnteroSQL(producto.visible) ?? 1,
-          ).lastInsertRowid,
+        const { rows } = await insertarProducto.run(
+          tiendaId,
+          producto.slug,
+          producto.nombre,
+          producto.descripcion ?? '',
+          producto.marca ?? '',
+          ...columnasAtributos(producto.atributos),
+          aEnteroSQL(producto.visible) ?? 1,
         );
+        productoId = rows[0].id;
       } else {
-        actualizarProducto.run(producto.descripcion, producto.marca, aEnteroSQL(producto.visible), productoId);
-        if (producto.atributos.length > 0) actualizarAtributos.run(...columnasAtributos(producto.atributos), productoId);
+        await actualizarProducto.run(producto.descripcion, producto.marca, aEnteroSQL(producto.visible), productoId);
+        if (producto.atributos.length > 0) await actualizarAtributos.run(...columnasAtributos(producto.atributos), productoId);
       }
 
       if (producto.categorias !== null) {
-        borrarCategorias.run(productoId);
-        for (const ruta of producto.categorias) asignarCategoria.run(productoId, obtenerCategoria(db, tiendaId, ruta));
+        await borrarCategorias.run(productoId);
+        for (const ruta of producto.categorias) await asignarCategoria.run(productoId, await obtenerCategoria(tx, tiendaId, ruta));
       }
 
       for (const v of producto.variantes) {
         const medidas = [v.pesoKg, v.altoCm, v.anchoCm, v.profundidadCm];
         if (v.id === null) {
-          insertarVariante.run(
+          await insertarVariante.run(
             tiendaId,
             productoId,
             v.sku,
@@ -177,8 +176,8 @@ export function aplicarImportacion(db, tiendaId, productos) {
             ...medidas,
           );
         } else {
-          actualizarVariante.run(v.precioCentavos, v.precioPromocionalCentavos, v.stock, ...medidas, v.id);
-          if (v.valores.length > 0) actualizarValores.run(...columnasAtributos(v.valores), v.id);
+          await actualizarVariante.run(v.precioCentavos, v.precioPromocionalCentavos, v.stock, ...medidas, v.id);
+          if (v.valores.length > 0) await actualizarValores.run(...columnasAtributos(v.valores), v.id);
         }
       }
     }

@@ -24,7 +24,7 @@ let dirSubidas;
 
 before(async () => {
   dirSubidas = mkdtempSync(path.join(tmpdir(), 'subidas-'));
-  db = abrirBase(':memory:');
+  db = (await abrirBase(':memory:'));
   const config = { produccion: false, secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres', dominio: 'localhost', dirSubidas };
   servidor = crearApp({ db, config }).listen(0);
   await once(servidor, 'listening');
@@ -72,10 +72,10 @@ const REMERA = {
 
 // ---------- Validación y guardado ----------
 
-test('validarProducto acepta un producto con variantes y convierte precios y stock', () => {
-  const db = abrirBase(':memory:');
-  const tiendaId = crearTiendaVacia(db, 'a');
-  const { datos, errores } = validarProducto(db, tiendaId, null, formularioProducto(REMERA));
+test('validarProducto acepta un producto con variantes y convierte precios y stock', async () => {
+  const db = (await abrirBase(':memory:'));
+  const tiendaId = (await crearTiendaVacia(db, 'a'));
+  const { datos, errores } = (await validarProducto(db, tiendaId, null, formularioProducto(REMERA)));
   assert.deepEqual(errores, {});
   assert.equal(datos.slug, 'remera-basica');
   assert.deepEqual(
@@ -84,10 +84,10 @@ test('validarProducto acepta un producto con variantes y convierte precios y sto
   );
 });
 
-test('validarProducto marca cada problema en su fila', () => {
-  const db = abrirBase(':memory:');
-  const tiendaId = crearTiendaVacia(db, 'a');
-  const { errores } = validarProducto(db, tiendaId, null, formularioProducto({
+test('validarProducto marca cada problema en su fila', async () => {
+  const db = (await abrirBase(':memory:'));
+  const tiendaId = (await crearTiendaVacia(db, 'a'));
+  const { errores } = (await validarProducto(db, tiendaId, null, formularioProducto({
     nombre: 'Buzo',
     atributos: ['Talle'],
     variantes: [
@@ -96,7 +96,7 @@ test('validarProducto marca cada problema en su fila', () => {
       { sku: 'B-3', valores: [''], precio: 'gratis' },
       { sku: '', valores: [''], precio: '', stock: '0' }, // vacía: se ignora
     ],
-  }));
+  })));
   assert.deepEqual(errores.filas[0], undefined);
   assert.match(errores.filas[1].join(' | '), /SKU "b-1" está repetido/);
   assert.match(errores.filas[1].join(' | '), /oferta tiene que ser menor/);
@@ -106,25 +106,25 @@ test('validarProducto marca cada problema en su fila', () => {
   assert.equal(errores.filas[3], undefined);
 });
 
-test('validarProducto pide atributos para tener varias variantes y no deja repetir nombres ni SKU de otro producto', () => {
-  const db = abrirBase(':memory:');
-  const tiendaId = crearTiendaVacia(db, 'a');
-  guardarProducto(db, tiendaId, null, validarProducto(db, tiendaId, null, formularioProducto(REMERA)).datos);
+test('validarProducto pide atributos para tener varias variantes y no deja repetir nombres ni SKU de otro producto', async () => {
+  const db = (await abrirBase(':memory:'));
+  const tiendaId = (await crearTiendaVacia(db, 'a'));
+  (await guardarProducto(db, tiendaId, null, (await validarProducto(db, tiendaId, null, formularioProducto(REMERA))).datos));
 
-  const { errores } = validarProducto(db, tiendaId, null, formularioProducto({
+  const { errores } = (await validarProducto(db, tiendaId, null, formularioProducto({
     nombre: 'remera  BÁSICA',
     variantes: [{ sku: 'REM-S', precio: '1' }, { sku: 'OTRO', precio: '1' }],
-  }));
+  })));
   assert.match(errores.nombre, /otro producto con este nombre/);
   assert.match(errores.variantes, /qué cambia entre ellas/);
   assert.match(errores.filas[0][0], /ya lo usa otro producto/);
 });
 
-test('guardarProducto actualiza, borra variantes quitadas y permite intercambiar SKU', () => {
-  const db = abrirBase(':memory:');
-  const tiendaId = crearTiendaVacia(db, 'a');
-  const id = guardarProducto(db, tiendaId, null, validarProducto(db, tiendaId, null, formularioProducto(REMERA)).datos);
-  const [s, m] = leerProducto(db, tiendaId, id).variantes;
+test('guardarProducto actualiza, borra variantes quitadas y permite intercambiar SKU', async () => {
+  const db = (await abrirBase(':memory:'));
+  const tiendaId = (await crearTiendaVacia(db, 'a'));
+  const id = (await guardarProducto(db, tiendaId, null, (await validarProducto(db, tiendaId, null, formularioProducto(REMERA))).datos));
+  const [s, m] = (await leerProducto(db, tiendaId, id)).variantes;
 
   const edicion = formularioProducto({
     ...REMERA,
@@ -134,19 +134,19 @@ test('guardarProducto actualiza, borra variantes quitadas y permite intercambiar
       { sku: 'REM-L', valores: ['L'], precio: '13000', stock: '5' },
     ],
   });
-  const { datos, errores } = validarProducto(db, tiendaId, id, edicion);
+  const { datos, errores } = (await validarProducto(db, tiendaId, id, edicion));
   assert.deepEqual(errores, {});
-  guardarProducto(db, tiendaId, id, datos);
-  assert.deepEqual(leerProducto(db, tiendaId, id).variantes.map((v) => [v.sku, v.valores[0], v.precio, v.stock]), [
+  (await guardarProducto(db, tiendaId, id, datos));
+  assert.deepEqual((await leerProducto(db, tiendaId, id)).variantes.map((v) => [v.sku, v.valores[0], v.precio, v.stock]), [
     ['REM-M', 'S', 1300000, 2], ['REM-S', 'M', 1300000, 1], ['REM-L', 'L', 1300000, 5],
   ]);
 
   const quitando = formularioProducto({ ...REMERA, variantes: [{ id: s.id, sku: 'REM-M', valores: ['S'], precio: '13000' }] });
-  guardarProducto(db, tiendaId, id, validarProducto(db, tiendaId, id, quitando).datos);
-  assert.equal(leerProducto(db, tiendaId, id).variantes.length, 1);
+  (await guardarProducto(db, tiendaId, id, (await validarProducto(db, tiendaId, id, quitando)).datos));
+  assert.equal((await leerProducto(db, tiendaId, id)).variantes.length, 1);
 });
 
-test('precioParaEditar devuelve un texto que se puede volver a cargar', () => {
+test('precioParaEditar devuelve un texto que se puede volver a cargar', async () => {
   assert.equal(precioParaEditar(1250000), '12.500');
   assert.equal(precioParaEditar(1250050), '12.500,50');
   assert.equal(precioParaEditar(null), '');
@@ -186,11 +186,11 @@ test('editar: cambiar precio y quitar una variante', async () => {
   const { nav, tiendaId } = await tiendaConPanel('editando');
   const ubicacion = (await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto(REMERA)), { desde: '/admin/productos/nuevo' })).headers.get('location');
   const id = Number(ubicacion.split('/').at(-1));
-  const [s] = leerProducto(db, tiendaId, id).variantes;
+  const [s] = (await leerProducto(db, tiendaId, id)).variantes;
 
   const edicion = formularioProducto({ ...REMERA, variantes: [{ id: s.id, sku: 'REM-S', valores: ['S'], precio: '15000', stock: '3' }] });
   assert.equal((await nav.enviar(ubicacion, comoPares(edicion))).status, 302);
-  const guardado = leerProducto(db, tiendaId, id);
+  const guardado = (await leerProducto(db, tiendaId, id));
   assert.deepEqual(guardado.variantes.map((v) => [v.sku, v.precio]), [['REM-S', 1500000]]);
 
   const html = await (await nav.pedir(ubicacion)).text();
@@ -287,9 +287,9 @@ test('una tienda no puede ver, editar ni borrar productos de otra', async () => 
 test('categorías: crear, anidar, renombrar y borrar con subcategorías sin borrar productos', async () => {
   const { nav, tiendaId } = await tiendaConPanel('concategorias');
   assert.equal((await nav.enviar('/admin/categorias', { nombre: 'Ropa', padreId: '' })).status, 302);
-  const ropa = db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND slug = ?').get(tiendaId, 'ropa').id;
+  const ropa = (await db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND slug = ?').get(tiendaId, 'ropa')).id;
   await nav.enviar('/admin/categorias', { nombre: 'Remeras', padreId: String(ropa) });
-  const remeras = db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND slug = ?').get(tiendaId, 'remeras').id;
+  const remeras = (await db.prepare('SELECT id FROM categorias WHERE tienda_id = ? AND slug = ?').get(tiendaId, 'remeras')).id;
 
   const repetida = await nav.enviar('/admin/categorias', { nombre: 'remeras', padreId: String(ropa) });
   assert.equal(repetida.status, 400);
@@ -304,18 +304,18 @@ test('categorías: crear, anidar, renombrar y borrar con subcategorías sin borr
   assert.match((await vidriera('concategorias', '/categoria/ropa/remeras-y-musculosas')).cuerpo, /Remera Básica/);
 
   await nav.enviar(`/admin/categorias/${ropa}/borrar`, {}, { desde: '/admin/categorias' });
-  assert.equal(db.prepare('SELECT count(*) AS n FROM categorias WHERE tienda_id = ?').get(tiendaId).n, 0);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM categorias WHERE tienda_id = ?').get(tiendaId)).n, 0);
   assert.equal((await vidriera('concategorias', '/producto/remera-basica')).status, 200, 'el producto sigue');
 });
 
 test('no se puede usar una categoría de otra tienda como padre ni asignarla a un producto', async () => {
   const { nav, tiendaId } = await tiendaConPanel('catpropia');
-  const ajena = crearCategoria(db, crearTiendaVacia(db, 'ajena'), { nombre: 'Ajena', slug: 'ajena', padreId: null });
+  const ajena = (await crearCategoria(db, (await crearTiendaVacia(db, 'ajena')), { nombre: 'Ajena', slug: 'ajena', padreId: null }));
   const respuesta = await nav.enviar('/admin/categorias', { nombre: 'Mía', padreId: String(ajena) });
   assert.equal(respuesta.status, 400);
 
   const ubicacion = (await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto({ ...REMERA, categorias: [ajena] })), { desde: '/admin/productos/nuevo' })).headers.get('location');
-  assert.deepEqual(leerProducto(db, tiendaId, Number(ubicacion.split('/').at(-1))).categoriaIds, []);
+  assert.deepEqual((await leerProducto(db, tiendaId, Number(ubicacion.split('/').at(-1)))).categoriaIds, []);
 });
 
 // ---------- Cuenta ----------

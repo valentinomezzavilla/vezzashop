@@ -132,10 +132,10 @@ export function rutasTienda({ db, config }) {
   const router = express.Router();
   const limitePedidos = crearLimite({ maximo: PEDIDOS_POR_HORA, ventanaMs: 60 * 60 * 1000 });
 
-  router.use((req, res, next) => {
-    const arbol = arbolCategorias(db, req.tienda.id);
-    const ajustes = leerAjustes(db, req.tienda.id);
-    const checkout = estadoCheckout(db, req.tienda.id, ajustes);
+  router.use(async (req, res, next) => {
+    const arbol = await arbolCategorias(db, req.tienda.id);
+    const ajustes = await leerAjustes(db, req.tienda.id);
+    const checkout = await estadoCheckout(db, req.tienda.id, ajustes);
     const origen = `${req.protocol}://${req.host}`;
     Object.assign(res.locals, {
       tienda: req.tienda,
@@ -168,15 +168,15 @@ export function rutasTienda({ db, config }) {
     productos.map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto), urlFotoAlternativa: urlImagen(tiendaId, p.fotoAlternativa) }));
 
   // Una página del catálogo con filtros, orden y paginación. `base` son los filtros fijos (categoría o búsqueda).
-  function listado(req, base) {
+  async function listado(req, base) {
     const tiendaId = req.tienda.id;
     const orden = ordenElegido(req, req.ajustes);
     const filtros = filtrosDe(req.query);
     const opciones = { ...base, ...filtros };
-    const total = contarVisibles(db, tiendaId, opciones);
+    const total = await contarVisibles(db, tiendaId, opciones);
     const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
     const pagina = Math.min(paginas, Math.max(1, Number.parseInt(req.query.pagina, 10) || 1));
-    const rango = rangoDePrecios(db, tiendaId);
+    const rango = await rangoDePrecios(db, tiendaId);
     const activos = [
       filtros.conStock && { texto: 'Con stock', url: conParametros(req, { stock: null, pagina: null }) },
       filtros.enOferta && { texto: 'En oferta', url: conParametros(req, { oferta: null, pagina: null }) },
@@ -184,7 +184,7 @@ export function rutasTienda({ db, config }) {
       filtros.precioMax !== null && { texto: `Hasta ${formatearPrecio(filtros.precioMax)}`, url: conParametros(req, { max: null, pagina: null }) },
     ].filter(Boolean);
     return {
-      productos: conFotos(tiendaId, productosVisibles(db, tiendaId, { ...opciones, orden, limite: POR_PAGINA, desde: (pagina - 1) * POR_PAGINA })),
+      productos: conFotos(tiendaId, await productosVisibles(db, tiendaId, { ...opciones, orden, limite: POR_PAGINA, desde: (pagina - 1) * POR_PAGINA })),
       total,
       pagina,
       paginas,
@@ -204,19 +204,19 @@ export function rutasTienda({ db, config }) {
     };
   }
 
-  router.get('/', (req, res) => {
-    const datos = listado(req, {});
+  router.get('/', async (req, res) => {
+    const datos = await listado(req, {});
     // Los destacados y los banners van arriba solo en la primera vista de la portada, sin filtros ni orden elegido.
     const portada = !req.query.orden && !datos.hayFiltros && datos.pagina === 1;
     const banners = portada
-      ? listarBanners(db, req.tienda.id).map((b) => ({
+      ? (await listarBanners(db, req.tienda.id)).map((b) => ({
           ...b,
           urlImagen: urlImagen(req.tienda.id, b.imagen),
           urlImagenMovil: urlImagen(req.tienda.id, b.imagenMovil),
         }))
       : [];
     const destacados = portada
-      ? productosVisibles(db, req.tienda.id, { soloDestacados: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS })
+      ? await productosVisibles(db, req.tienda.id, { soloDestacados: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS })
       : [];
     res.locals.meta.imagen = banners[0]?.urlImagen ?? res.locals.urlLogo;
     res.render('tienda/catalogo', {
@@ -229,7 +229,7 @@ export function rutasTienda({ db, config }) {
     });
   });
 
-  router.get('/categoria/*ruta', (req, res, next) => {
+  router.get('/categoria/*ruta', async (req, res, next) => {
     const encontrada = buscarCategoria(req.arbol, req.params.ruta);
     if (!encontrada) return next();
     const { categoria, migas } = encontrada;
@@ -240,14 +240,14 @@ export function rutasTienda({ db, config }) {
       subcategorias: categoria.hijas,
       banners: [],
       destacados: [],
-      ...listado(req, { categoriaId: categoria.id }),
+      ...(await listado(req, { categoriaId: categoria.id })),
     });
   });
 
-  router.get('/buscar', (req, res) => {
+  router.get('/buscar', async (req, res) => {
     const busqueda = String(req.query.q ?? '').trim().slice(0, 80);
     res.locals.busqueda = busqueda;
-    const datos = listado(req, { busqueda });
+    const datos = await listado(req, { busqueda });
     // Sin nada escrito no se muestra todo el catálogo: solo el buscador y las categorías para empezar.
     if (!busqueda) Object.assign(datos, { productos: [], total: 0, mostrados: 0, urlSiguiente: null });
     res.render('tienda/catalogo', {
@@ -262,13 +262,13 @@ export function rutasTienda({ db, config }) {
   });
 
   // Sugerencias del buscador mientras se escribe.
-  router.get('/api/buscar', (req, res) => {
+  router.get('/api/buscar', async (req, res) => {
     const busqueda = String(req.query.q ?? '').trim().slice(0, 80);
     if (busqueda.length < 2) return res.json({ total: 0, productos: [] });
     const opciones = { busqueda };
-    const productos = productosVisibles(db, req.tienda.id, { ...opciones, orden: 'nombre', limite: MAX_SUGERENCIAS });
+    const productos = await productosVisibles(db, req.tienda.id, { ...opciones, orden: 'nombre', limite: MAX_SUGERENCIAS });
     res.json({
-      total: contarVisibles(db, req.tienda.id, opciones),
+      total: await contarVisibles(db, req.tienda.id, opciones),
       productos: productos.map((p) => ({
         nombre: p.nombre,
         url: `/producto/${p.slug}`,
@@ -279,10 +279,10 @@ export function rutasTienda({ db, config }) {
   });
 
   // Precios y stock actuales de lo que hay en el carrito (el carrito vive en el navegador).
-  router.get('/api/carrito', (req, res) => {
+  router.get('/api/carrito', async (req, res) => {
     const skus = [...new Set(String(req.query.skus ?? '').split(',').map((s) => s.trim()).filter(Boolean))].slice(0, MAX_EN_CARRITO);
     res.json({
-      variantes: variantesParaCarrito(db, req.tienda.id, skus).map((v) => ({
+      variantes: (await variantesParaCarrito(db, req.tienda.id, skus)).map((v) => ({
         ...v,
         foto: urlImagen(req.tienda.id, v.foto),
         url: `/producto/${v.slug}`,
@@ -291,15 +291,15 @@ export function rutasTienda({ db, config }) {
     });
   });
 
-  router.get('/producto/:slug', (req, res, next) => {
-    const producto = productoVisible(db, req.tienda.id, req.params.slug);
+  router.get('/producto/:slug', async (req, res, next) => {
+    const producto = await productoVisible(db, req.tienda.id, req.params.slug);
     if (!producto) return next();
     const indice = indexarCategorias(req.arbol);
     const variantes = producto.variantes.map((v) => datosVariante(v, producto, req.ajustes));
     const inicial = variantes.find((v) => v.hayStock) ?? variantes[0];
     const valoresPorAtributo = producto.atributos.map((_, n) => [...new Set(producto.variantes.map((v) => v.valores[n]))]);
     const fotos = producto.fotos.map((archivo) => urlImagen(req.tienda.id, archivo));
-    const relacionados = productosRelacionados(db, req.tienda.id, { slug: producto.slug, categoriaIds: producto.categoriaIds });
+    const relacionados = await productosRelacionados(db, req.tienda.id, { slug: producto.slug, categoriaIds: producto.categoriaIds });
 
     // Para la vista previa al compartir el link y para Google.
     const { origen } = res.locals;
@@ -403,14 +403,14 @@ export function rutasTienda({ db, config }) {
     });
   }
 
-  router.get('/checkout', (req, res) => {
+  router.get('/checkout', async (req, res) => {
     if (!req.checkout.activo) return res.redirect('/');
     const items = leerItems(req.query);
-    const { lineas, cambios } = lineasDelCarrito(db, req.tienda.id, items);
+    const { lineas, cambios } = await lineasDelCarrito(db, req.tienda.id, items);
     mostrarCheckout(req, res, { lineas, cambios, sinItems: items.length === 0 });
   });
 
-  router.post('/checkout', express.urlencoded({ extended: false, limit: '64kb' }), (req, res) => {
+  router.post('/checkout', express.urlencoded({ extended: false, limit: '64kb' }), async (req, res) => {
     // Un formulario de otro sitio no puede hacer pedidos en nombre de nadie.
     const origen = req.get('origin');
     if (origen && origen !== res.locals.origen) return res.status(403).render('tienda/no-encontrado', { titulo: 'No encontrado' });
@@ -419,7 +419,7 @@ export function rutasTienda({ db, config }) {
     if (req.body.sitio) return res.redirect(303, '/');
 
     const items = leerItems(req.body);
-    const { lineas, cambios } = lineasDelCarrito(db, req.tienda.id, items);
+    const { lineas, cambios } = await lineasDelCarrito(db, req.tienda.id, items);
     const { valores, errores, datos } = validarCheckout(req.body, req.checkout);
     const volver = (extra) => mostrarCheckout(req, res, { lineas, cambios, valores, errores, status: 400, ...extra });
 
@@ -431,11 +431,11 @@ export function rutasTienda({ db, config }) {
 
     let pedido;
     try {
-      pedido = crearPedido(db, req.tienda.id, items, datos);
+      pedido = await crearPedido(db, req.tienda.id, items, datos);
     } catch (error) {
       if (!(error instanceof ErrorDeStock)) throw error;
       // Alguien compró lo mismo mientras tanto: se muestra el carrito actualizado.
-      const actual = lineasDelCarrito(db, req.tienda.id, items);
+      const actual = await lineasDelCarrito(db, req.tienda.id, items);
       return volver({ lineas: actual.lineas, cambios: error.problemas });
     }
     limitePedidos.registrar(req.ip);
@@ -443,8 +443,8 @@ export function rutasTienda({ db, config }) {
   });
 
   // El pedido, para el cliente: qué compró, cómo pagar y en qué estado está. El link no se puede adivinar.
-  router.get('/pedido/:token', (req, res, next) => {
-    const pedido = leerPedidoPorToken(db, req.tienda.id, req.params.token);
+  router.get('/pedido/:token', async (req, res, next) => {
+    const pedido = await leerPedidoPorToken(db, req.tienda.id, req.params.token);
     if (!pedido) return next();
     const { ajustes } = req;
     const urlPedido = `${res.locals.origen}/pedido/${pedido.token}`;

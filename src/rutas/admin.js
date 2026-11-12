@@ -74,28 +74,28 @@ export function rutasAdmin({ db, config }) {
       next(error);
     });
 
-  function mostrarDiseno(req, res, { valores = null, errores = {}, status = 200 } = {}) {
+  async function mostrarDiseno(req, res, { valores = null, errores = {}, status = 200 } = {}) {
     const { tiendaId } = req.session.usuario;
-    const ajustes = leerAjustes(db, tiendaId);
+    const ajustes = await leerAjustes(db, tiendaId);
     res.status(status).render('admin/diseno', {
       valores: valores ?? ajustes,
       errores,
       urlLogo: urlImagen(tiendaId, ajustes.logo),
       ordenes: ORDENES,
-      banners: listarBanners(db, tiendaId).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
+      banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
       maxBanners: MAX_BANNERS,
       megasImagen: MEGAS_IMAGEN,
     });
   }
 
-  router.use((req, res, next) => {
+  router.use(async (req, res, next) => {
     res.locals.csrf = tokenCsrf(req);
     res.locals.usuario = req.session.usuario ?? null;
-    const tienda = req.session.usuario ? buscarTienda(db, req.session.usuario.tiendaId) : null;
+    const tienda = req.session.usuario ? await buscarTienda(db, req.session.usuario.tiendaId) : null;
     res.locals.urlMiTienda = tienda ? urlTienda(req, config.dominio, tienda.slug) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
     // Para el número al lado de "Pedidos" en el menú.
-    res.locals.pedidosNuevos = tienda ? contarPedidosNuevos(db, tienda.id) : 0;
+    res.locals.pedidosNuevos = tienda ? await contarPedidosNuevos(db, tienda.id) : 0;
     // Para marcar en el menú la sección en la que se está: "/productos" -> "productos", "/importar/x" -> "importar".
     res.locals.seccionActual = req.path.split('/')[1] || null;
     res.locals.aviso = req.session.aviso ?? null;
@@ -165,7 +165,7 @@ export function rutasAdmin({ db, config }) {
       }
 
       const { productos, errores: erroresFormato } = interpretarHoja(filas);
-      const { resumen, errores: erroresBase } = previsualizar(db, tiendaId, productos);
+      const { resumen, errores: erroresBase } = await previsualizar(db, tiendaId, productos);
       const filasConError = new Set(erroresFormato.map((e) => e.fila));
       const errores = [...erroresFormato, ...erroresBase.filter((e) => !filasConError.has(e.fila))].sort(
         (a, b) => a.fila - b.fila,
@@ -201,7 +201,7 @@ export function rutasAdmin({ db, config }) {
     try {
       const { productos, errores } = interpretarHoja(await leerExcel(await readFile(ruta)));
       if (errores.length > 0) throw new ErrorDeImportacion(errores);
-      const resumen = aplicarImportacion(db, req.session.usuario.tiendaId, productos);
+      const resumen = await aplicarImportacion(db, req.session.usuario.tiendaId, productos);
       req.session.aviso = { tipo: 'ok', texto: textoResumen(resumen) };
       res.redirect('/admin/productos');
     } catch (error) {
@@ -228,7 +228,7 @@ export function rutasAdmin({ db, config }) {
       return mostrarDiseno(req, res, { valores: req.body, errores, status: 400 });
     }
 
-    const logoAnterior = leerAjustes(db, tiendaId).logo;
+    const logoAnterior = (await leerAjustes(db, tiendaId)).logo;
     let logo = req.body.quitarLogo ? null : logoAnterior;
     if (req.file) {
       try {
@@ -238,7 +238,7 @@ export function rutasAdmin({ db, config }) {
         return mostrarDiseno(req, res, { valores: req.body, errores: { logo: error.message }, status: 400 });
       }
     }
-    actualizarAjustes(db, tiendaId, { ...ajustes, logo });
+    await actualizarAjustes(db, tiendaId, { ...ajustes, logo });
     if (logo !== logoAnterior) await borrarImagen(config.dirSubidas, tiendaId, logoAnterior);
 
     req.session.aviso = { tipo: 'ok', texto: 'Listo, guardamos los cambios. Ya se ven en tu tienda.' };
@@ -256,7 +256,7 @@ export function rutasAdmin({ db, config }) {
         res.redirect('/admin/diseno#banners');
       };
 
-      if (listarBanners(db, tiendaId).length >= MAX_BANNERS) {
+      if ((await listarBanners(db, tiendaId)).length >= MAX_BANNERS) {
         return volverConError(`Podés tener hasta ${MAX_BANNERS} banners. Borrá alguno para agregar otro.`);
       }
       const imagen = req.files?.imagen?.[0];
@@ -276,7 +276,7 @@ export function rutasAdmin({ db, config }) {
         for (const archivo of guardadas) await borrarImagen(config.dirSubidas, tiendaId, archivo);
         return volverConError(error.message);
       }
-      agregarBanner(db, tiendaId, {
+      await agregarBanner(db, tiendaId, {
         imagen: guardadas[0],
         imagenMovil: guardadas[1] ?? null,
         enlace: enlace.valor,
@@ -292,9 +292,9 @@ export function rutasAdmin({ db, config }) {
     const id = Number(req.params.id);
     const { accion } = req.params;
     if (accion === 'subir' || accion === 'bajar') {
-      moverBanner(db, tiendaId, id, accion === 'subir' ? -1 : 1);
+      await moverBanner(db, tiendaId, id, accion === 'subir' ? -1 : 1);
     } else if (accion === 'borrar') {
-      const borrado = borrarBanner(db, tiendaId, id);
+      const borrado = await borrarBanner(db, tiendaId, id);
       if (borrado) {
         await borrarImagen(config.dirSubidas, tiendaId, borrado.imagen);
         await borrarImagen(config.dirSubidas, tiendaId, borrado.imagenMovil);

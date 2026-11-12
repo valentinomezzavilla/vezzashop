@@ -9,7 +9,7 @@ let servidor;
 let puerto;
 
 before(async () => {
-  const db = abrirBase(':memory:');
+  const db = await abrirBase(':memory:');
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',

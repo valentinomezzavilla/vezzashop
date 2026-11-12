@@ -13,12 +13,13 @@ if (!values.nombre || !values.email) {
 
 try {
   cargarEnv();
-  const db = abrirBase(leerConfig().rutaBase);
+  const db = await abrirBase(leerConfig().urlBase);
   const { tienda, email, clave } = await crearTienda(db, values);
   console.log(`Tienda creada: ${tienda.nombre} (id ${tienda.id})`);
   console.log(`Usuario:       ${email}`);
   console.log(`Clave:         ${clave}`);
   console.log('Guardá la clave ahora: no se vuelve a mostrar.');
+  await db.cerrar();
 } catch (error) {
   console.error(`No se pudo crear la tienda: ${error.message}`);
   process.exit(1);

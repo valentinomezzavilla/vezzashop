@@ -31,8 +31,8 @@ export function crearApp({ db, config }) {
   });
 
   // Para el chequeo de salud de Coolify/Docker: va primero para responder con cualquier host y sin crear sesión.
-  app.get('/salud', (req, res) => {
-    db.prepare('SELECT 1').get();
+  app.get('/salud', async (req, res) => {
+    await db.prepare('SELECT 1').get();
     res.type('text').send('ok');
   });
 
@@ -43,10 +43,10 @@ export function crearApp({ db, config }) {
   // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:
   // la vidriera no las usa y así las visitas no crean sesiones.
   const vidriera = rutasTienda({ db, config });
-  app.use((req, res, next) => {
+  app.use(async (req, res, next) => {
     const slug = slugDeHost(req.hostname, config.dominio);
     if (slug === null) return next();
-    req.tienda = buscarTiendaPorSlug(db, slug);
+    req.tienda = await buscarTiendaPorSlug(db, slug);
     if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });
     vidriera(req, res, next);
   });
