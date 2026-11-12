@@ -40,8 +40,9 @@ export function leerConfig(env = process.env) {
     puerto: Number(env.PUERTO ?? 3000),
     produccion: env.NODE_ENV === 'production',
     secretoSesion: env.SECRETO_SESION,
-    // Las tiendas se ven en <slug>.<dominio>; el panel, en el dominio a secas.
+    // El panel se ve en `dominio`; las tiendas, en <slug>.<dominioTiendas>, que por defecto es el mismo `dominio`.
     dominio: (env.DOMINIO || 'localhost').trim().toLowerCase(),
+    dominioTiendas: (env.DOMINIO_TIENDAS || env.DOMINIO || 'localhost').trim().toLowerCase(),
     urlBase: leerUrlBase(env),
     dirImportaciones: env.DIR_IMPORTACIONES ?? path.join(RAIZ, 'data', 'importaciones'),
     dirSubidas: env.DIR_SUBIDAS ?? path.join(RAIZ, 'data', 'subidas'),

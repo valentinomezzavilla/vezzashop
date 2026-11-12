@@ -179,6 +179,10 @@ salud). En los ejemplos el dominio es `vezzashop.com`: cambialo por el tuyo.
    - `SECRETO_SESION`: generalo con el comando de [Configuración](#configuración). No lo marques como
      variable de build.
    - `DOMINIO=vezzashop.com`
+   - `DOMINIO_TIENDAS` (opcional): el dominio donde viven las tiendas, si no es el mismo del panel. Por ejemplo
+     `DOMINIO=tiendas.vezzadev.com` y `DOMINIO_TIENDAS=vezzadev.com` dan el panel en `tiendas.vezzadev.com` y las
+     tiendas en `<nombre>.vezzadev.com`. Los nombres `www`, `admin`, `panel`, `api`, `app`, `mail`, `tiendas` y
+     `coolify` no se pueden usar como tienda.
    - `DATABASE_URL`: la **Postgres URL (internal)** del recurso del paso 3. Si la base y la aplicación están en el
      mismo servidor de Coolify, usá la interna (no sale a internet).
    - `NODE_ENV=production` y `PUERTO=3000` ya vienen en la imagen.

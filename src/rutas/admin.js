@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { autenticar, buscarTienda } from '../tiendas.js';
-import { urlTienda } from '../util/dominios.js';
+import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
 import { rutasAdminPedidos } from './admin-pedidos.js';
 import { contarPedidosNuevos } from '../pedidos.js';
@@ -92,7 +92,7 @@ export function rutasAdmin({ db, config }) {
     res.locals.csrf = tokenCsrf(req);
     res.locals.usuario = req.session.usuario ?? null;
     const tienda = req.session.usuario ? await buscarTienda(db, req.session.usuario.tiendaId) : null;
-    res.locals.urlMiTienda = tienda ? urlTienda(req, config.dominio, tienda.slug) : null;
+    res.locals.urlMiTienda = tienda ? urlTienda(req, dominioDeTiendas(config), tienda.slug) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
     // Para el número al lado de "Pedidos" en el menú.
     res.locals.pedidosNuevos = tienda ? await contarPedidosNuevos(db, tienda.id) : 0;

@@ -63,6 +63,14 @@ test('slugDeHost reconoce el subdominio de la tienda', () => {
   assert.equal(slugDeHost('ropa.otrodominio.com', 'vezzashop.com'), null);
 });
 
+test('slugDeHost con el panel en otro subdominio: las tiendas cuelgan del dominio raíz', () => {
+  // Panel en tiendas.vezzadev.com, tiendas en <nombre>.vezzadev.com
+  assert.equal(slugDeHost('ufoambos.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), 'ufoambos');
+  assert.equal(slugDeHost('tiendas.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
+  assert.equal(slugDeHost('coolify.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
+  assert.equal(slugDeHost('vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
+});
+
 test('cada subdominio muestra solo los productos de su tienda', async () => {
   const ropa = await pedir('ropa.localhost', '/');
   assert.equal(ropa.status, 200);

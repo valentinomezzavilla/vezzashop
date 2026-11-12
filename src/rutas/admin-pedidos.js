@@ -34,7 +34,7 @@ import {
   direccionEnUnaLinea,
 } from '../pedidos.js';
 import { buscarTienda } from '../tiendas.js';
-import { urlTienda } from '../util/dominios.js';
+import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { formatearFecha, formatearPrecio } from '../util/formato.js';
 
 const id = (valor) => (/^\d+$/.test(String(valor)) ? Number(valor) : null);
@@ -84,7 +84,7 @@ export function rutasAdminPedidos({ db, config }) {
   router.get('/pedidos/:pedidoId', cargarPedido, async (req, res) => {
     const { pedido } = req;
     const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
-    const urlCliente = `${urlTienda(req, config.dominio, tienda.slug)}/pedido/${pedido.token}`;
+    const urlCliente = `${urlTienda(req, dominioDeTiendas(config), tienda.slug)}/pedido/${pedido.token}`;
     const saludo = `¡Hola ${pedido.cliente.nombre.split(' ')[0]}! Te escribimos de ${tienda.nombre} por tu pedido #${pedido.numero}.`;
     res.render('admin/pedido', {
       pedido,

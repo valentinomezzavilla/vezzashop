@@ -7,7 +7,7 @@ import { rutasTienda } from './rutas/tienda.js';
 import { buscarTiendaPorSlug } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
 import { icono } from './util/iconos.js';
-import { slugDeHost, urlPanel } from './util/dominios.js';
+import { dominioDeTiendas, slugDeHost, urlPanel } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
@@ -44,7 +44,7 @@ export function crearApp({ db, config }) {
   // la vidriera no las usa y así las visitas no crean sesiones.
   const vidriera = rutasTienda({ db, config });
   app.use(async (req, res, next) => {
-    const slug = slugDeHost(req.hostname, config.dominio);
+    const slug = slugDeHost(req.hostname, dominioDeTiendas(config), config.dominio);
     if (slug === null) return next();
     req.tienda = await buscarTiendaPorSlug(db, slug);
     if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });

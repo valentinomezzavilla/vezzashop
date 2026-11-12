@@ -24,7 +24,7 @@ import {
 import { arbolCategoriasAdmin, aplanar, validarCategoria, crearCategoria, editarCategoria, borrarCategoria } from '../categorias.js';
 import { buscarTienda, renombrarTienda, cambiarClave, LARGO_MINIMO_CLAVE } from '../tiendas.js';
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
-import { urlTienda } from '../util/dominios.js';
+import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { plural } from '../util/formato.js';
 
 const MEGAS_IMAGEN = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
@@ -70,7 +70,7 @@ export function rutasAdminTienda({ db, config }) {
       errores,
       categorias: aplanar(await arbolCategoriasAdmin(db, tiendaId)),
       fotos: producto ? (await listarFotos(db, tiendaId, producto.id)).map((f) => ({ ...f, url: urlImagen(tiendaId, f.archivo) })) : [],
-      urlEnTienda: producto ? `${urlTienda(req, config.dominio, tienda.slug)}/producto/${producto.slug}` : null,
+      urlEnTienda: producto ? `${urlTienda(req, dominioDeTiendas(config), tienda.slug)}/producto/${producto.slug}` : null,
       maxAtributos: MAX_ATRIBUTOS,
       maxFotos: MAX_FOTOS,
       megasImagen: MEGAS_IMAGEN,
@@ -241,7 +241,7 @@ export function rutasAdminTienda({ db, config }) {
     res.status(status).render('admin/cuenta', {
       tienda,
       email: req.session.usuario.email,
-      urlTienda: urlTienda(req, config.dominio, tienda.slug),
+      urlTienda: urlTienda(req, dominioDeTiendas(config), tienda.slug),
       errores,
       largoMinimoClave: LARGO_MINIMO_CLAVE,
     });
