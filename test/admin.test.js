@@ -24,7 +24,7 @@ let fotos; // base de las URLs del servidor de fotos de prueba
 before(async () => {
   dirImportaciones = mkdtempSync(path.join(tmpdir(), 'importaciones-'));
   dirSubidas = mkdtempSync(path.join(tmpdir(), 'subidas-'));
-  db = abrirBase(':memory:');
+  db = await abrirBase(':memory:');
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',
@@ -52,7 +52,7 @@ after(() => {
   rmSync(dirSubidas, { recursive: true, force: true });
 });
 
-const tiendaIdDe = (slug) => db.prepare('SELECT id FROM tiendas WHERE slug = ?').get(slug).id;
+const tiendaIdDe = async (slug) => (await db.prepare('SELECT id FROM tiendas WHERE slug = ?').get(slug)).id;
 
 const navegador = () => crearNavegador(base);
 
@@ -191,8 +191,8 @@ test('carga masiva con fotos pegadas y por link, sin duplicar al volver a subir'
   assert.equal(confirmacion.headers.get('location'), '/admin/productos');
   assert.match(await (await nav.pedir('/admin/productos')).text(), /Se agregaron 3 fotos/);
 
-  const tiendaId = tiendaIdDe('confotos');
-  const filas = db
+  const tiendaId = await tiendaIdDe('confotos');
+  const filas = await db
     .prepare(`SELECT p.nombre, f.archivo FROM producto_fotos f JOIN productos p ON p.id = f.producto_id
               WHERE f.tienda_id = ? ORDER BY p.nombre`)
     .all(tiendaId);
@@ -216,17 +216,17 @@ test('subir otro archivo descarta la carpeta pendiente anterior', async () => {
   const archivo = await excel([['SKU', 'Nombre', 'Precio'], ['Z', 'Zeta', 1000]]);
   await nav.subirExcel(archivo);
   await nav.subirExcel(archivo);
-  const prefijo = `${tiendaIdDe('dosveces')}-`;
+  const prefijo = `${await tiendaIdDe('dosveces')}-`;
   assert.equal(readdirSync(dirImportaciones).filter((n) => n.startsWith(prefijo)).length, 1);
 });
 
 test('una importación pendiente del formato viejo se trata como si no hubiera ninguna', async () => {
   const nav = await ingresarComoNuevaTienda('sesionvieja');
   await nav.subirExcel(await excel([['SKU', 'Nombre', 'Precio'], ['V', 'Vieja', 1000]]));
-  db.prepare(
-    `UPDATE sesiones SET datos = json_set(datos, '$.importacion', json(?))
-     WHERE json_extract(datos, '$.usuario.tiendaId') = ?`,
-  ).run(JSON.stringify({ archivo: 'viejo.xlsx', nombreOriginal: 'viejo.xlsx' }), tiendaIdDe('sesionvieja'));
+  await db.prepare(
+    `UPDATE sesiones SET datos = jsonb_set(datos::jsonb, '{importacion}', ?::jsonb)::text
+     WHERE (datos::jsonb #>> '{usuario,tiendaId}')::int = ?`,
+  ).run(JSON.stringify({ archivo: 'viejo.xlsx', nombreOriginal: 'viejo.xlsx' }), await tiendaIdDe('sesionvieja'));
   const respuesta = await nav.enviar('/admin/importar/confirmar', {}, { desde: '/admin/importar' });
   assert.equal(respuesta.status, 302);
   assert.equal(respuesta.headers.get('location'), '/admin/importar');

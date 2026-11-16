@@ -64,15 +64,15 @@
               <a class="celda-pedido" href="/admin/pedidos/<%= p.id %>">#<%= p.numero %></a>
               <span class="ayuda celda-nota"><%= p.fecha %></span>
             </td>
-            <td>
+            <td data-etiqueta="Cliente">
               <span class="celda-fila"><%= p.cliente.nombre %></span>
               <span class="ayuda celda-nota"><%= p.unidades %> producto<%= p.unidades === 1 ? '' : 's' %></span>
             </td>
-            <td>
+            <td data-etiqueta="Entrega y pago">
               <span class="celda-fila"><%= p.entrega.nombre %></span>
               <span class="ayuda celda-nota"><%= p.tituloPago %></span>
             </td>
-            <td class="numero precio-celda"><%= formatearPrecio(p.total) %><% if (p.envio === null) { %><span class="ayuda celda-nota">+ envío</span><% } %></td>
+            <td class="numero precio-celda" data-etiqueta="Total"><%= formatearPrecio(p.total) %><% if (p.envio === null) { %><span class="ayuda celda-nota">+ envío</span><% } %></td>
             <td><span class="pastilla pastilla-<%= p.estado %>"><%= p.tituloEstado %></span></td>
           </tr>
         <% } %>

@@ -22,6 +22,16 @@ export function cargarEnv() {
   return archivo;
 }
 
+// PostgreSQL: DATABASE_URL (postgres://usuario:clave@host:5432/base). En producción es obligatoria.
+// Sin ella, en tu compu se usa PGlite (un Postgres que corre dentro de Node) guardado en ./data/pglite.
+function leerUrlBase(env) {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.NODE_ENV === 'production') {
+    throw new Error('Falta DATABASE_URL (la conexión a PostgreSQL). Mirá .env.example y el README.');
+  }
+  return `pglite:${path.join(RAIZ, 'data', 'pglite')}`;
+}
+
 export function leerConfig(env = process.env) {
   if (!env.SECRETO_SESION || env.SECRETO_SESION.length < 32) {
     throw new Error('Falta SECRETO_SESION (mínimo 32 caracteres). Mirá .env.example y el README.');
@@ -30,9 +40,10 @@ export function leerConfig(env = process.env) {
     puerto: Number(env.PUERTO ?? 3000),
     produccion: env.NODE_ENV === 'production',
     secretoSesion: env.SECRETO_SESION,
-    // Las tiendas se ven en <slug>.<dominio>; el panel, en el dominio a secas.
+    // El panel se ve en `dominio`; las tiendas, en <slug>.<dominioTiendas>, que por defecto es el mismo `dominio`.
     dominio: (env.DOMINIO || 'localhost').trim().toLowerCase(),
-    rutaBase: env.RUTA_BASE_DATOS ?? path.join(RAIZ, 'data', 'plataforma.db'),
+    dominioTiendas: (env.DOMINIO_TIENDAS || env.DOMINIO || 'localhost').trim().toLowerCase(),
+    urlBase: leerUrlBase(env),
     dirImportaciones: env.DIR_IMPORTACIONES ?? path.join(RAIZ, 'data', 'importaciones'),
     dirSubidas: env.DIR_SUBIDAS ?? path.join(RAIZ, 'data', 'subidas'),
   };

@@ -11,8 +11,8 @@ export function plural(cantidad, singular, pluralTexto) {
 
 const FECHA = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Cordoba', dateStyle: 'short', timeStyle: 'short' });
 
-// La fecha que guarda SQLite (UTC, "2026-11-04 15:30:00") en hora argentina: "4/11/26, 12:30".
-export function formatearFecha(fechaSqlite) {
-  if (!fechaSqlite) return '';
-  return FECHA.format(new Date(`${fechaSqlite.replace(' ', 'T')}Z`));
+// La fecha que guarda la base (texto en UTC, "2026-11-04 15:30:00") en hora argentina: "4/11/26, 12:30".
+export function formatearFecha(fechaGuardada) {
+  if (!fechaGuardada) return '';
+  return FECHA.format(new Date(`${fechaGuardada.replace(' ', 'T')}Z`));
 }

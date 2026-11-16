@@ -1,4 +1,4 @@
-// Guarda las sesiones del panel en SQLite: sobreviven a reinicios del servidor.
+// Guarda las sesiones del panel en la base de datos: sobreviven a reinicios y se comparten entre instancias.
 import session from 'express-session';
 
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
@@ -15,41 +15,27 @@ export class AlmacenSesiones extends session.Store {
     this.borrarVencidas = db.prepare('DELETE FROM sesiones WHERE expira <= ?');
   }
 
+  // express-session espera callbacks, pero la base es asíncrona: cada método espera la consulta y avisa por el callback.
   get(sid, listo) {
-    try {
-      const fila = this.leer.get(sid, Date.now());
-      listo(null, fila ? JSON.parse(fila.datos) : null);
-    } catch (error) {
-      listo(error);
-    }
+    this.leer.get(sid, Date.now()).then(
+      (fila) => listo(null, fila ? JSON.parse(fila.datos) : null),
+      (error) => listo(error),
+    );
   }
 
   set(sid, sesion, listo) {
-    try {
-      this.borrarVencidas.run(Date.now());
-      this.guardar.run(sid, JSON.stringify(sesion), vencimiento(sesion));
-      listo?.(null);
-    } catch (error) {
-      listo?.(error);
-    }
+    this.borrarVencidas
+      .run(Date.now())
+      .then(() => this.guardar.run(sid, JSON.stringify(sesion), vencimiento(sesion)))
+      .then(() => listo?.(null), (error) => listo?.(error));
   }
 
   touch(sid, sesion, listo) {
-    try {
-      this.renovar.run(vencimiento(sesion), sid);
-      listo?.(null);
-    } catch (error) {
-      listo?.(error);
-    }
+    this.renovar.run(vencimiento(sesion), sid).then(() => listo?.(null), (error) => listo?.(error));
   }
 
   destroy(sid, listo) {
-    try {
-      this.borrar.run(sid);
-      listo?.(null);
-    } catch (error) {
-      listo?.(error);
-    }
+    this.borrar.run(sid).then(() => listo?.(null), (error) => listo?.(error));
   }
 }
 

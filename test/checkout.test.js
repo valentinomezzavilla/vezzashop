@@ -20,7 +20,7 @@ let puerto;
 let db;
 
 before(async () => {
-  db = abrirBase(':memory:');
+  db = (await abrirBase(':memory:'));
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',
@@ -36,7 +36,7 @@ after(() => servidor.close());
 
 const vidriera = (slug, ruta) => pedirConHost(puerto, `${slug}.localhost`, ruta);
 const comprar = (slug, campos, headers) => enviarConHost(puerto, `${slug}.localhost`, '/checkout', campos, headers);
-const stockDe = (tiendaId, sku) => db.prepare('SELECT stock FROM variantes WHERE tienda_id = ? AND sku = ?').get(tiendaId, sku).stock;
+const stockDe = async (tiendaId, sku) => (await db.prepare('SELECT stock FROM variantes WHERE tienda_id = ? AND sku = ?').get(tiendaId, sku)).stock;
 
 // Tienda con productos y el panel abierto. Buzo $30.000 (stock 3), Gorra $5.000 (stock 1).
 async function tienda(slug) {
@@ -47,7 +47,7 @@ async function tienda(slug) {
     ['GORRA', 'Gorra', 5000, 1, null, null],
   ]);
   assert.deepEqual(errores, []);
-  aplicarImportacion(db, creada.id, productos);
+  (await aplicarImportacion(db, creada.id, productos));
   const nav = crearNavegador(`http://127.0.0.1:${puerto}`);
   assert.equal((await nav.enviar('/admin/ingresar', { email: `${slug}@ejemplo.com`, clave })).status, 302);
   return { nav, tiendaId: creada.id };
@@ -79,7 +79,7 @@ const DIRECCION = { calle: 'Obispo Trejo 300', piso: '2 B', ciudad: 'Córdoba', 
 
 // ---------- Cuentas ----------
 
-test('el envío es gratis desde el monto configurado, y a coordinar no suma al total', () => {
+test('el envío es gratis desde el monto configurado, y a coordinar no suma al total', async () => {
   const moto = { costo: 450000, gratisDesde: 6000000 };
   assert.equal(costoEnvio(moto, 3000000), 450000);
   assert.equal(costoEnvio(moto, 6000000), 0);
@@ -90,7 +90,7 @@ test('el envío es gratis desde el monto configurado, y a coordinar no suma al t
   assert.equal(calcularTotales(3000000, { costo: null, gratisDesde: null }, null).total, 3000000);
 });
 
-test('leerItems junta repetidos, ignora basura y pone topes', () => {
+test('leerItems junta repetidos, ignora basura y pone topes', async () => {
   assert.deepEqual(leerItems({ sku: ['A', 'B', 'A', '', 'C'], cantidad: ['2', '1', '3', '5', 'x'] }), [
     { sku: 'A', cantidad: 5 }, { sku: 'B', cantidad: 1 },
   ]);
@@ -98,14 +98,14 @@ test('leerItems junta repetidos, ignora basura y pone topes', () => {
   assert.deepEqual(leerItems({}), []);
 });
 
-test('el teléfono del cliente se pasa a un número de WhatsApp', () => {
+test('el teléfono del cliente se pasa a un número de WhatsApp', async () => {
   assert.equal(telefonoParaWhatsapp('351 15 123 4567'), '5493511234567');
   assert.equal(telefonoParaWhatsapp('0351 1234567'), '5493511234567');
   assert.equal(telefonoParaWhatsapp('+54 9 351 123-4567'), '5493511234567');
   assert.equal(telefonoParaWhatsapp('11 2345 6789'), '5491123456789');
 });
 
-test('validarPagos pide alias o CBU para la transferencia y revisa los números', () => {
+test('validarPagos pide alias o CBU para la transferencia y revisa los números', async () => {
   assert.deepEqual(Object.keys(validarPagos({ pagoTransferencia: '1' }).errores), ['transferenciaAlias']);
   const { errores } = validarPagos({ pagoTransferencia: '1', transferenciaAlias: 'no', transferenciaCbu: '123', descuentoTransferencia: '95', cuotasSinInteres: '1' });
   assert.deepEqual(Object.keys(errores).sort(), ['cuotasSinInteres', 'descuentoTransferencia', 'transferenciaAlias', 'transferenciaCbu']);
@@ -116,7 +116,7 @@ test('validarPagos pide alias o CBU para la transferencia y revisa los números'
   assert.deepEqual(validarPagos({ transferenciaAlias: 'x' }).errores, {}, 'con la transferencia apagada no se revisa el alias');
 });
 
-test('validarMetodoEntrega pide el costo salvo que se coordine después', () => {
+test('validarMetodoEntrega pide el costo salvo que se coordine después', async () => {
   assert.ok(validarMetodoEntrega({ tipo: 'domicilio', nombre: 'Moto' }).errores.costo);
   assert.equal(validarMetodoEntrega({ tipo: 'domicilio', nombre: 'Moto', costo: '4.500,50' }).datos.costo, 450050);
   const coordinar = validarMetodoEntrega({ tipo: 'domicilio', nombre: 'Correo', aCoordinar: '1', gratisDesde: '1000' });
@@ -130,7 +130,7 @@ test('validarMetodoEntrega pide el costo salvo que se coordine después', () => 
 
 test('sin formas de entrega y pago no hay checkout: el carrito sigue por WhatsApp', async () => {
   const { tiendaId } = await tienda('sinconfigurar');
-  actualizarAjustes(db, tiendaId, { whatsapp: '5493511234567' });
+  (await actualizarAjustes(db, tiendaId, { whatsapp: '5493511234567' }));
   assert.equal((await vidriera('sinconfigurar', '/checkout?sku=GORRA&cantidad=1')).location, '/');
   const ficha = (await vidriera('sinconfigurar', '/producto/gorra')).cuerpo;
   assert.match(ficha, /Enviar pedido por WhatsApp/);
@@ -187,10 +187,10 @@ test('comprar con envío y transferencia: crea el pedido, descuenta stock y mues
   ]);
   assert.equal(respuesta.status, 303);
   const [, token] = respuesta.location.match(/^\/pedido\/([\w-]+)\?nuevo=1$/);
-  assert.equal(stockDe(tiendaId, 'BUZO-M'), 2);
-  assert.equal(stockDe(tiendaId, 'GORRA'), 0);
+  assert.equal((await stockDe(tiendaId, 'BUZO-M')), 2);
+  assert.equal((await stockDe(tiendaId, 'GORRA')), 0);
 
-  const pedido = db.prepare('SELECT * FROM pedidos WHERE token = ?').get(token);
+  const pedido = (await db.prepare('SELECT * FROM pedidos WHERE token = ?').get(token));
   assert.equal(pedido.numero, 1);
   assert.equal(pedido.subtotal_centavos, 3500000);
   assert.equal(pedido.descuento_centavos, 350000, '10% de $35.000');
@@ -217,7 +217,7 @@ test('comprar con envío y transferencia: crea el pedido, descuenta stock y mues
   // El segundo pedido de la tienda es el #2.
   const otro = await comprar('compra', [['sku', 'BUZO-M'], ['cantidad', '1'], ...Object.entries(CLIENTE), ['entrega', ids['Retiro en el local']], ['pago', 'efectivo']]);
   assert.equal(otro.status, 303);
-  const segundo = db.prepare('SELECT numero, descuento_porcentaje, envio_centavos, direccion_calle FROM pedidos WHERE token = ?').get(otro.location.match(/\/pedido\/([\w-]+)/)[1]);
+  const segundo = (await db.prepare('SELECT numero, descuento_porcentaje, envio_centavos, direccion_calle FROM pedidos WHERE token = ?').get(otro.location.match(/\/pedido\/([\w-]+)/)[1]));
   assert.deepEqual({ ...segundo }, { numero: 2, descuento_porcentaje: 5, envio_centavos: 0, direccion_calle: '' }, 'el retiro no guarda dirección');
 });
 
@@ -234,8 +234,8 @@ test('con datos que faltan no se crea nada y se marca qué revisar', async () =>
   }
   assert.match(respuesta.cuerpo, /name="cantidad" value="2"/, 'conserva el carrito');
   assert.match(respuesta.cuerpo, /value="Lu"/, 'conserva lo que se escribió');
-  assert.equal(stockDe(tiendaId, 'BUZO-M'), 3);
-  assert.equal(db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId).n, 0);
+  assert.equal((await stockDe(tiendaId, 'BUZO-M')), 3);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId)).n, 0);
 });
 
 test('el efectivo solo con entregas que lo aceptan', async () => {
@@ -257,8 +257,8 @@ test('si el stock cambió mientras tanto, no se crea el pedido y se avisa', asyn
   const segundo = await comprar('carrera', campos);
   assert.equal(segundo.status, 400);
   assert.match(segundo.cuerpo, /Gorra ya no tiene stock y lo sacamos/);
-  assert.equal(stockDe(tiendaId, 'GORRA'), 0);
-  assert.equal(db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId).n, 1);
+  assert.equal((await stockDe(tiendaId, 'GORRA')), 0);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId)).n, 1);
 });
 
 test('no se aceptan pedidos desde otro sitio ni de robots', async () => {
@@ -267,7 +267,7 @@ test('no se aceptan pedidos desde otro sitio ni de robots', async () => {
   const campos = [['sku', 'BUZO-M'], ['cantidad', '1'], ...Object.entries(CLIENTE), ['entrega', ids['Retiro en el local']], ['pago', 'transferencia']];
   assert.equal((await comprar('protegida', campos, { origin: 'https://otro-sitio.com' })).status, 403);
   assert.equal((await comprar('protegida', [...campos, ['sitio', 'https://spam.com']])).location, '/');
-  assert.equal(db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId).n, 0);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId)).n, 0);
   assert.equal((await comprar('protegida', campos, { origin: `http://protegida.localhost:${puerto}` })).status, 303, 'desde la misma tienda, sí');
 });
 
@@ -280,8 +280,8 @@ test('el panel lista los pedidos, los avanza de estado y al cancelar devuelve el
     ['sku', 'BUZO-M'], ['cantidad', '2'], ...Object.entries(CLIENTE), ['entrega', ids['Retiro en el local']], ['pago', 'transferencia'],
   ]);
   const token = respuesta.location.match(/\/pedido\/([\w-]+)/)[1];
-  const { id } = db.prepare('SELECT id FROM pedidos WHERE token = ?').get(token);
-  assert.equal(stockDe(tiendaId, 'BUZO-M'), 1);
+  const { id } = (await db.prepare('SELECT id FROM pedidos WHERE token = ?').get(token));
+  assert.equal((await stockDe(tiendaId, 'BUZO-M')), 1);
 
   const inicio = await (await nav.pedir('/admin/inicio')).text();
   assert.match(inicio, /Tenés un pedido nuevo/);
@@ -303,45 +303,45 @@ test('el panel lista los pedidos, los avanza de estado y al cancelar devuelve el
   assert.match((await vidriera('panelpedidos', `/pedido/${token}`)).cuerpo, /Pago confirmado/, 'el cliente ve el estado');
 
   await nav.enviar(`/admin/pedidos/${id}/cancelar`, {}, { desde: `/admin/pedidos/${id}` });
-  assert.equal(stockDe(tiendaId, 'BUZO-M'), 3, 'volvieron las 2 unidades');
-  assert.equal(db.prepare('SELECT estado FROM pedidos WHERE id = ?').get(id).estado, 'cancelado');
+  assert.equal((await stockDe(tiendaId, 'BUZO-M')), 3, 'volvieron las 2 unidades');
+  assert.equal((await db.prepare('SELECT estado FROM pedidos WHERE id = ?').get(id)).estado, 'cancelado');
   await nav.enviar(`/admin/pedidos/${id}/cancelar`, {}, { desde: `/admin/pedidos/${id}` });
-  assert.equal(stockDe(tiendaId, 'BUZO-M'), 3, 'cancelar dos veces no devuelve dos veces');
+  assert.equal((await stockDe(tiendaId, 'BUZO-M')), 3, 'cancelar dos veces no devuelve dos veces');
   await nav.enviar(`/admin/pedidos/${id}/estado`, { estado: 'nuevo' }, { desde: '/admin/pedidos' });
-  assert.equal(db.prepare('SELECT estado FROM pedidos WHERE id = ?').get(id).estado, 'cancelado', 'un cancelado no vuelve atrás');
+  assert.equal((await db.prepare('SELECT estado FROM pedidos WHERE id = ?').get(id)).estado, 'cancelado', 'un cancelado no vuelve atrás');
 });
 
 test('una tienda no ve ni toca los pedidos ni las entregas de otra', async () => {
   const duenia = await tienda('duenia');
   const ids = await configurar(duenia.nav);
   const respuesta = await comprar('duenia', [['sku', 'BUZO-M'], ['cantidad', '1'], ...Object.entries(CLIENTE), ['entrega', ids['Retiro en el local']], ['pago', 'transferencia']]);
-  const { id } = db.prepare('SELECT id FROM pedidos WHERE token = ?').get(respuesta.location.match(/\/pedido\/([\w-]+)/)[1]);
+  const { id } = (await db.prepare('SELECT id FROM pedidos WHERE token = ?').get(respuesta.location.match(/\/pedido\/([\w-]+)/)[1]));
 
   const intrusa = await tienda('intrusa');
   assert.equal((await intrusa.nav.pedir(`/admin/pedidos/${id}`)).status, 404);
   assert.equal((await intrusa.nav.enviar(`/admin/pedidos/${id}/cancelar`, {}, { desde: '/admin/pedidos' })).status, 404);
   assert.equal((await intrusa.nav.pedir(`/admin/pagos/entregas/${ids['Retiro en el local']}`)).status, 404);
-  assert.equal(stockDe(duenia.tiendaId, 'BUZO-M'), 2);
+  assert.equal((await stockDe(duenia.tiendaId, 'BUZO-M')), 2);
 });
 
 test('Envíos y pagos: modelos para empezar, editar, pausar y no guardar formas de pago inválidas', async () => {
   const { nav, tiendaId } = await tienda('envios');
-  actualizarAjustes(db, tiendaId, { direccion: 'Bv. San Juan 567' });
+  (await actualizarAjustes(db, tiendaId, { direccion: 'Bv. San Juan 567' }));
   const pagina = await (await nav.pedir('/admin/pagos')).text();
   assert.match(pagina, /Todavía no hay formas de entrega/);
   const retiro = await (await nav.pedir('/admin/pagos/entregas/nueva?modelo=retiro')).text();
   assert.match(retiro, /value="Retiro en el local"/);
   assert.match(retiro, /Bv\. San Juan 567\. Coordinamos/, 'el retiro trae la dirección de la tienda');
 
-  const id = crearMetodoEntrega(db, tiendaId, { tipo: 'domicilio', nombre: 'Moto', descripcion: '', costo: 100000, gratisDesde: null, aceptaEfectivo: false, activo: true });
+  const id = (await crearMetodoEntrega(db, tiendaId, { tipo: 'domicilio', nombre: 'Moto', descripcion: '', costo: 100000, gratisDesde: null, aceptaEfectivo: false, activo: true }));
   await nav.enviar(`/admin/pagos/entregas/${id}`, { tipo: 'domicilio', nombre: 'Moto rápida', costo: '2000', activo: '1' });
   assert.match(await (await nav.pedir('/admin/pagos')).text(), /Moto rápida/);
   await nav.enviar(`/admin/pagos/entregas/${id}/activar`, { valor: '0' }, { desde: '/admin/pagos' });
-  assert.equal(db.prepare('SELECT activo FROM metodos_entrega WHERE id = ?').get(id).activo, 0);
+  assert.equal((await db.prepare('SELECT activo FROM metodos_entrega WHERE id = ?').get(id)).activo, 0);
 
   const mal = await nav.enviar('/admin/pagos', { pagoTransferencia: '1', descuentoTransferencia: '10' });
   assert.equal(mal.status, 400);
   assert.match(await mal.text(), /escribí tu alias o tu CBU/);
-  assert.equal(leerAjustes(db, tiendaId).pagoTransferencia, false);
-  assert.equal(leerAjustes(db, tiendaId).direccion, 'Bv. San Juan 567', 'guardar pagos no toca el resto de los ajustes');
+  assert.equal((await leerAjustes(db, tiendaId)).pagoTransferencia, false);
+  assert.equal((await leerAjustes(db, tiendaId)).direccion, 'Bv. San Juan 567', 'guardar pagos no toca el resto de los ajustes');
 });

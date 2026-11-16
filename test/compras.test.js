@@ -19,22 +19,22 @@ let servidor;
 let puerto;
 
 before(async () => {
-  const db = abrirBase(':memory:');
+  const db = (await abrirBase(':memory:'));
   const moda = await crearTienda(db, { nombre: 'Moda', email: 'moda@ejemplo.com' });
   const muchos = await crearTienda(db, { nombre: 'Muchos', email: 'muchos@ejemplo.com' });
-  importar(db, moda.tienda.id, [
+  (await importar(db, moda.tienda.id, [
     ENCABEZADOS,
     ['CAM-S', 'Camión de Juguete', 'Jugueterías Ñandú', 'Juguetes', 12500, 9900, 3, 'Color', 'Rojo', 'Sí'],
     ['CAM-M', 'Camión de Juguete', null, null, 12500, null, 0, null, 'Azul', null],
     ['BUZO-1', 'Buzo Frisa', 'Vezza', 'Ropa', 30000, null, 2, null, null, null],
     ['GOR-1', 'Gorra Sin Stock', null, 'Ropa', 5000, null, 0, null, null, null],
     ['OCU-1', 'Producto Oculto Camión', null, 'Ropa', 5000, null, 5, null, null, 'No'],
-  ]);
-  guardarAjustes(db, moda.tienda.id, { ...leerAjustes(db, moda.tienda.id), whatsapp: '5493511234567', descuentoTransferencia: 10 });
-  importar(db, muchos.tienda.id, [
+  ]));
+  (await guardarAjustes(db, moda.tienda.id, { ...(await leerAjustes(db, moda.tienda.id)), whatsapp: '5493511234567', descuentoTransferencia: 10 }));
+  (await importar(db, muchos.tienda.id, [
     ['SKU', 'Nombre', 'Precio', 'Stock'],
     ...Array.from({ length: 30 }, (_, i) => [`P-${i}`, `Producto ${String(i).padStart(2, '0')}`, 1000 + i, 1]),
-  ]);
+  ]));
 
   const config = { produccion: false, secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres', dominio: 'localhost', dirSubidas: mkdtempSync(path.join(tmpdir(), 'subidas-')) };
   servidor = crearApp({ db, config }).listen(0);
@@ -44,10 +44,10 @@ before(async () => {
 
 after(() => servidor.close());
 
-function importar(db, tiendaId, hoja) {
+async function importar(db, tiendaId, hoja) {
   const { productos, errores } = interpretarHoja(hoja);
   assert.deepEqual(errores, []);
-  aplicarImportacion(db, tiendaId, productos);
+  (await aplicarImportacion(db, tiendaId, productos));
 }
 
 const pedir = (ruta, tienda = 'moda') => pedirConHost(puerto, `${tienda}.localhost`, ruta);

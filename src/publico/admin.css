@@ -766,3 +766,58 @@ button.pastilla-boton:focus-visible { outline: none; box-shadow: var(--foco); }
 .campo-con-prefijo input:disabled { background: var(--superficie-suave); color: var(--texto-tenue); }
 .editor-entrega, .editor-pedido { grid-template-areas: "principal lateral"; }
 @media (max-width: 1000px) { .editor-entrega, .editor-pedido { grid-template-areas: "principal" "lateral"; } }
+
+/* ---------- Celular: las tablas de productos, pedidos y variantes pasan a tarjetas ---------- */
+
+/* Con una tabla de 5 columnas en 390px, Stock, Estado y los botones de acción quedaban escondidos detrás de un
+   scroll horizontal. Acá cada fila es una tarjeta con todo a la vista. Los <th> siguen en el HTML (para lectores
+   de pantalla), solo se ocultan visualmente; las etiquetas de cada dato salen de data-etiqueta. */
+@media (max-width: 700px) {
+  .tabla-productos, .tabla-pedidos, .tabla-variantes,
+  .tabla-productos tbody, .tabla-pedidos tbody, .tabla-variantes tbody { display: block; }
+  .tabla-productos thead, .tabla-pedidos thead, .tabla-variantes thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+  }
+  .tabla-productos td, .tabla-pedidos td, .tabla-variantes td { display: block; padding: 0; border: 0; white-space: normal; }
+  .tabla-productos td[data-etiqueta]::before,
+  .tabla-pedidos td[data-etiqueta]::before,
+  .tabla-variantes td[data-etiqueta]::before {
+    content: attr(data-etiqueta);
+    display: block;
+    margin-bottom: .15rem;
+    font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--texto-tenue);
+  }
+  .tabla-productos tbody tr, .tabla-pedidos tbody tr { padding: .9rem 1rem; border-bottom: 1px solid var(--borde); }
+  .tabla-productos tbody tr:last-child, .tabla-pedidos tbody tr:last-child { border-bottom: 0; }
+
+  /* Productos: nombre arriba; abajo precio, stock y estado, y los botones a la derecha. */
+  .tabla-productos tbody tr { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem 1.5rem; }
+  .tabla-productos td:first-child { flex: 1 1 100%; }
+  .tabla-productos .numero { text-align: left; }
+  .tabla-productos .celda-acciones { margin-left: auto; }
+
+  /* Pedidos: número y estado arriba; cliente, entrega y total debajo. */
+  .tabla-pedidos tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem 1rem; }
+  .tabla-pedidos td { grid-column: 1 / -1; min-width: 0; }
+  .tabla-pedidos td:first-child { grid-column: 1; grid-row: 1; }
+  .tabla-pedidos td:last-child { grid-column: 2; grid-row: 1; }
+  .tabla-pedidos .numero { text-align: left; }
+  .tabla-pedidos td .celda-fila { max-width: none; white-space: normal; }
+
+  /* Variantes: cada variante es una tarjeta con sus campos rotulados (el nombre de cada valor, por ejemplo Talle). */
+  .tabla-variantes-contenedor { border: 0; background: none; overflow: visible; }
+  .tabla-variantes .fila-variante {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem;
+    padding: .9rem; margin-bottom: .6rem;
+    border: 1px solid var(--borde); border-radius: var(--radio-chico); background: var(--superficie);
+  }
+  .tabla-variantes .fila-variante td { flex: 1 1 72px; min-width: 0; padding: 0; }
+  .tabla-variantes .fila-variante .celda-sku { flex-basis: 100%; }
+  .tabla-variantes .fila-variante .celda-quitar { flex: 0 0 auto; width: auto; }
+  .tabla-variantes input, .tabla-variantes .entrada-sku, .tabla-variantes .entrada-precio, .tabla-variantes .entrada-stock { min-width: 0; min-height: 42px; font-size: 1rem; }
+  .tabla-variantes .fila-con-error { border-color: var(--error-borde); margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .tabla-variantes .fila-errores { display: block; margin-bottom: .6rem; padding: .5rem .9rem; border: 1px solid var(--error-borde); border-top: 0; border-radius: 0 0 var(--radio-chico) var(--radio-chico); background: var(--error-fondo); }
+  .tabla-variantes .fila-errores td { padding: 0 !important; background: none; }
+  .tabla-variantes tbody tr:hover { background: var(--superficie); }
+}

@@ -25,7 +25,7 @@ const mensajeTope = (tope) => `Las fotos de la planilla pesan más de ${tope / M
 // Las fotos subidas antes de que existieran las huellas no tienen una: se calcula leyendo el archivo.
 // Si el archivo no está, la foto queda sin huella.
 export async function completarHuellas(db, dirSubidas, tiendaId) {
-  const sinHuella = db
+  const sinHuella = await db
     .prepare('SELECT id, archivo FROM producto_fotos WHERE tienda_id = ? AND huella IS NULL')
     .all(tiendaId);
   const guardar = db.prepare('UPDATE producto_fotos SET huella = ? WHERE id = ?');
@@ -37,7 +37,7 @@ export async function completarHuellas(db, dirSubidas, tiendaId) {
       if (error.code === 'ENOENT') continue;
       throw error;
     }
-    guardar.run(huellaDe(contenido), foto.id);
+    await guardar.run(huellaDe(contenido), foto.id);
   }
 }
 

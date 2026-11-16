@@ -1,5 +1,5 @@
 # Imagen para producción (Coolify u otro servidor con Docker).
-# Node 24 trae SQLite incluido (node:sqlite): no hace falta instalar una base de datos.
+# La base de datos es PostgreSQL y se conecta con DATABASE_URL (en Coolify: un recurso PostgreSQL aparte).
 FROM node:24-alpine
 
 ENV NODE_ENV=production \
@@ -12,8 +12,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY src ./src
 COPY scripts ./scripts
 
-# data/ guarda la base SQLite, los Excel pendientes y las imágenes subidas: montala en un volumen
-# persistente en /app/data. Se crea acá con dueño "node" para que el volumen nuevo herede el permiso.
+# data/ guarda los Excel pendientes y las imágenes subidas (la base de datos está en PostgreSQL): montala en un
+# volumen persistente en /app/data. Se crea acá con dueño "node" para que el volumen nuevo herede el permiso.
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node
 

@@ -1,14 +1,18 @@
-// Cada tienda se ve en un subdominio del dominio principal: demo.vezzashop.com -> tienda "demo".
-// El dominio principal (y www) es el del panel.
+// Cada tienda se ve en un subdominio del dominio de las tiendas: demo.vezzashop.com -> tienda "demo".
+// El panel vive en su propio dominio (DOMINIO), que por defecto es el mismo de las tiendas; si no, en DOMINIO_TIENDAS
+// (por ejemplo panel en tiendas.vezzadev.com y tiendas en <nombre>.vezzadev.com).
 
 // Subdominios que no pueden ser tiendas: se usan para el panel u otros servicios.
-export const SUBDOMINIOS_RESERVADOS = new Set(['www', 'admin', 'panel', 'api', 'app', 'mail']);
+export const SUBDOMINIOS_RESERVADOS = new Set(['www', 'admin', 'panel', 'api', 'app', 'mail', 'tiendas', 'coolify']);
+
+// El dominio donde viven las tiendas (<slug>.<dominio>): DOMINIO_TIENDAS, o DOMINIO si no se configuró.
+export const dominioDeTiendas = (config) => config.dominioTiendas ?? config.dominio;
 
 // Devuelve el slug de la tienda según el host, o null si es el dominio del panel.
 // "demo.localhost" -> "demo"; "localhost", "www.localhost", "127.0.0.1" -> null
-export function slugDeHost(hostname, dominio) {
+export function slugDeHost(hostname, dominio, dominioPanel = dominio) {
   const host = String(hostname ?? '').toLowerCase();
-  if (!dominio || !host.endsWith(`.${dominio}`)) return null;
+  if (!dominio || host === dominioPanel || !host.endsWith(`.${dominio}`)) return null;
   const slug = host.slice(0, -dominio.length - 1);
   return SUBDOMINIOS_RESERVADOS.has(slug) ? null : slug;
 }

@@ -3,16 +3,16 @@ import { slugificar } from './util/slug.js';
 
 // Árbol de categorías de la tienda, sin las que no tienen productos visibles (ni ellas ni sus hijas).
 // Cada nodo: { id, nombre, slug, ruta: ['ropa', 'remeras'], hijas: [...] }
-export function arbolCategorias(db, tiendaId) {
-  const categorias = db
+export async function arbolCategorias(db, tiendaId) {
+  const categorias = await db
     .prepare(
-      `SELECT c.id, c.padre_id AS padreId, c.nombre, c.slug,
+      `SELECT c.id, c.padre_id AS "padreId", c.nombre, c.slug,
               exists (SELECT 1 FROM producto_categorias pc
                       JOIN productos p ON p.id = pc.producto_id AND p.visible = 1
                       WHERE pc.categoria_id = c.id
-                        AND exists (SELECT 1 FROM variantes v WHERE v.producto_id = p.id)) AS conProductos
+                        AND exists (SELECT 1 FROM variantes v WHERE v.producto_id = p.id)) AS "conProductos"
        FROM categorias c WHERE c.tienda_id = ?
-       ORDER BY c.nombre COLLATE NOCASE`,
+       ORDER BY lower(c.nombre), c.id`,
     )
     .all(tiendaId);
 
@@ -44,10 +44,10 @@ export function buscarCategoria(arbol, slugs) {
 
 // Órdenes posibles del catálogo. El SQL sale de acá, nunca de lo que manda el visitante.
 export const ORDENES = {
-  nombre: { titulo: 'Nombre (A-Z)', sql: 'p.nombre COLLATE NOCASE' },
+  nombre: { titulo: 'Nombre (A-Z)', sql: 'lower(p.nombre), p.id' },
   nuevos: { titulo: 'Más nuevos', sql: 'p.id DESC' },
-  'precio-menor': { titulo: 'Precio: menor a mayor', sql: 'precioDesde, p.nombre COLLATE NOCASE' },
-  'precio-mayor': { titulo: 'Precio: mayor a menor', sql: 'precioDesde DESC, p.nombre COLLATE NOCASE' },
+  'precio-menor': { titulo: 'Precio: menor a mayor', sql: '"precioDesde", lower(p.nombre), p.id' },
+  'precio-mayor': { titulo: 'Precio: mayor a menor', sql: '"precioDesde" DESC, lower(p.nombre), p.id' },
 };
 export const esOrden = (valor) => typeof valor === 'string' && Object.hasOwn(ORDENES, valor);
 
@@ -75,7 +75,7 @@ function consultaVisibles(tiendaId, opciones) {
   }
   if (categoriaId !== null) {
     donde.push(`p.id IN (
-      WITH RECURSIVE arbol(id) AS (SELECT ? UNION ALL SELECT c.id FROM categorias c JOIN arbol a ON c.padre_id = a.id)
+      WITH RECURSIVE arbol(id) AS (SELECT CAST(? AS INTEGER) UNION ALL SELECT c.id FROM categorias c JOIN arbol a ON c.padre_id = a.id)
       SELECT producto_id FROM producto_categorias WHERE categoria_id IN (SELECT id FROM arbol))`);
     parametros.push(categoriaId);
   }
@@ -90,22 +90,23 @@ function consultaVisibles(tiendaId, opciones) {
     parametros.push(patron, patron, patron);
   }
   if (conStock) tener.push('sum(v.stock) > 0');
-  if (enOferta) tener.push('max(v.precio_promocional_centavos IS NOT NULL) = 1');
+  if (enOferta) tener.push('bool_or(v.precio_promocional_centavos IS NOT NULL)');
   const parametrosTener = [];
   if (precioMin !== null) {
-    tener.push('precioDesde >= ?');
+    // En HAVING no se puede usar el alias "precioDesde": se repite la expresión.
+    tener.push('min(coalesce(v.precio_promocional_centavos, v.precio_centavos)) >= ?');
     parametrosTener.push(precioMin);
   }
   if (precioMax !== null) {
-    tener.push('precioDesde <= ?');
+    tener.push('min(coalesce(v.precio_promocional_centavos, v.precio_centavos)) <= ?');
     parametrosTener.push(precioMax);
   }
 
   return {
-    sql: `SELECT p.id, p.slug, p.nombre, p.marca, p.destacado, ${FOTO_EN(0)} AS foto, ${FOTO_EN(1)} AS fotoAlternativa,
-                 min(coalesce(v.precio_promocional_centavos, v.precio_centavos)) AS precioDesde,
-                 max(coalesce(v.precio_promocional_centavos, v.precio_centavos)) AS precioHasta,
-                 min(v.precio_centavos) AS precioLista,
+    sql: `SELECT p.id, p.slug, p.nombre, p.marca, p.destacado, ${FOTO_EN(0)} AS foto, ${FOTO_EN(1)} AS "fotoAlternativa",
+                 min(coalesce(v.precio_promocional_centavos, v.precio_centavos)) AS "precioDesde",
+                 max(coalesce(v.precio_promocional_centavos, v.precio_centavos)) AS "precioHasta",
+                 min(v.precio_centavos) AS "precioLista",
                  sum(v.stock) AS stock
           FROM productos p JOIN variantes v ON v.producto_id = p.id
           WHERE ${donde.join(' AND ')}
@@ -123,9 +124,9 @@ export function productosVisibles(db, tiendaId, opciones = {}) {
   return db.prepare(`${sql} ORDER BY ${ORDENES[esOrden(orden) ? orden : 'nombre'].sql}${paginado}`).all(...parametros);
 }
 
-export function contarVisibles(db, tiendaId, opciones = {}) {
+export async function contarVisibles(db, tiendaId, opciones = {}) {
   const { sql, parametros } = consultaVisibles(tiendaId, opciones);
-  return db.prepare(`SELECT count(*) AS n FROM (${sql})`).get(...parametros).n;
+  return (await db.prepare(`SELECT count(*) AS n FROM (${sql}) AS visibles`).get(...parametros)).n;
 }
 
 // Rango de precios (finales) del catálogo de la tienda, para el filtro de precio.
@@ -140,28 +141,28 @@ export function rangoDePrecios(db, tiendaId) {
 }
 
 // Hasta `limite` productos para "También te puede gustar": primero los de las mismas categorías, después otros.
-export function productosRelacionados(db, tiendaId, { slug, categoriaIds, limite = 4 }) {
+export async function productosRelacionados(db, tiendaId, { slug, categoriaIds, limite = 4 }) {
   const mismas = categoriaIds.length
-    ? productosVisibles(db, tiendaId, { categoriaIds, excluirSlug: slug, conStock: true, orden: 'nuevos', limite })
+    ? await productosVisibles(db, tiendaId, { categoriaIds, excluirSlug: slug, conStock: true, orden: 'nuevos', limite })
     : [];
   if (mismas.length >= limite) return mismas;
   const vistos = new Set([slug, ...mismas.map((p) => p.slug)]);
-  const otros = productosVisibles(db, tiendaId, { conStock: true, orden: 'nuevos', limite: limite * 3 }).filter((p) => !vistos.has(p.slug));
+  const otros = (await productosVisibles(db, tiendaId, { conStock: true, orden: 'nuevos', limite: limite * 3 })).filter((p) => !vistos.has(p.slug));
   return [...mismas, ...otros].slice(0, limite);
 }
 
 // Datos frescos de las variantes del carrito (solo de productos visibles). Las que ya no existen no vuelven.
-export function variantesParaCarrito(db, tiendaId, skus) {
+export async function variantesParaCarrito(db, tiendaId, skus) {
   if (skus.length === 0) return [];
-  return db
+  return (await db
     .prepare(
-      `SELECT v.sku, v.stock, v.precio_centavos AS precio, coalesce(v.precio_promocional_centavos, v.precio_centavos) AS precioFinal,
+      `SELECT v.sku, v.stock, v.precio_centavos AS precio, coalesce(v.precio_promocional_centavos, v.precio_centavos) AS "precioFinal",
               v.valor1, v.valor2, v.valor3, p.atributo1, p.atributo2, p.atributo3, p.nombre, p.slug,
               (SELECT archivo FROM producto_fotos f WHERE f.producto_id = p.id ORDER BY f.orden, f.id LIMIT 1) AS foto
        FROM variantes v JOIN productos p ON p.id = v.producto_id
        WHERE v.tienda_id = ? AND p.visible = 1 AND v.sku IN (${skus.map(() => '?').join(', ')})`,
     )
-    .all(tiendaId, ...skus)
+    .all(tiendaId, ...skus))
     .map((v) => ({
       sku: v.sku,
       stock: v.stock,
@@ -178,8 +179,8 @@ export function variantesParaCarrito(db, tiendaId, skus) {
 }
 
 // Ficha de un producto visible, con sus variantes y categorías. null si no existe o está oculto.
-export function productoVisible(db, tiendaId, slug) {
-  const producto = db
+export async function productoVisible(db, tiendaId, slug) {
+  const producto = await db
     .prepare(
       `SELECT id, slug, nombre, descripcion, marca, atributo1, atributo2, atributo3
        FROM productos WHERE tienda_id = ? AND slug = ? AND visible = 1`,
@@ -188,13 +189,13 @@ export function productoVisible(db, tiendaId, slug) {
   if (!producto) return null;
 
   const atributos = [producto.atributo1, producto.atributo2, producto.atributo3].filter((a) => a !== null);
-  const variantes = db
+  const variantes = (await db
     .prepare(
       `SELECT sku, valor1, valor2, valor3, precio_centavos AS precio,
-              precio_promocional_centavos AS precioPromocional, stock
+              precio_promocional_centavos AS "precioPromocional", stock
        FROM variantes WHERE producto_id = ? ORDER BY id`,
     )
-    .all(producto.id)
+    .all(producto.id))
     .map((v) => ({
       sku: v.sku,
       valores: [v.valor1, v.valor2, v.valor3].slice(0, atributos.length),
@@ -204,14 +205,14 @@ export function productoVisible(db, tiendaId, slug) {
     }));
   if (variantes.length === 0) return null;
 
-  const categoriaIds = db
+  const categoriaIds = (await db
     .prepare('SELECT categoria_id AS id FROM producto_categorias WHERE producto_id = ?')
-    .all(producto.id)
+    .all(producto.id))
     .map((f) => f.id);
 
-  const fotos = db
+  const fotos = (await db
     .prepare('SELECT archivo FROM producto_fotos WHERE producto_id = ? ORDER BY orden, id')
-    .all(producto.id)
+    .all(producto.id))
     .map((f) => f.archivo);
 
   return {

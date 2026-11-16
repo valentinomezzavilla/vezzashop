@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { mkdir } from 'node:fs/promises';
 import { autenticar, buscarTienda } from '../tiendas.js';
-import { urlTienda } from '../util/dominios.js';
+import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
 import { rutasAdminPedidos } from './admin-pedidos.js';
 import { contarPedidosNuevos } from '../pedidos.js';
@@ -82,28 +82,28 @@ export function rutasAdmin({ db, config }) {
       next(error);
     });
 
-  function mostrarDiseno(req, res, { valores = null, errores = {}, status = 200 } = {}) {
+  async function mostrarDiseno(req, res, { valores = null, errores = {}, status = 200 } = {}) {
     const { tiendaId } = req.session.usuario;
-    const ajustes = leerAjustes(db, tiendaId);
+    const ajustes = await leerAjustes(db, tiendaId);
     res.status(status).render('admin/diseno', {
       valores: valores ?? ajustes,
       errores,
       urlLogo: urlImagen(tiendaId, ajustes.logo),
       ordenes: ORDENES,
-      banners: listarBanners(db, tiendaId).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
+      banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
       maxBanners: MAX_BANNERS,
       megasImagen: MEGAS_IMAGEN,
     });
   }
 
-  router.use((req, res, next) => {
+  router.use(async (req, res, next) => {
     res.locals.csrf = tokenCsrf(req);
     res.locals.usuario = req.session.usuario ?? null;
-    const tienda = req.session.usuario ? buscarTienda(db, req.session.usuario.tiendaId) : null;
-    res.locals.urlMiTienda = tienda ? urlTienda(req, config.dominio, tienda.slug) : null;
+    const tienda = req.session.usuario ? await buscarTienda(db, req.session.usuario.tiendaId) : null;
+    res.locals.urlMiTienda = tienda ? urlTienda(req, dominioDeTiendas(config), tienda.slug) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
     // Para el número al lado de "Pedidos" en el menú.
-    res.locals.pedidosNuevos = tienda ? contarPedidosNuevos(db, tienda.id) : 0;
+    res.locals.pedidosNuevos = tienda ? await contarPedidosNuevos(db, tienda.id) : 0;
     // Para marcar en el menú la sección en la que se está: "/productos" -> "productos", "/importar/x" -> "importar".
     res.locals.seccionActual = req.path.split('/')[1] || null;
     res.locals.aviso = req.session.aviso ?? null;
@@ -180,7 +180,7 @@ export function rutasAdmin({ db, config }) {
       const { fotosPorFila, errores: erroresFotos } = await obtenerFotos({ productos, columnaImg, fotosExcel, descargar });
       asignarFotos(productos, fotosPorFila);
       await completarHuellas(db, config.dirSubidas, tiendaId);
-      const { resumen, errores: erroresBase } = previsualizar(db, tiendaId, productos);
+      const { resumen, errores: erroresBase } = await previsualizar(db, tiendaId, productos);
       const filasConError = new Set(erroresFormato.map((e) => e.fila));
       const errores = [
         ...erroresFormato,
@@ -234,22 +234,22 @@ export function rutasAdmin({ db, config }) {
       if (erroresFormato.length > 0) throw new ErrorDeImportacion(erroresFormato);
       asignarFotos(productos, leida.fotosPorFila);
       await completarHuellas(db, config.dirSubidas, tiendaId);
-      const { errores, fotosAGuardar } = previsualizar(db, tiendaId, productos);
+      const { errores, fotosAGuardar } = await previsualizar(db, tiendaId, productos);
       if (errores.length > 0) throw new ErrorDeImportacion(errores);
 
-      // Los archivos se escriben antes de la transacción (que es sincrónica); si algo falla, se borran.
+      // Los archivos se escriben antes de la transacción; si algo falla, se borran.
       const archivos = new Map();
       for (const foto of fotosAGuardar) {
         const archivo = await guardarImagen(config.dirSubidas, tiendaId, foto.contenido);
         guardadas.push(archivo);
         archivos.set(claveFoto(foto.slug, foto.huella), archivo);
       }
-      const resumen = aplicarImportacion(db, tiendaId, productos, archivos);
+      const resumen = await aplicarImportacion(db, tiendaId, productos, archivos);
       aplicada = true;
       // Si entre medio el producto ya recibió esa foto, su archivo quedó sin usar.
       const usado = db.prepare('SELECT 1 FROM producto_fotos WHERE tienda_id = ? AND archivo = ?');
       for (const archivo of guardadas) {
-        if (!usado.get(tiendaId, archivo)) await borrarImagen(config.dirSubidas, tiendaId, archivo);
+        if (!(await usado.get(tiendaId, archivo))) await borrarImagen(config.dirSubidas, tiendaId, archivo);
       }
 
       req.session.aviso = { tipo: 'ok', texto: textoResumen(resumen) };
@@ -277,7 +277,7 @@ export function rutasAdmin({ db, config }) {
       return mostrarDiseno(req, res, { valores: req.body, errores, status: 400 });
     }
 
-    const logoAnterior = leerAjustes(db, tiendaId).logo;
+    const logoAnterior = (await leerAjustes(db, tiendaId)).logo;
     let logo = req.body.quitarLogo ? null : logoAnterior;
     if (req.file) {
       try {
@@ -287,7 +287,7 @@ export function rutasAdmin({ db, config }) {
         return mostrarDiseno(req, res, { valores: req.body, errores: { logo: error.message }, status: 400 });
       }
     }
-    actualizarAjustes(db, tiendaId, { ...ajustes, logo });
+    await actualizarAjustes(db, tiendaId, { ...ajustes, logo });
     if (logo !== logoAnterior) await borrarImagen(config.dirSubidas, tiendaId, logoAnterior);
 
     req.session.aviso = { tipo: 'ok', texto: 'Listo, guardamos los cambios. Ya se ven en tu tienda.' };
@@ -305,7 +305,7 @@ export function rutasAdmin({ db, config }) {
         res.redirect('/admin/diseno#banners');
       };
 
-      if (listarBanners(db, tiendaId).length >= MAX_BANNERS) {
+      if ((await listarBanners(db, tiendaId)).length >= MAX_BANNERS) {
         return volverConError(`Podés tener hasta ${MAX_BANNERS} banners. Borrá alguno para agregar otro.`);
       }
       const imagen = req.files?.imagen?.[0];
@@ -325,7 +325,7 @@ export function rutasAdmin({ db, config }) {
         for (const archivo of guardadas) await borrarImagen(config.dirSubidas, tiendaId, archivo);
         return volverConError(error.message);
       }
-      agregarBanner(db, tiendaId, {
+      await agregarBanner(db, tiendaId, {
         imagen: guardadas[0],
         imagenMovil: guardadas[1] ?? null,
         enlace: enlace.valor,
@@ -341,9 +341,9 @@ export function rutasAdmin({ db, config }) {
     const id = Number(req.params.id);
     const { accion } = req.params;
     if (accion === 'subir' || accion === 'bajar') {
-      moverBanner(db, tiendaId, id, accion === 'subir' ? -1 : 1);
+      await moverBanner(db, tiendaId, id, accion === 'subir' ? -1 : 1);
     } else if (accion === 'borrar') {
-      const borrado = borrarBanner(db, tiendaId, id);
+      const borrado = await borrarBanner(db, tiendaId, id);
       if (borrado) {
         await borrarImagen(config.dirSubidas, tiendaId, borrado.imagen);
         await borrarImagen(config.dirSubidas, tiendaId, borrado.imagenMovil);

@@ -18,17 +18,17 @@ let servidor;
 let puerto;
 
 before(async () => {
-  const db = abrirBase(':memory:');
+  const db = await abrirBase(':memory:');
   const ropa = await crearTienda(db, { nombre: 'Ropa', email: 'ropa@ejemplo.com' });
   const parabrisas = await crearTienda(db, { nombre: 'Parabrisas', email: 'parabrisas@ejemplo.com' });
-  importar(db, ropa.tienda.id, [
+  await importar(db, ropa.tienda.id, [
     ENCABEZADOS,
     ['REM-S', 'Remera Básica', 'Ropa > Remeras', 12500, 9900, 10, 'Talle', 'S', 'Sí'],
     ['REM-M', 'Remera Básica', null, 12500, 9900, 0, null, 'M', null],
     ['BUZO', 'Buzo Frisa', 'Ropa > Buzos', 30000, null, 2, null, null, null],
     ['TOTE', 'Tote Secreta', 'Accesorios', 5000, null, 5, null, null, 'No'],
   ]);
-  importar(db, parabrisas.tienda.id, [
+  await importar(db, parabrisas.tienda.id, [
     ENCABEZADOS,
     ['PB-01', 'Parabrisas Gol Trend', 'Vidrios', 180000, null, 4, null, null, null],
   ]);
@@ -46,10 +46,10 @@ before(async () => {
 
 after(() => servidor.close());
 
-function importar(db, tiendaId, hoja) {
+async function importar(db, tiendaId, hoja) {
   const { productos, errores } = interpretarHoja(hoja);
   assert.deepEqual(errores, []);
-  aplicarImportacion(db, tiendaId, productos);
+  await aplicarImportacion(db, tiendaId, productos);
 }
 
 const pedir = (host, ruta) => pedirConHost(puerto, host, ruta);
@@ -61,6 +61,14 @@ test('slugDeHost reconoce el subdominio de la tienda', () => {
   assert.equal(slugDeHost('www.vezzashop.com', 'vezzashop.com'), null);
   assert.equal(slugDeHost('127.0.0.1', 'localhost'), null);
   assert.equal(slugDeHost('ropa.otrodominio.com', 'vezzashop.com'), null);
+});
+
+test('slugDeHost con el panel en otro subdominio: las tiendas cuelgan del dominio raíz', () => {
+  // Panel en tiendas.vezzadev.com, tiendas en <nombre>.vezzadev.com
+  assert.equal(slugDeHost('ufoambos.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), 'ufoambos');
+  assert.equal(slugDeHost('tiendas.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
+  assert.equal(slugDeHost('coolify.vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
+  assert.equal(slugDeHost('vezzadev.com', 'vezzadev.com', 'tiendas.vezzadev.com'), null);
 });
 
 test('cada subdominio muestra solo los productos de su tienda', async () => {
