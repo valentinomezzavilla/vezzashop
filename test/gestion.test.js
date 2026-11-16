@@ -10,12 +10,8 @@ import { crearApp } from '../src/app.js';
 import { crearTienda, autenticar } from '../src/tiendas.js';
 import { validarProducto, guardarProducto, leerProducto, precioParaEditar } from '../src/productos.js';
 import { crearCategoria } from '../src/categorias.js';
-import { crearNavegador, pedirConHost, crearTiendaVacia } from './ayudantes.js';
-
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-  'base64',
-);
+import { crearNavegador, pedirConHost, crearTiendaVacia, PNG } from './ayudantes.js';
+import { huellaDe } from '../src/imagenes.js';
 
 let servidor;
 let puerto;
@@ -240,6 +236,7 @@ test('fotos: subir varias, elegir la principal, verlas en la tienda y borrarlas 
   const carpeta = path.join(dirSubidas, String(tiendaId));
   const archivos = readdirSync(carpeta);
   assert.equal(archivos.length, 2);
+  assert.deepEqual(db.prepare('SELECT huella FROM producto_fotos WHERE tienda_id = ?').all(tiendaId).map((f) => f.huella), [huellaDe(PNG), huellaDe(PNG)]);
 
   const editor = await (await nav.pedir(ubicacion)).text();
   assert.match(editor, /Agregamos 2 fotos/);

@@ -340,11 +340,11 @@ export function listarFotos(db, tiendaId, productoId) {
     .all(productoId, tiendaId);
 }
 
-export function agregarFoto(db, tiendaId, productoId, archivo) {
+export function agregarFoto(db, tiendaId, productoId, archivo, huella = null) {
   db.prepare(
-    `INSERT INTO producto_fotos (tienda_id, producto_id, archivo, orden)
-     VALUES (?, ?, ?, (SELECT ifnull(max(orden), 0) + 1 FROM producto_fotos WHERE producto_id = ?))`,
-  ).run(tiendaId, productoId, archivo, productoId);
+    `INSERT INTO producto_fotos (tienda_id, producto_id, archivo, huella, orden)
+     VALUES (?, ?, ?, ?, (SELECT ifnull(max(orden), 0) + 1 FROM producto_fotos WHERE producto_id = ?))`,
+  ).run(tiendaId, productoId, archivo, huella, productoId);
 }
 
 // Mueve una foto un lugar (-1 antes, +1 después) o al principio ('principal').

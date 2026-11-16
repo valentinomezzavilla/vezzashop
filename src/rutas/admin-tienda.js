@@ -23,7 +23,7 @@ import {
 } from '../productos.js';
 import { arbolCategoriasAdmin, aplanar, validarCategoria, crearCategoria, editarCategoria, borrarCategoria } from '../categorias.js';
 import { buscarTienda, renombrarTienda, cambiarClave, LARGO_MINIMO_CLAVE } from '../tiendas.js';
-import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
+import { guardarImagen, borrarImagen, urlImagen, huellaDe, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { urlTienda } from '../util/dominios.js';
 import { plural } from '../util/formato.js';
 
@@ -166,14 +166,16 @@ export function rutasAdminTienda({ db, config }) {
       // Primero se revisan todas, así no queda una carga a medias si una no es imagen.
       const guardadas = [];
       try {
-        for (const archivo of archivos) guardadas.push(await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer));
+        for (const archivo of archivos) {
+          guardadas.push({ archivo: await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer), huella: huellaDe(archivo.buffer) });
+        }
       } catch (error) {
         if (!(error instanceof ErrorDeImagen)) throw error;
-        for (const archivo of guardadas) await borrarImagen(config.dirSubidas, tiendaId, archivo);
+        for (const { archivo } of guardadas) await borrarImagen(config.dirSubidas, tiendaId, archivo);
         avisar(req, 'error', `No subimos nada: ${error.message}`, 'fotos');
         return volverAFotos(req, res);
       }
-      for (const archivo of guardadas) agregarFoto(db, tiendaId, req.producto.id, archivo);
+      for (const { archivo, huella } of guardadas) agregarFoto(db, tiendaId, req.producto.id, archivo, huella);
       avisar(req, 'ok', guardadas.length === 1 ? 'Agregamos la foto.' : `Agregamos ${guardadas.length} fotos.`, 'fotos');
       volverAFotos(req, res);
     },

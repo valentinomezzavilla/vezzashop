@@ -1,6 +1,6 @@
 // Imágenes que suben los clientes (logo, banners). Se guardan en <dirSubidas>/<tiendaId>/<uuid>.<ext>
 // y se sirven en /subidas/<tiendaId>/<archivo>.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -35,5 +35,8 @@ export async function borrarImagen(dirSubidas, tiendaId, archivo) {
   if (!archivo) return;
   await rm(path.join(dirSubidas, String(tiendaId), path.basename(archivo)), { force: true });
 }
+
+// Identifica una imagen por su contenido: dos archivos iguales tienen la misma huella.
+export const huellaDe = (buffer) => createHash('sha256').update(buffer).digest('hex');
 
 export const urlImagen = (tiendaId, archivo) => (archivo ? `/subidas/${tiendaId}/${archivo}` : null);

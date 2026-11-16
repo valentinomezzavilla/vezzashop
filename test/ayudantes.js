@@ -2,6 +2,13 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
+// Un PNG de 1x1. otraFoto(n) sigue siendo un PNG válido, pero con otro contenido (y otra huella).
+export const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+export const otraFoto = (n) => Buffer.concat([PNG, Buffer.from([n])]);
+
 // Navegador mínimo contra el panel: guarda cookies y no sigue redirecciones.
 export function crearNavegador(base) {
   const cookies = new Map();
