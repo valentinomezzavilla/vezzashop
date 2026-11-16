@@ -1,8 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
 import { once } from 'node:events';
 import writeExcelFile from 'write-excel-file/node';
 import { readSheet } from 'read-excel-file/node';
@@ -10,31 +11,48 @@ import { abrirBase } from '../src/db.js';
 import { crearApp } from '../src/app.js';
 import { crearTienda } from '../src/tiendas.js';
 import { COLUMNAS, interpretarHoja } from '../src/importacion/interpretar.js';
-import { crearNavegador } from './ayudantes.js';
+import { crearNavegador, conFotoEnCelda, PNG, otraFoto } from './ayudantes.js';
 
 let servidor;
 let base;
 let db;
 let dirImportaciones;
+let dirSubidas;
+let servidorFotos;
+let fotos; // base de las URLs del servidor de fotos de prueba
 
 before(async () => {
   dirImportaciones = mkdtempSync(path.join(tmpdir(), 'importaciones-'));
+  dirSubidas = mkdtempSync(path.join(tmpdir(), 'subidas-'));
   db = abrirBase(':memory:');
   const config = {
     produccion: false,
     secretoSesion: 'secreto-de-prueba-de-al-menos-32-caracteres',
     dirImportaciones,
-    dirSubidas: dirImportaciones,
+    dirSubidas,
+    permitirLinksLocales: true, // el servidor de fotos de prueba está en 127.0.0.1
   };
   servidor = crearApp({ db, config }).listen(0);
   await once(servidor, 'listening');
   base = `http://127.0.0.1:${servidor.address().port}`;
+
+  servidorFotos = http.createServer((req, res) => {
+    if (req.url === '/foto.png') return res.writeHead(200, { 'content-type': 'image/png' }).end(otraFoto(7));
+    res.writeHead(404).end();
+  });
+  servidorFotos.listen(0, '127.0.0.1');
+  await once(servidorFotos, 'listening');
+  fotos = `http://127.0.0.1:${servidorFotos.address().port}`;
 });
 
 after(() => {
   servidor.close();
+  servidorFotos.close();
   rmSync(dirImportaciones, { recursive: true, force: true });
+  rmSync(dirSubidas, { recursive: true, force: true });
 });
+
+const tiendaIdDe = (slug) => db.prepare('SELECT id FROM tiendas WHERE slug = ?').get(slug).id;
 
 const navegador = () => crearNavegador(base);
 
@@ -152,4 +170,72 @@ test('salir cierra la sesión', async () => {
   const respuesta = await nav.enviar('/admin/salir', {}, { desde: '/admin/productos' });
   assert.equal(respuesta.status, 302);
   assert.equal((await nav.pedir('/admin/productos')).status, 302);
+});
+
+// ---------- Fotos en la carga masiva ----------
+
+test('carga masiva con fotos pegadas y por link, sin duplicar al volver a subir', async () => {
+  const nav = await ingresarComoNuevaTienda('confotos');
+  const hoja = [
+    ['SKU', 'Nombre', 'Precio', 'img', 'link-img'],
+    ['A1', 'Flotante', 1000, null, null],
+    ['B1', 'Por Link', 1000, null, `${fotos}/foto.png`],
+    ['C1', 'En Celda', 1000, null, null],
+  ];
+  const imagen = { content: PNG, contentType: 'image/png', width: 10, height: 10, dpi: 96, anchor: { row: 2, column: 4 } };
+  const xlsx = conFotoEnCelda(await writeExcelFile(hoja, { images: [imagen] }).toBuffer(), 'D4', otraFoto(3));
+
+  const vistaPrevia = await (await nav.subirExcel(xlsx)).text();
+  assert.match(vistaPrevia, /data-dato="fotos-nuevas">3</);
+  const confirmacion = await nav.enviar('/admin/importar/confirmar', {}, { desde: '/admin/importar' });
+  assert.equal(confirmacion.headers.get('location'), '/admin/productos');
+  assert.match(await (await nav.pedir('/admin/productos')).text(), /Se agregaron 3 fotos/);
+
+  const tiendaId = tiendaIdDe('confotos');
+  const filas = db
+    .prepare(`SELECT p.nombre, f.archivo FROM producto_fotos f JOIN productos p ON p.id = f.producto_id
+              WHERE f.tienda_id = ? ORDER BY p.nombre`)
+    .all(tiendaId);
+  assert.deepEqual(filas.map((f) => f.nombre), ['En Celda', 'Flotante', 'Por Link']);
+  for (const { archivo } of filas) assert.ok(existsSync(path.join(dirSubidas, String(tiendaId), archivo)), archivo);
+
+  assert.match(await (await nav.subirExcel(xlsx)).text(), /data-dato="fotos-nuevas">0</);
+});
+
+test('un link caído se ve en la vista previa y no deja confirmar', async () => {
+  const nav = await ingresarComoNuevaTienda('linkcaido');
+  const archivo = await excel([['SKU', 'Nombre', 'Precio', 'link-img'], ['X', 'Algo', 1000, `${fotos}/no-existe`]]);
+  const html = await (await nav.subirExcel(archivo)).text();
+  assert.match(html, /Fila 2/);
+  assert.match(html, /Foto de &#34;link-img&#34;: el link respondió con un error \(404\)/);
+  assert.doesNotMatch(html, /action="\/admin\/importar\/confirmar"/);
+});
+
+test('subir otro archivo descarta la carpeta pendiente anterior', async () => {
+  const nav = await ingresarComoNuevaTienda('dosveces');
+  const archivo = await excel([['SKU', 'Nombre', 'Precio'], ['Z', 'Zeta', 1000]]);
+  await nav.subirExcel(archivo);
+  await nav.subirExcel(archivo);
+  const prefijo = `${tiendaIdDe('dosveces')}-`;
+  assert.equal(readdirSync(dirImportaciones).filter((n) => n.startsWith(prefijo)).length, 1);
+});
+
+test('una importación pendiente del formato viejo se trata como si no hubiera ninguna', async () => {
+  const nav = await ingresarComoNuevaTienda('sesionvieja');
+  await nav.subirExcel(await excel([['SKU', 'Nombre', 'Precio'], ['V', 'Vieja', 1000]]));
+  db.prepare(
+    `UPDATE sesiones SET datos = json_set(datos, '$.importacion', json(?))
+     WHERE json_extract(datos, '$.usuario.tiendaId') = ?`,
+  ).run(JSON.stringify({ archivo: 'viejo.xlsx', nombreOriginal: 'viejo.xlsx' }), tiendaIdDe('sesionvieja'));
+  const respuesta = await nav.enviar('/admin/importar/confirmar', {}, { desde: '/admin/importar' });
+  assert.equal(respuesta.status, 302);
+  assert.equal(respuesta.headers.get('location'), '/admin/importar');
+  assert.doesNotMatch(await (await nav.pedir('/admin/productos')).text(), /Vieja/);
+});
+
+test('un Excel de más de 30 MB se rechaza con un mensaje claro', async () => {
+  const nav = await ingresarComoNuevaTienda('pesado');
+  const respuesta = await nav.subirExcel(Buffer.alloc(31 * 1024 * 1024));
+  assert.equal(respuesta.status, 400);
+  assert.match(await respuesta.text(), /pesa más de 30 MB/);
 });

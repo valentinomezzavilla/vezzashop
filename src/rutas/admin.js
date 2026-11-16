@@ -1,8 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { autenticar, buscarTienda } from '../tiendas.js';
 import { urlTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
@@ -11,9 +9,13 @@ import { contarPedidosNuevos } from '../pedidos.js';
 import { tokenCsrf, verificarCsrf } from '../csrf.js';
 import { plural } from '../util/formato.js';
 import { interpretarHoja } from '../importacion/interpretar.js';
-import { previsualizar, aplicarImportacion, ErrorDeImportacion } from '../importacion/aplicar.js';
+import { previsualizar, aplicarImportacion, ErrorDeImportacion, claveFoto } from '../importacion/aplicar.js';
 import { leerExcel, ErrorDeLectura } from '../importacion/leer-excel.js';
 import { generarPlantilla } from '../importacion/plantilla.js';
+import { leerFotosExcel } from '../importacion/fotos-excel.js';
+import { obtenerFotos, asignarFotos, completarHuellas } from '../importacion/fotos.js';
+import { crearDescargador, esDireccionPublica } from '../importacion/descargar.js';
+import { guardarPendiente, leerPendiente, borrarPendiente, borrarPendientesViejos } from '../importacion/pendiente.js';
 import {
   leerAjustes,
   actualizarAjustes,
@@ -28,8 +30,8 @@ import {
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { ORDENES } from '../vidriera.js';
 
-const TAMANO_MAXIMO = 5 * 1024 * 1024;
-const VIDA_ARCHIVO_PENDIENTE_MS = 24 * 60 * 60 * 1000;
+// El Excel puede traer fotos pegadas: por eso el límite es mucho más alto que el de una foto sola.
+const TAMANO_MAXIMO = 30 * 1024 * 1024;
 const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const ERROR_LECTURA =
@@ -37,13 +39,17 @@ const ERROR_LECTURA =
   'abrilo en Excel o Google Sheets y guardalo como .xlsx.';
 
 function textoResumen(r) {
+  const fotos = r.fotosNuevas > 0 ? ` Se agregaron ${plural(r.fotosNuevas, 'foto', 'fotos')}.` : '';
   return (
     `Listo: se cargaron ${plural(r.productosNuevos, 'producto nuevo', 'productos nuevos')} ` +
     `y se actualizaron ${plural(r.productosActualizados, 'producto', 'productos')} ` +
     `(${plural(r.variantesNuevas, 'variante nueva', 'variantes nuevas')}, ` +
-    `${plural(r.variantesActualizadas, 'actualizada', 'actualizadas')}).`
+    `${plural(r.variantesActualizadas, 'actualizada', 'actualizadas')}).` +
+    fotos
   );
 }
+
+const SIN_PENDIENTE = 'No hay ninguna importación pendiente. Subí el archivo de nuevo.';
 
 const MEGAS_IMAGEN = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
 
@@ -52,6 +58,8 @@ const regenerarSesion = (req) =>
 
 export function rutasAdmin({ db, config }) {
   const router = express.Router();
+  // permitirLinksLocales solo lo activan los tests (el servidor de fotos de prueba está en 127.0.0.1).
+  const descargar = crearDescargador({ permitirDireccion: config.permitirLinksLocales ? () => true : esDireccionPublica });
   const recibirArchivo = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: TAMANO_MAXIMO, files: 1 },
@@ -146,7 +154,7 @@ export function rutasAdmin({ db, config }) {
     (req, res, next) =>
       recibirArchivo(req, res, (error) => {
         if (error instanceof multer.MulterError) {
-          const mensaje = error.code === 'LIMIT_FILE_SIZE' ? 'El archivo pesa más de 5 MB.' : ERROR_LECTURA;
+          const mensaje = error.code === 'LIMIT_FILE_SIZE' ? `El archivo pesa más de ${TAMANO_MAXIMO / 1024 / 1024} MB.` : ERROR_LECTURA;
           return res.status(400).render('admin/importar', { error: mensaje });
         }
         next(error);
@@ -157,27 +165,35 @@ export function rutasAdmin({ db, config }) {
       const { tiendaId } = req.session.usuario;
 
       let filas;
+      let fotosExcel;
       try {
         filas = await leerExcel(req.file.buffer);
+        // Si read-excel-file pudo leerlo, es un zip válido; un error acá es un .xlsx con partes rotas.
+        fotosExcel = leerFotosExcel(req.file.buffer);
       } catch (error) {
-        if (!(error instanceof ErrorDeLectura)) throw error;
+        if (!(error instanceof ErrorDeLectura) && filas === undefined) throw error;
         return res.status(400).render('admin/importar', { error: ERROR_LECTURA });
       }
 
-      const { productos, errores: erroresFormato } = interpretarHoja(filas);
+      // Las fotos se buscan acá (incluidas las descargas), así los links que fallan se ven antes de confirmar.
+      const { productos, errores: erroresFormato, columnaImg } = interpretarHoja(filas);
+      const { fotosPorFila, errores: erroresFotos } = await obtenerFotos({ productos, columnaImg, fotosExcel, descargar });
+      asignarFotos(productos, fotosPorFila);
+      await completarHuellas(db, config.dirSubidas, tiendaId);
       const { resumen, errores: erroresBase } = previsualizar(db, tiendaId, productos);
       const filasConError = new Set(erroresFormato.map((e) => e.fila));
-      const errores = [...erroresFormato, ...erroresBase.filter((e) => !filasConError.has(e.fila))].sort(
-        (a, b) => a.fila - b.fila,
-      );
+      const errores = [
+        ...erroresFormato,
+        ...erroresFotos,
+        ...erroresBase.filter((e) => !filasConError.has(e.fila)),
+      ].sort((a, b) => a.fila - b.fila);
 
       await descartarPendiente(req, config);
       if (errores.length === 0 && productos.length > 0) {
         await mkdir(config.dirImportaciones, { recursive: true });
         await borrarPendientesViejos(config.dirImportaciones);
-        const archivo = `${tiendaId}-${randomUUID()}.xlsx`;
-        await writeFile(path.join(config.dirImportaciones, archivo), req.file.buffer);
-        req.session.importacion = { archivo, nombreOriginal: req.file.originalname };
+        const carpeta = await guardarPendiente(config.dirImportaciones, tiendaId, { excel: req.file.buffer, fotosPorFila });
+        req.session.importacion = { carpeta, nombreOriginal: req.file.originalname };
       }
 
       res.render('admin/vista-previa', {
@@ -191,20 +207,55 @@ export function rutasAdmin({ db, config }) {
 
   router.post('/importar/confirmar', verificarCsrf, async (req, res) => {
     const pendiente = req.session.importacion;
-    if (!pendiente) {
-      req.session.aviso = { tipo: 'error', texto: 'No hay ninguna importación pendiente. Subí el archivo de nuevo.' };
+    if (!pendiente?.carpeta) {
+      // Sin importación, o una guardada con el formato anterior a las fotos ({ archivo }): hay que subirla de nuevo.
+      await descartarPendiente(req, config);
+      req.session.aviso = { tipo: 'error', texto: SIN_PENDIENTE };
       return res.redirect('/admin/importar');
     }
     delete req.session.importacion;
-    const ruta = path.join(config.dirImportaciones, path.basename(pendiente.archivo));
+    const { tiendaId } = req.session.usuario;
+    const guardadas = [];
+    let aplicada = false;
 
     try {
-      const { productos, errores } = interpretarHoja(await leerExcel(await readFile(ruta)));
+      // La carpeta se borra apenas se lee, antes de responder: pase lo que pase, ya no se va a usar.
+      let leida;
+      try {
+        leida = await leerPendiente(config.dirImportaciones, pendiente.carpeta);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        req.session.aviso = { tipo: 'error', texto: SIN_PENDIENTE };
+        return res.redirect('/admin/importar');
+      } finally {
+        await borrarPendiente(config.dirImportaciones, pendiente.carpeta);
+      }
+      const { productos, errores: erroresFormato } = interpretarHoja(await leerExcel(leida.excel));
+      if (erroresFormato.length > 0) throw new ErrorDeImportacion(erroresFormato);
+      asignarFotos(productos, leida.fotosPorFila);
+      await completarHuellas(db, config.dirSubidas, tiendaId);
+      const { errores, fotosAGuardar } = previsualizar(db, tiendaId, productos);
       if (errores.length > 0) throw new ErrorDeImportacion(errores);
-      const resumen = aplicarImportacion(db, req.session.usuario.tiendaId, productos);
+
+      // Los archivos se escriben antes de la transacción (que es sincrónica); si algo falla, se borran.
+      const archivos = new Map();
+      for (const foto of fotosAGuardar) {
+        const archivo = await guardarImagen(config.dirSubidas, tiendaId, foto.contenido);
+        guardadas.push(archivo);
+        archivos.set(claveFoto(foto.slug, foto.huella), archivo);
+      }
+      const resumen = aplicarImportacion(db, tiendaId, productos, archivos);
+      aplicada = true;
+      // Si entre medio el producto ya recibió esa foto, su archivo quedó sin usar.
+      const usado = db.prepare('SELECT 1 FROM producto_fotos WHERE tienda_id = ? AND archivo = ?');
+      for (const archivo of guardadas) {
+        if (!usado.get(tiendaId, archivo)) await borrarImagen(config.dirSubidas, tiendaId, archivo);
+      }
+
       req.session.aviso = { tipo: 'ok', texto: textoResumen(resumen) };
       res.redirect('/admin/productos');
     } catch (error) {
+      if (!aplicada) for (const archivo of guardadas) await borrarImagen(config.dirSubidas, tiendaId, archivo);
       // Puede pasar si entre la vista previa y la confirmación cambió algo en la tienda.
       if (!(error instanceof ErrorDeImportacion)) throw error;
       res.status(422).render('admin/vista-previa', {
@@ -213,8 +264,6 @@ export function rutasAdmin({ db, config }) {
         errores: error.errores,
         vacio: false,
       });
-    } finally {
-      await rm(ruta, { force: true });
     }
   });
 
@@ -309,18 +358,11 @@ export function rutasAdmin({ db, config }) {
   return router;
 }
 
+// Borra la importación que esperaba confirmación. Las de antes de las fotos eran un .xlsx suelto ({ archivo }).
 async function descartarPendiente(req, config) {
   const pendiente = req.session.importacion;
   if (!pendiente) return;
   delete req.session.importacion;
-  await rm(path.join(config.dirImportaciones, path.basename(pendiente.archivo)), { force: true });
-}
-
-// Limpia archivos de importaciones que nadie confirmó.
-async function borrarPendientesViejos(dir) {
-  const limite = Date.now() - VIDA_ARCHIVO_PENDIENTE_MS;
-  for (const nombre of await readdir(dir)) {
-    const ruta = path.join(dir, nombre);
-    if ((await stat(ruta)).mtimeMs < limite) await rm(ruta, { force: true });
-  }
+  const nombre = pendiente.carpeta ?? pendiente.archivo;
+  if (nombre) await borrarPendiente(config.dirImportaciones, nombre);
 }

@@ -74,8 +74,24 @@ Reglas:
 - Precios en pesos: `12500`, `12.500` y `12.500,50` son válidos. Se guardan en centavos.
 - Volver a subir la planilla **no duplica**: actualiza por SKU. Las celdas vacías no borran nada,
   y los productos que no están en la planilla no se tocan.
-- Si hay un solo error, no se guarda nada.
-- Archivo `.xlsx` de hasta 5 MB.
+- Si hay un solo error, no se guarda nada (tampoco las fotos).
+- Archivo `.xlsx` de hasta 30 MB.
+
+Fotos, con las columnas **img** y **link-img**:
+
+- **img**: la foto pegada en la celda (Excel 365: Insertar > Imágenes > Colocar en celda) o flotando encima,
+  con su esquina de arriba a la izquierda en esa celda. Varias fotos flotantes en la misma celda entran todas,
+  de izquierda a derecha.
+- **link-img**: el link de la foto. Se descarga en la vista previa; los links compartidos de Google Drive y
+  Dropbox se convierten al link de descarga. Hasta 200 links por planilla, 15 s y 5 MB por foto.
+- Si están las dos, gana **img**. Una foto pegada fuera de la columna img o texto en img es un error.
+- Las fotos son del producto: se suman las de todas sus filas, en orden (si no tenía fotos, la primera queda
+  como principal). Se reconocen por su contenido (huella SHA-256), así que volver a subir la planilla no las
+  duplica. Hasta 10 fotos por producto, JPG, PNG o WEBP.
+- Las descargas solo van a direcciones públicas: se rechazan localhost, las redes privadas y las que aparecen
+  después de una redirección.
+- Entre la vista previa y la confirmación, el Excel y las fotos esperan en `DIR_IMPORTACIONES`, en una carpeta
+  por importación que se borra al confirmar o a las 24 horas.
 
 ## Vidriera de cada tienda
 
@@ -230,6 +246,10 @@ src/
     aplicar.js           cruza con la base y guarda (todo o nada)
     leer-excel.js        lectura del .xlsx
     plantilla.js         plantilla descargable
+    fotos-excel.js       fotos pegadas en el .xlsx (flotantes y colocadas en celda)
+    descargar.js         descarga de fotos por link, solo a direcciones públicas
+    fotos.js             fotos de cada fila y de cada producto, huellas
+    pendiente.js         carpeta de la importación que espera confirmación
   rutas/admin.js         panel /admin: login, carga masiva y diseño
   rutas/admin-tienda.js  panel /admin: inicio, productos, fotos, categorías y cuenta
   rutas/admin-pedidos.js panel /admin: pedidos, y envíos y pagos
