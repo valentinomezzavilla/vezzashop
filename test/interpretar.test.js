@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { interpretarHoja } from '../src/importacion/interpretar.js';
 
-const VACIO = { pesoKg: null, altoCm: null, anchoCm: null, profundidadCm: null };
+const VACIO = { pesoKg: null, altoCm: null, anchoCm: null, profundidadCm: null, link: null, textoImg: null };
 
 test('agrupa en un producto las filas con el mismo nombre y arma sus variantes', () => {
   const { productos, errores } = interpretarHoja([
@@ -122,4 +122,20 @@ test('valida que las variantes de un producto sean consistentes', () => {
   assert.match(porFila[5], /combinación.*fila 2/);
   assert.match(porFila[6], /Atributo 1/);
   assert.match(porFila[7], /varias filas/);
+});
+
+test('lee img y link-img (también por sus alias) y dice en qué columna está img', () => {
+  const { productos, errores, columnaImg } = interpretarHoja([
+    ['SKU', 'Nombre', 'Precio', 'Foto', 'Link imagen'],
+    ['A', 'Uno', 100, null, ' https://ejemplo.com/a.jpg '],
+    ['B', 'Dos', 100, 'texto', null],
+  ]);
+  assert.deepEqual(errores, []);
+  assert.equal(columnaImg, 3);
+  assert.deepEqual(productos.map((p) => [p.variantes[0].link, p.variantes[0].textoImg]), [
+    ['https://ejemplo.com/a.jpg', null],
+    [null, 'texto'],
+  ]);
+  assert.equal(interpretarHoja([['SKU', 'Nombre'], ['A', 'Uno']]).columnaImg, null);
+  assert.equal(interpretarHoja([['Nombre'], ['Uno']]).columnaImg, null);
 });

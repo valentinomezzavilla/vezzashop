@@ -17,6 +17,11 @@ const INSTRUCCIONES = [
   'Categorías: usá > para subcategorías y coma para poner varias. Ejemplo: Ropa > Remeras, Ofertas',
   'Visible: Sí o No. Si lo dejás vacío, el producto se muestra en la tienda.',
   'Peso y medidas: en kilos y centímetros. Los vas a necesitar para calcular envíos.',
+  'img: pegá la foto adentro de la celda. En Excel: Insertar > Imágenes > Colocar en celda. También sirve pegarla encima de la celda.',
+  'link-img: el link de la foto (JPG, PNG o WEBP). Sirven los links de Google Drive compartidos con "Cualquier persona con el enlace" y los de Dropbox.',
+  '   Si completás las dos, se usa la foto de img. Si una está vacía, se usa la otra.',
+  '   Las fotos de todas las filas de un producto se suman a ese producto. La de la primera fila es la principal.',
+  '   Cada producto puede tener hasta 10 fotos de hasta 5 MB. Si volvés a subir la planilla, las fotos no se duplican.',
   '',
   'Si volvés a subir la planilla:',
   ' - Los productos que ya existen se actualizan (se reconocen por SKU y por nombre).',
@@ -30,6 +35,8 @@ const INSTRUCCIONES = [
   'TAZA-01   | Taza Cerámica |               | Cocina         | 4500  | 30 |       |   |       |',
 ];
 
+const ANCHOS = { descripcion: 40, img: 24, linkImg: 40 };
+
 export function generarPlantilla() {
   const encabezados = COLUMNAS.map((columna) => ({
     value: columna.titulo,
@@ -40,7 +47,7 @@ export function generarPlantilla() {
     {
       sheet: 'Productos',
       data: [encabezados],
-      columns: COLUMNAS.map((columna) => ({ width: columna.clave === 'descripcion' ? 40 : 18 })),
+      columns: COLUMNAS.map((columna) => ({ width: ANCHOS[columna.clave] ?? 18 })),
       stickyRowsCount: 1,
     },
     {

@@ -32,6 +32,8 @@ export const COLUMNAS = [
   { clave: 'anchoCm', titulo: 'Ancho (cm)', alias: ['ancho'] },
   { clave: 'profundidadCm', titulo: 'Profundidad (cm)', alias: ['profundidad'] },
   { clave: 'visible', titulo: 'Visible' },
+  { clave: 'img', titulo: 'img', alias: ['imagen', 'foto'] },
+  { clave: 'linkImg', titulo: 'link-img', alias: ['link imagen', 'link foto', 'url imagen'] },
 ];
 
 const MAX_ATRIBUTOS = 3;
@@ -78,6 +80,7 @@ export function interpretarHoja(filas) {
     return {
       productos: [],
       errores: faltantes.map((c) => ({ fila: 1, mensaje: `Falta la columna "${c.titulo}"` })),
+      columnaImg: null,
     };
   }
 
@@ -123,6 +126,9 @@ export function interpretarHoja(filas) {
       altoCm: leer('altoCm', parsearDecimal),
       anchoCm: leer('anchoCm', parsearDecimal),
       profundidadCm: leer('profundidadCm', parsearDecimal),
+      // Las fotos pegadas en "img" no son valores de celda: las lee fotos-excel.js. Acá queda el texto, por si escribieron algo.
+      link: textoCelda(celda('linkImg')),
+      textoImg: textoCelda(celda('img')),
     };
 
     if (sku) {
@@ -209,5 +215,5 @@ export function interpretarHoja(filas) {
   }
 
   errores.sort((a, b) => a.fila - b.fila);
-  return { productos: [...productos.values()], errores };
+  return { productos: [...productos.values()], errores, columnaImg: indice.img ?? null };
 }
