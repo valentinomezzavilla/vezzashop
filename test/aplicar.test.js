@@ -2,8 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirBase } from '../src/db.js';
 import { interpretarHoja } from '../src/importacion/interpretar.js';
-import { previsualizar, aplicarImportacion, ErrorDeImportacion } from '../src/importacion/aplicar.js';
-import { leerCatalogo, crearTiendaVacia } from './ayudantes.js';
+import { previsualizar, aplicarImportacion, ErrorDeImportacion, claveFoto } from '../src/importacion/aplicar.js';
+import { asignarFotos } from '../src/importacion/fotos.js';
+import { listarFotos } from '../src/productos.js';
+import { huellaDe } from '../src/imagenes.js';
+import { leerCatalogo, crearTiendaVacia, PNG, otraFoto } from './ayudantes.js';
 
 const ENCABEZADOS = ['SKU', 'Nombre', 'Descripción', 'Categorías', 'Precio', 'Stock', 'Atributo 1', 'Valor 1'];
 const CATALOGO_INICIAL = [
@@ -28,7 +31,7 @@ test('crea productos, variantes y categorías nuevas', () => {
   const { db, tiendaId } = preparar();
   const resumen = importar(db, tiendaId, CATALOGO_INICIAL);
 
-  assert.deepEqual(resumen, { productosNuevos: 2, productosActualizados: 0, variantesNuevas: 3, variantesActualizadas: 0 });
+  assert.deepEqual(resumen, { productosNuevos: 2, productosActualizados: 0, variantesNuevas: 3, variantesActualizadas: 0, fotosNuevas: 0 });
   assert.deepEqual(leerCatalogo(db, tiendaId), [
     {
       nombre: 'Gorra', descripcion: '', visible: 1, atributos: [], categorias: ['Accesorios'],
@@ -51,7 +54,7 @@ test('importar dos veces el mismo Excel no duplica nada', () => {
 
   const resumen = importar(db, tiendaId, CATALOGO_INICIAL);
 
-  assert.deepEqual(resumen, { productosNuevos: 0, productosActualizados: 2, variantesNuevas: 0, variantesActualizadas: 3 });
+  assert.deepEqual(resumen, { productosNuevos: 0, productosActualizados: 2, variantesNuevas: 0, variantesActualizadas: 3, fotosNuevas: 0 });
   assert.deepEqual(leerCatalogo(db, tiendaId), antes);
   assert.equal(db.prepare('SELECT count(*) AS n FROM categorias').get().n, 3);
 });
@@ -97,7 +100,7 @@ test('agrega una variante nueva a un producto que ya existe', () => {
 
   const resumen = importar(db, tiendaId, [ENCABEZADOS, ['REM-L', 'Remera Básica', null, null, 13000, 2, 'Talle', 'L']]);
 
-  assert.deepEqual(resumen, { productosNuevos: 0, productosActualizados: 1, variantesNuevas: 1, variantesActualizadas: 0 });
+  assert.deepEqual(resumen, { productosNuevos: 0, productosActualizados: 1, variantesNuevas: 1, variantesActualizadas: 0, fotosNuevas: 0 });
   const remera = leerCatalogo(db, tiendaId).find((p) => p.nombre === 'Remera Básica');
   assert.deepEqual(remera.variantes.map((v) => v.sku), ['REM-L', 'REM-M', 'REM-S']);
 });
@@ -148,7 +151,65 @@ test('cada tienda tiene su propio catálogo aunque repitan SKU', () => {
 
   const resumen = importar(db, otraTiendaId, [['SKU', 'Nombre', 'Precio'], ['GORRA', 'Gorra', 9999]]);
 
-  assert.deepEqual(resumen, { productosNuevos: 1, productosActualizados: 0, variantesNuevas: 1, variantesActualizadas: 0 });
+  assert.deepEqual(resumen, { productosNuevos: 1, productosActualizados: 0, variantesNuevas: 1, variantesActualizadas: 0, fotosNuevas: 0 });
   assert.equal(leerCatalogo(db, otraTiendaId)[0].variantes[0].precio, 999900);
   assert.equal(leerCatalogo(db, tiendaId).find((p) => p.nombre === 'Gorra').variantes[0].precio, 800000);
+});
+
+// ---------- Fotos ----------
+
+const HOJA_FOTOS = [['SKU', 'Nombre', 'Precio'], ['GORRA', 'Gorra', 8000], ['REM', 'Remera', 9000]];
+
+// Productos de la hoja con fotos por fila (la Gorra es la fila 2, la Remera la 3).
+function conFotos(fotosPorFila) {
+  const { productos } = interpretarHoja(HOJA_FOTOS);
+  asignarFotos(productos, new Map(Object.entries(fotosPorFila).map(([fila, fotos]) => [Number(fila), fotos])));
+  return productos;
+}
+const archivosPara = (pares) => new Map(pares.map(([slug, foto, archivo]) => [claveFoto(slug, huellaDe(foto)), archivo]));
+const idDe = (db, slug) => db.prepare('SELECT id FROM productos WHERE slug = ?').get(slug).id;
+
+test('previsualizar cuenta las fotos nuevas y saltea las que el producto ya tiene', () => {
+  const { db, tiendaId } = preparar();
+  aplicarImportacion(db, tiendaId, conFotos({ 2: [PNG] }), archivosPara([['gorra', PNG, 'a.png']]));
+
+  const { resumen, errores, fotosAGuardar } = previsualizar(db, tiendaId, conFotos({ 2: [PNG, otraFoto(1)] }));
+
+  assert.deepEqual(errores, []);
+  assert.equal(resumen.fotosNuevas, 1);
+  assert.deepEqual(fotosAGuardar.map((f) => [f.slug, f.huella]), [['gorra', huellaDe(otraFoto(1))]]);
+  assert.deepEqual(fotosAGuardar[0].contenido, otraFoto(1));
+});
+
+test('aplicarImportacion agrega las fotos en orden; la primera queda como principal', () => {
+  const { db, tiendaId } = preparar();
+  const resumen = aplicarImportacion(db, tiendaId, conFotos({ 2: [PNG, otraFoto(1)] }),
+    archivosPara([['gorra', PNG, 'a.png'], ['gorra', otraFoto(1), 'b.png']]));
+
+  assert.equal(resumen.fotosNuevas, 2);
+  assert.deepEqual(listarFotos(db, tiendaId, idDe(db, 'gorra')).map((f) => f.archivo), ['a.png', 'b.png']);
+  assert.deepEqual(db.prepare('SELECT huella FROM producto_fotos ORDER BY orden').all().map((f) => f.huella), [huellaDe(PNG), huellaDe(otraFoto(1))]);
+});
+
+test('si el producto ya tenía fotos, las nuevas van al final', () => {
+  const { db, tiendaId } = preparar();
+  aplicarImportacion(db, tiendaId, conFotos({ 2: [PNG] }), archivosPara([['gorra', PNG, 'a.png']]));
+  aplicarImportacion(db, tiendaId, conFotos({ 2: [otraFoto(1), PNG] }), archivosPara([['gorra', otraFoto(1), 'b.png']]));
+  assert.deepEqual(listarFotos(db, tiendaId, idDe(db, 'gorra')).map((f) => f.archivo), ['a.png', 'b.png']);
+});
+
+test('un producto que pasaría de 10 fotos es un problema', () => {
+  const { db, tiendaId } = preparar();
+  const once = Array.from({ length: 11 }, (_, i) => otraFoto(i));
+  const { errores } = previsualizar(db, tiendaId, conFotos({ 2: once }));
+  assert.deepEqual(errores, [{ fila: 2, mensaje: '"Gorra" quedaría con 11 fotos y el máximo es 10' }]);
+  assert.throws(() => aplicarImportacion(db, tiendaId, conFotos({ 2: once })), ErrorDeImportacion);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM productos').get().n, 0);
+});
+
+test('la misma foto en dos productos se guarda para cada uno', () => {
+  const { db, tiendaId } = preparar();
+  aplicarImportacion(db, tiendaId, conFotos({ 2: [PNG], 3: [PNG] }), archivosPara([['gorra', PNG, 'g.png'], ['remera', PNG, 'r.png']]));
+  assert.deepEqual(listarFotos(db, tiendaId, idDe(db, 'gorra')).map((f) => f.archivo), ['g.png']);
+  assert.deepEqual(listarFotos(db, tiendaId, idDe(db, 'remera')).map((f) => f.archivo), ['r.png']);
 });

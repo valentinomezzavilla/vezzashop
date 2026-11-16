@@ -4,9 +4,11 @@
 //  - Una celda vacía no cambia lo que ya estaba cargado.
 //  - Lo que no está en el Excel no se toca.
 //  - Si hay un solo error, no se guarda nada.
+//  - Las fotos se reconocen por su huella: una foto que el producto ya tiene no se vuelve a agregar.
 
 import { enTransaccion } from '../db.js';
 import { slugificar } from '../util/slug.js';
+import { MAX_FOTOS, agregarFoto } from '../productos.js';
 
 export class ErrorDeImportacion extends Error {
   constructor(errores) {
@@ -20,19 +22,24 @@ const mismosAtributos = (a, b) => a.length === b.length && a.every((x, i) => x.t
 const columnasAtributos = (lista) => [lista[0] ?? null, lista[1] ?? null, lista[2] ?? null];
 const aEnteroSQL = (booleano) => (booleano === null ? null : Number(booleano));
 
+// Identifica una foto nueva de un producto en el mapa de archivos ya guardados que recibe aplicarImportacion.
+export const claveFoto = (slug, huella) => `${slug}\u0000${huella}`;
+
 function analizar(db, tiendaId, productos) {
   const buscarProducto = db.prepare(
     'SELECT id, nombre, atributo1, atributo2, atributo3 FROM productos WHERE tienda_id = ? AND slug = ?',
   );
   const contarVariantes = db.prepare('SELECT count(*) AS n FROM variantes WHERE producto_id = ?');
+  const huellasDeProducto = db.prepare('SELECT huella FROM producto_fotos WHERE producto_id = ?');
   const buscarVariante = db.prepare(
     `SELECT v.id, p.slug, p.nombre FROM variantes v JOIN productos p ON p.id = v.producto_id
      WHERE v.tienda_id = ? AND v.sku = ?`,
   );
 
   const errores = [];
-  const resumen = { productosNuevos: 0, productosActualizados: 0, variantesNuevas: 0, variantesActualizadas: 0 };
+  const resumen = { productosNuevos: 0, productosActualizados: 0, variantesNuevas: 0, variantesActualizadas: 0, fotosNuevas: 0 };
   const plan = [];
+  const fotosAGuardar = [];
 
   for (const producto of productos) {
     const existente = buscarProducto.get(tiendaId, producto.slug);
@@ -82,16 +89,31 @@ function analizar(db, tiendaId, productos) {
       }
       variantes.push({ ...variante, id: varianteExistente?.id ?? null });
     }
-    plan.push({ ...producto, id: existente?.id ?? null, variantes });
+
+    const huellasExistentes = existente ? huellasDeProducto.all(existente.id).map((f) => f.huella) : [];
+    const conocidas = new Set(huellasExistentes);
+    const fotosNuevas = (producto.fotos ?? []).filter((foto) => !conocidas.has(foto.huella));
+    const totalFotos = huellasExistentes.length + fotosNuevas.length;
+    if (fotosNuevas.length > 0 && totalFotos > MAX_FOTOS) {
+      errores.push({
+        fila: producto.primeraFila,
+        mensaje: `"${existente?.nombre ?? producto.nombre}" quedaría con ${totalFotos} fotos y el máximo es ${MAX_FOTOS}`,
+      });
+    }
+    resumen.fotosNuevas += fotosNuevas.length;
+    for (const { huella, contenido } of fotosNuevas) fotosAGuardar.push({ slug: producto.slug, huella, contenido });
+
+    plan.push({ ...producto, id: existente?.id ?? null, variantes, fotosNuevas });
   }
 
   errores.sort((a, b) => a.fila - b.fila);
-  return { resumen, errores, plan };
+  return { resumen, errores, plan, fotosAGuardar };
 }
 
+// fotosAGuardar: las fotos que hay que escribir antes de aplicarImportacion (una por producto y huella).
 export function previsualizar(db, tiendaId, productos) {
-  const { resumen, errores } = analizar(db, tiendaId, productos);
-  return { resumen, errores };
+  const { resumen, errores, fotosAGuardar } = analizar(db, tiendaId, productos);
+  return { resumen, errores, fotosAGuardar };
 }
 
 function obtenerCategoria(db, tiendaId, ruta) {
@@ -106,7 +128,8 @@ function obtenerCategoria(db, tiendaId, ruta) {
   return padreId;
 }
 
-export function aplicarImportacion(db, tiendaId, productos) {
+// archivos: claveFoto(slug, huella) -> nombre del archivo ya guardado. Las fotos nuevas sin archivo no se agregan.
+export function aplicarImportacion(db, tiendaId, productos, archivos = new Map()) {
   return enTransaccion(db, () => {
     const { resumen, errores, plan } = analizar(db, tiendaId, productos);
     if (errores.length > 0) throw new ErrorDeImportacion(errores);
@@ -138,6 +161,7 @@ export function aplicarImportacion(db, tiendaId, productos) {
        profundidad_cm = coalesce(?, profundidad_cm), actualizado_en = datetime('now') WHERE id = ?`,
     );
     const actualizarValores = db.prepare('UPDATE variantes SET valor1 = ?, valor2 = ?, valor3 = ? WHERE id = ?');
+    let fotosAgregadas = 0;
 
     for (const producto of plan) {
       let productoId = producto.id;
@@ -181,7 +205,14 @@ export function aplicarImportacion(db, tiendaId, productos) {
           if (v.valores.length > 0) actualizarValores.run(...columnasAtributos(v.valores), v.id);
         }
       }
+
+      for (const { huella } of producto.fotosNuevas) {
+        const archivo = archivos.get(claveFoto(producto.slug, huella));
+        if (!archivo) continue;
+        agregarFoto(db, tiendaId, productoId, archivo, huella);
+        fotosAgregadas++;
+      }
     }
-    return resumen;
+    return { ...resumen, fotosNuevas: fotosAgregadas };
   });
 }
