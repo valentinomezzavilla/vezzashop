@@ -1,6 +1,7 @@
 // Utilidades solo para tests.
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 
 // Un PNG de 1x1. otraFoto(n) sigue siendo un PNG válido, pero con otro contenido (y otra huella).
 export const PNG = Buffer.from(
@@ -137,4 +138,40 @@ export function leerCatalogo(db, tiendaId) {
         })),
     };
   });
+}
+
+// Agrega a un .xlsx una foto "colocada en la celda" (la opción de Excel 365), con las mismas partes que escribe Excel:
+// la celda queda con vm="1" y la foto se encuentra por metadata.xml -> richData -> xl/media.
+export function conFotoEnCelda(xlsx, referencia, contenido, { targetAbsoluto = false } = {}) {
+  const partes = unzipSync(new Uint8Array(xlsx));
+  const fila = referencia.match(/\d+/)[0];
+  const hoja = 'xl/worksheets/sheet1.xml';
+  const xml = strFromU8(partes[hoja]);
+  const filaXml = new RegExp(`(<row r="${fila}"[^>]*>[\\s\\S]*?)(</row>)`);
+  assert.match(xml, filaXml, `la fila ${fila} tiene que existir en la hoja`);
+  partes[hoja] = strToU8(xml.replace(filaXml, `$1<c r="${referencia}" t="e" vm="1"><v>#VALUE!</v></c>$2`));
+  partes['xl/media/foto-en-celda.png'] = new Uint8Array(contenido);
+  const RD = 'http://schemas.microsoft.com/office/spreadsheetml/2017/richdata';
+  partes['xl/metadata.xml'] = strToU8(
+    `<metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xlrd="${RD}">` +
+      '<metadataTypes count="1"><metadataType name="XLRICHVALUE" minSupportedVersion="120000"/></metadataTypes>' +
+      '<futureMetadata name="XLRICHVALUE" count="1"><bk><extLst><ext uri="{3e2802c4-a4d2-4d8b-9148-e3be6c30e623}">' +
+      '<xlrd:rvb i="0"/></ext></extLst></bk></futureMetadata>' +
+      '<valueMetadata count="1"><bk><rc t="1" v="0"/></bk></valueMetadata></metadata>',
+  );
+  partes['xl/richData/rdrichvaluestructure.xml'] = strToU8(
+    `<rvStructures xmlns="${RD}" count="1"><s t="_localImage"><k n="_rvRel:LocalImageIdentifier" t="i"/><k n="CalcOrigin" t="i"/></s></rvStructures>`,
+  );
+  partes['xl/richData/rdrichvalue.xml'] = strToU8(`<rvData xmlns="${RD}" count="1"><rv s="0"><v>0</v><v>5</v></rv></rvData>`);
+  partes['xl/richData/richValueRel.xml'] = strToU8(
+    '<richValueRels xmlns="http://schemas.microsoft.com/office/spreadsheetml/2022/richvaluerel" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><rel r:id="rId1"/></richValueRels>',
+  );
+  const destino = targetAbsoluto ? '/xl/media/foto-en-celda.png' : '../media/foto-en-celda.png';
+  partes['xl/richData/_rels/richValueRel.xml.rels'] = strToU8(
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${destino}"/>` +
+      '</Relationships>',
+  );
+  return Buffer.from(zipSync(partes));
 }
