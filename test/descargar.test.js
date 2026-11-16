@@ -88,3 +88,12 @@ test('explica cada falla', async () => {
   };
   for (const [link, mensaje] of Object.entries(casos)) await assert.rejects(abierto()(link), { message: mensaje }, link);
 });
+
+test('se corta si se aborta desde afuera', async () => {
+  const control = new AbortController();
+  setTimeout(() => control.abort(), 50);
+  const descargar = crearDescargador({ permitirDireccion: () => true, tiempoMaximoMs: 5000 });
+  const inicio = Date.now();
+  await assert.rejects(descargar(local('/lenta'), { senal: control.signal }), { message: 'el link tardó demasiado en responder' });
+  assert.ok(Date.now() - inicio < 1000, 'tiene que cortar enseguida, no esperar su propio tiempo máximo');
+});

@@ -134,8 +134,7 @@ export function crearDescargador({
     return Buffer.concat(partes);
   }
 
-  async function descargar(link) {
-    const senal = AbortSignal.timeout(tiempoMaximoMs);
+  async function descargar(link, senal) {
     let url = leerUrl(link);
     for (let vuelta = 0; ; vuelta++) {
       const respuesta = await pedir(url, senal);
@@ -156,13 +155,17 @@ export function crearDescargador({
     }
   }
 
-  return async (link) => {
+  // senal (opcional): corta la descarga desde afuera, por ejemplo cuando se acaba el tiempo de toda la planilla.
+  return async (link, { senal: externa } = {}) => {
+    const tiempo = AbortSignal.timeout(tiempoMaximoMs);
+    const senal = externa ? AbortSignal.any([tiempo, externa]) : tiempo;
     try {
-      return await descargar(link);
+      return await descargar(link, senal);
     } catch (error) {
       if (error instanceof ErrorDeDescarga) throw error;
       if (error.cause instanceof ErrorDeDescarga) throw error.cause;
-      if (error.name === 'AbortError' || error.name === 'TimeoutError') throw new ErrorDeDescarga(MENSAJES.tiempo);
+      // Según en qué momento se corta, el error es AbortError o un "aborted" del socket: se mira la señal.
+      if (senal.aborted) throw new ErrorDeDescarga(MENSAJES.tiempo);
       throw new ErrorDeDescarga(MENSAJES.red, { cause: error });
     }
   };

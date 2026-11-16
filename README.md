@@ -84,7 +84,10 @@ Fotos, con las columnas **img** y **link-img**:
   de izquierda a derecha.
 - **link-img**: el link de la foto. Se descarga en la vista previa; los links compartidos de Google Drive y
   Dropbox se convierten al link de descarga. Hasta 200 links por planilla, 15 s y 5 MB por foto.
-- Si están las dos, gana **img**. Una foto pegada fuera de la columna img o texto en img es un error.
+- Si están las dos, gana **img**. Una foto pegada fuera de la columna img, texto en img o una foto pegada que no
+  se puede leer (por ejemplo, agrupada con otras) es un error: ninguna fila se queda sin foto en silencio.
+- Por planilla: hasta 90 s de descargas y 200 MB de fotos en total. Si se pasa, es un error y hay que subirla en
+  partes. Del Excel se descomprimen solo las partes necesarias, y cada foto solo si pesa hasta 5 MB.
 - Las fotos son del producto: se suman las de todas sus filas, en orden (si no tenía fotos, la primera queda
   como principal). Se reconocen por su contenido (huella SHA-256), así que volver a subir la planilla no las
   duplica. Hasta 10 fotos por producto, JPG, PNG o WEBP.
