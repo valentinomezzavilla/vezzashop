@@ -54,13 +54,15 @@
         <%- icono('basura', { tamano: 16 }) %> <span>Borrar seleccionados (<span data-cuenta-seleccion>0</span>)</span>
       </button>
     </form>
+    <%# Fuera de la tabla: en el celular el encabezado de la tabla se oculta. Sin JavaScript no sirve, así que lo muestra admin.js. %>
+    <label class="seleccionar-todos" hidden data-control-seleccion>
+      <input type="checkbox" data-seleccionar-todos> Seleccionar todos
+    </label>
     <div class="tabla-contenedor">
       <table class="tabla tabla-productos">
         <thead>
           <tr>
-            <th scope="col" class="celda-seleccion">
-              <input type="checkbox" data-seleccionar-todos aria-label="Seleccionar todos los productos de la lista">
-            </th>
+            <th scope="col" class="celda-seleccion"><span class="visualmente-oculto">Seleccionar</span></th>
             <th scope="col">Producto</th>
             <th scope="col">Precio</th>
             <th scope="col" class="numero">Stock</th>

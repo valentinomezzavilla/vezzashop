@@ -21,7 +21,7 @@
     <% } %>
   </ul>
   <p class="aviso aviso-error"><%- icono('alerta', { tamano: 18 }) %><span>También se borran sus fotos y variantes. Los pedidos ya hechos no cambian.</span></p>
-  <form method="post" action="/admin/productos/borrar-varios/confirmar" class="acciones">
+  <form method="post" action="/admin/productos/borrar-varios/confirmar" class="acciones" data-un-solo-envio>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <input type="hidden" name="volver" value="<%= volver %>">
     <% for (const p of productos) { %><input type="hidden" name="ids" value="<%= p.id %>"><% } %>

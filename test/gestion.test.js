@@ -236,7 +236,9 @@ test('borrar varios desde el listado: se confirma viendo la lista y se borran so
   const volver = '/admin/productos?filtro=todos&q=a';
 
   const lista = await (await nav.pedir('/admin/productos')).text();
-  assert.match(lista, /data-seleccionar-todos/);
+  const encabezado = lista.match(/<thead>[\s\S]*?<\/thead>/)[0];
+  assert.doesNotMatch(encabezado, /data-seleccionar-todos/, '"Seleccionar todos" no puede quedar en el encabezado: en el celular se oculta');
+  assert.match(lista, /<input type="checkbox" data-seleccionar-todos[^>]*>\s*Seleccionar todos/);
   assert.match(lista, new RegExp(`name="ids" value="${idDeUbicacion(a)}" form="borrar-varios"`));
 
   const pares = [['ids', idDeUbicacion(a)], ['ids', idDeUbicacion(b)], ['ids', idDeUbicacion(b)], ['volver', volver]];
@@ -258,9 +260,39 @@ test('borrar varios desde el listado: se confirma viendo la lista y se borran so
   assert.match(despues, /Vaso Verde/);
   assert.equal(readdirSync(path.join(dirSubidas, String(tiendaId))).length, 0, 'se borran las fotos');
 
+  // Volver a confirmar lo que ya se borró no muestra un error: los productos ya no están.
   const otraVez = await nav.enviar('/admin/productos/borrar-varios/confirmar', pares, { desde: '/admin/productos' });
   assert.equal(otraVez.headers.get('location'), volver);
+  assert.doesNotMatch(await (await nav.pedir('/admin/productos')).text(), /Elegí al menos un producto para borrar/);
+
+  // Sin ningún producto marcado, sí.
+  await nav.enviar('/admin/productos/borrar-varios/confirmar', [['volver', volver]], { desde: '/admin/productos' });
   assert.match(await (await nav.pedir('/admin/productos')).text(), /Elegí al menos un producto para borrar/);
+});
+
+test('un doble clic en "Sí, borrar" deja el aviso de que se borró, no un error', async () => {
+  const { nav } = await tiendaConPanel('dobleclic');
+  const a = await crearDesdePanel(nav, 'Uno Doble', 'D1');
+  const b = await crearDesdePanel(nav, 'Dos Doble', 'D2');
+  const csrf = await nav.csrfDe('/admin/productos/nuevo');
+  const envio = () => nav.pedir('/admin/productos/borrar-varios/confirmar', {
+    method: 'POST',
+    body: new URLSearchParams([['_csrf', csrf], ['ids', idDeUbicacion(a)], ['ids', idDeUbicacion(b)]]),
+  });
+  const respuestas = await Promise.all([envio(), envio()]);
+  assert.deepEqual(respuestas.map((r) => r.status), [302, 302]);
+  const lista = await (await nav.pedir('/admin/productos')).text();
+  assert.match(lista, /Borramos 2 productos/);
+  assert.doesNotMatch(lista, /Elegí al menos un producto para borrar/);
+});
+
+test('marcar más de mil productos no rompe la confirmación', async () => {
+  const { nav } = await tiendaConPanel('muchosids');
+  const a = await crearDesdePanel(nav, 'Entre Muchos', 'M1');
+  const pares = [['ids', idDeUbicacion(a)], ...Array.from({ length: 1500 }, (_, i) => ['ids', String(900000 + i)])];
+  const respuesta = await nav.enviar('/admin/productos/borrar-varios', pares, { desde: '/admin/productos' });
+  assert.equal(respuesta.status, 200);
+  assert.match(await respuesta.text(), /Sí, borrar 1 producto</);
 });
 
 test('borrar varios no toca productos de otra tienda ni redirige afuera', async () => {

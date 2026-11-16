@@ -275,6 +275,8 @@ const barraSeleccion = document.querySelector('[data-barra-seleccion]');
 if (barraSeleccion) {
   const casillas = [...document.querySelectorAll(`input[name="ids"][form="${barraSeleccion.id}"]`)];
   const todos = document.querySelector('[data-seleccionar-todos]');
+  const controlTodos = document.querySelector('[data-control-seleccion]');
+  if (controlTodos) controlTodos.hidden = false;
   const cuenta = barraSeleccion.querySelector('[data-cuenta-seleccion]');
   const actualizar = () => {
     const marcadas = casillas.filter((c) => c.checked).length;
@@ -291,4 +293,11 @@ if (barraSeleccion) {
     actualizar();
   });
   actualizar();
+}
+
+// Formularios que no se pueden mandar dos veces (por ejemplo, confirmar un borrado): se desactiva el botón al enviar.
+for (const formulario of document.querySelectorAll('form[data-un-solo-envio]')) {
+  formulario.addEventListener('submit', () => {
+    for (const boton of formulario.querySelectorAll('button[type="submit"]')) boton.disabled = true;
+  });
 }

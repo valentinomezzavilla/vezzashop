@@ -51,7 +51,8 @@ export function crearApp({ db, config }) {
     vidriera(req, res, next);
   });
 
-  app.use(express.urlencoded({ extended: false }));
+  // Más campos que los 1000 de fábrica: al borrar varios productos, cada uno marcado es un campo "ids".
+  app.use(express.urlencoded({ extended: false, parameterLimit: 10_000, limit: '200kb' }));
   app.use(
     session({
       name: 'sesion',

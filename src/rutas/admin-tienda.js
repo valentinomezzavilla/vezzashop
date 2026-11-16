@@ -125,10 +125,15 @@ export function rutasAdminTienda({ db, config }) {
 
   router.post('/productos/borrar-varios/confirmar', verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const { borrados, fotos } = await borrarProductos(db, tiendaId, idsDeFormulario(req.body.ids));
+    const ids = idsDeFormulario(req.body.ids);
+    const { borrados, fotos } = await borrarProductos(db, tiendaId, ids);
     for (const archivo of fotos) await borrarImagen(config.dirSubidas, tiendaId, archivo);
-    if (borrados === 0) avisar(req, 'error', 'Elegí al menos un producto para borrar.');
-    else avisar(req, 'ok', `Borramos ${plural(borrados, 'producto', 'productos')}.`);
+    if (borrados > 0) avisar(req, 'ok', `Borramos ${plural(borrados, 'producto', 'productos')}.`);
+    else if (ids.length === 0) avisar(req, 'error', 'Elegí al menos un producto para borrar.');
+    // Si se mandaron productos que ya no estaban (por ejemplo, por un doble clic), no hay nada nuevo que avisar.
+    // Pero este pedido ya se llevó de la sesión el "Borramos…" del primer envío (los avisos se leen en cada pedido),
+    // así que se devuelve para que se vea.
+    else if (res.locals.aviso) req.session.aviso = res.locals.aviso;
     res.redirect(volverSeguro(req.body.volver));
   });
 

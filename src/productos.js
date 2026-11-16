@@ -331,14 +331,15 @@ export function borrarProducto(db, tiendaId, id) {
   });
 }
 
-// ids que llegan de un formulario (uno, varios o ninguno): enteros positivos, sin repetir, hasta 1000.
+// ids que llegan de un formulario (uno, varios o ninguno): enteros positivos, sin repetir, hasta 5000.
+// (El límite de campos por formulario está en app.js.)
 export function idsDeFormulario(valor) {
   const lista = Array.isArray(valor) ? valor : valor === undefined || valor === null ? [] : [valor];
   const ids = new Set();
   for (const v of lista) {
     const n = Number(v);
     if (Number.isSafeInteger(n) && n > 0) ids.add(n);
-    if (ids.size >= 1000) break;
+    if (ids.size >= 5000) break;
   }
   return [...ids];
 }
