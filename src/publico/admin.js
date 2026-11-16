@@ -268,3 +268,27 @@ if (menu && menu.scrollWidth > menu.clientWidth) {
   const desde = activa.getBoundingClientRect().left - menu.getBoundingClientRect().left + menu.scrollLeft;
   menu.scrollLeft = desde - (menu.clientWidth - activa.offsetWidth) / 2;
 }
+
+// ---------- Productos: seleccionar varios para borrar ----------
+// Sin JavaScript la barra se ve siempre y funciona igual; acá se oculta hasta que haya algo marcado.
+const barraSeleccion = document.querySelector('[data-barra-seleccion]');
+if (barraSeleccion) {
+  const casillas = [...document.querySelectorAll(`input[name="ids"][form="${barraSeleccion.id}"]`)];
+  const todos = document.querySelector('[data-seleccionar-todos]');
+  const cuenta = barraSeleccion.querySelector('[data-cuenta-seleccion]');
+  const actualizar = () => {
+    const marcadas = casillas.filter((c) => c.checked).length;
+    cuenta.textContent = String(marcadas);
+    barraSeleccion.hidden = marcadas === 0;
+    if (todos) {
+      todos.checked = marcadas > 0 && marcadas === casillas.length;
+      todos.indeterminate = marcadas > 0 && marcadas < casillas.length;
+    }
+  };
+  for (const casilla of casillas) casilla.addEventListener('change', actualizar);
+  todos?.addEventListener('change', () => {
+    for (const casilla of casillas) casilla.checked = todos.checked;
+    actualizar();
+  });
+  actualizar();
+}

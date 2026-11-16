@@ -15,6 +15,9 @@ import {
   validarProducto,
   guardarProducto,
   borrarProducto,
+  idsDeFormulario,
+  productosParaBorrar,
+  borrarProductos,
   cambiarMarca,
   listarFotos,
   agregarFoto,
@@ -28,6 +31,12 @@ import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { plural } from '../util/formato.js';
 
 const MEGAS_IMAGEN = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
+
+// A dónde volver después de una acción en el listado: solo páginas del panel, nunca otro sitio.
+const volverSeguro = (valor) => {
+  const volver = String(valor ?? '');
+  return volver.startsWith('/admin/') && !volver.startsWith('//') ? volver : '/admin/productos';
+};
 const id = (valor) => (/^\d+$/.test(String(valor)) ? Number(valor) : null);
 
 export function rutasAdminTienda({ db, config }) {
@@ -97,6 +106,32 @@ export function rutasAdminTienda({ db, config }) {
     next(req.producto ? undefined : 'route');
   };
 
+  // ---------- Borrar varios desde el listado ----------
+  // Van antes de las rutas con :productoId, para que "borrar-varios" no se tome como un id.
+
+  router.post('/productos/borrar-varios', verificarCsrf, async (req, res) => {
+    const { tiendaId } = req.session.usuario;
+    const volver = volverSeguro(req.body.volver);
+    const productos = await productosParaBorrar(db, tiendaId, idsDeFormulario(req.body.ids));
+    if (productos.length === 0) {
+      avisar(req, 'error', 'Elegí al menos un producto para borrar.');
+      return res.redirect(volver);
+    }
+    res.render('admin/borrar-productos', {
+      productos: productos.map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto) })),
+      volver,
+    });
+  });
+
+  router.post('/productos/borrar-varios/confirmar', verificarCsrf, async (req, res) => {
+    const { tiendaId } = req.session.usuario;
+    const { borrados, fotos } = await borrarProductos(db, tiendaId, idsDeFormulario(req.body.ids));
+    for (const archivo of fotos) await borrarImagen(config.dirSubidas, tiendaId, archivo);
+    if (borrados === 0) avisar(req, 'error', 'Elegí al menos un producto para borrar.');
+    else avisar(req, 'ok', `Borramos ${plural(borrados, 'producto', 'productos')}.`);
+    res.redirect(volverSeguro(req.body.volver));
+  });
+
   router.get('/productos/:productoId', cargarProducto, (req, res) => {
     mostrarEditor(req, res, { producto: req.producto, formulario: formularioDesdeProducto(req.producto) });
   });
@@ -130,8 +165,7 @@ export function rutasAdminTienda({ db, config }) {
       destacado: valor ? 'aparece en Destacados' : 'ya no está en Destacados',
     };
     avisar(req, 'ok', `"${req.producto.nombre}" ${textos[req.params.campo]}.`);
-    const volver = String(req.body.volver ?? '');
-    res.redirect(volver.startsWith('/admin/') && !volver.startsWith('//') ? volver : '/admin/productos');
+    res.redirect(volverSeguro(req.body.volver));
   });
 
   const volverAFotos = (req, res) => res.redirect(`/admin/productos/${req.producto.id}#fotos`);

@@ -12,6 +12,15 @@ import { validarProducto, guardarProducto, leerProducto, precioParaEditar } from
 import { crearCategoria } from '../src/categorias.js';
 import { crearNavegador, pedirConHost, crearTiendaVacia, PNG } from './ayudantes.js';
 import { huellaDe } from '../src/imagenes.js';
+import { crearPedido } from '../src/pedidos.js';
+
+const DATOS_PEDIDO = {
+  cliente: { nombre: 'Cliente de Prueba', telefono: '3511234567', email: '' },
+  entrega: { tipo: 'retiro', nombre: 'Retiro en el local', descripcion: '', costo: 0, gratisDesde: null },
+  direccion: { calle: '', piso: '', ciudad: '', provincia: '', cp: '', referencias: '' },
+  pago: { clave: 'efectivo', descuento: 0 },
+  notas: '',
+};
 
 let servidor;
 let puerto;
@@ -209,6 +218,73 @@ test('ocultar y destacar desde el listado', async () => {
 
   const afuera = await nav.enviar(`${ubicacion}/visible`, { valor: '1', volver: 'https://otro-sitio.com' }, { desde: '/admin/productos' });
   assert.equal(afuera.headers.get('location'), '/admin/productos', 'no redirige a otros sitios');
+});
+
+// ---------- Borrar varios productos desde el listado ----------
+
+const crearDesdePanel = async (nav, nombre, sku, stock = '1') =>
+  (await nav.enviar('/admin/productos/nuevo', comoPares(formularioProducto({ nombre, variantes: [{ sku, precio: '1000', stock }] })),
+    { desde: '/admin/productos/nuevo' })).headers.get('location');
+const idDeUbicacion = (ubicacion) => ubicacion.split('/').pop();
+
+test('borrar varios desde el listado: se confirma viendo la lista y se borran solo esos, con sus fotos', async () => {
+  const { nav, tiendaId } = await tiendaConPanel('borrarvarios');
+  const a = await crearDesdePanel(nav, 'Taza Roja', 'T1');
+  const b = await crearDesdePanel(nav, 'Plato Azul', 'P1');
+  await crearDesdePanel(nav, 'Vaso Verde', 'V1');
+  await nav.enviarArchivos(`${a}/fotos`, { fotos: [{ contenido: PNG, nombre: 'a.png' }] }, { desde: a });
+  const volver = '/admin/productos?filtro=todos&q=a';
+
+  const lista = await (await nav.pedir('/admin/productos')).text();
+  assert.match(lista, /data-seleccionar-todos/);
+  assert.match(lista, new RegExp(`name="ids" value="${idDeUbicacion(a)}" form="borrar-varios"`));
+
+  const pares = [['ids', idDeUbicacion(a)], ['ids', idDeUbicacion(b)], ['ids', idDeUbicacion(b)], ['volver', volver]];
+  const confirmacion = await nav.enviar('/admin/productos/borrar-varios', pares, { desde: '/admin/productos' });
+  assert.equal(confirmacion.status, 200);
+  const html = await confirmacion.text();
+  assert.match(html, /Taza Roja/);
+  assert.match(html, /Plato Azul/);
+  assert.doesNotMatch(html, /Vaso Verde/);
+  assert.match(html, /Sí, borrar 2 productos/);
+  assert.match(html, /Los pedidos ya hechos no cambian/);
+  assert.match(await (await nav.pedir('/admin/productos')).text(), /Taza Roja/, 'mostrar la confirmación no borra nada');
+
+  const borrado = await nav.enviar('/admin/productos/borrar-varios/confirmar', pares, { desde: '/admin/productos' });
+  assert.equal(borrado.headers.get('location'), volver);
+  const despues = await (await nav.pedir('/admin/productos')).text();
+  assert.match(despues, /Borramos 2 productos/);
+  assert.doesNotMatch(despues, /Taza Roja|Plato Azul/);
+  assert.match(despues, /Vaso Verde/);
+  assert.equal(readdirSync(path.join(dirSubidas, String(tiendaId))).length, 0, 'se borran las fotos');
+
+  const otraVez = await nav.enviar('/admin/productos/borrar-varios/confirmar', pares, { desde: '/admin/productos' });
+  assert.equal(otraVez.headers.get('location'), volver);
+  assert.match(await (await nav.pedir('/admin/productos')).text(), /Elegí al menos un producto para borrar/);
+});
+
+test('borrar varios no toca productos de otra tienda ni redirige afuera', async () => {
+  const { nav: navA } = await tiendaConPanel('borrara');
+  const ajeno = idDeUbicacion(await crearDesdePanel(navA, 'Remera Ajena', 'RA1'));
+  const { nav: navB } = await tiendaConPanel('borrarb');
+
+  const sinNada = await navB.enviar('/admin/productos/borrar-varios', [['ids', ajeno], ['ids', 'x']], { desde: '/admin/productos/nuevo' });
+  assert.equal(sinNada.headers.get('location'), '/admin/productos');
+  const afuera = await navB.enviar('/admin/productos/borrar-varios/confirmar', [['ids', ajeno], ['volver', 'https://otro-sitio.com']],
+    { desde: '/admin/productos/nuevo' });
+  assert.equal(afuera.headers.get('location'), '/admin/productos');
+  assert.match(await (await navA.pedir('/admin/productos')).text(), /Remera Ajena/);
+});
+
+test('borrar un producto que ya tiene pedidos no cambia el pedido', async () => {
+  const { nav, tiendaId } = await tiendaConPanel('borrarconpedido');
+  const ubicacion = await crearDesdePanel(nav, 'Taza Vendida', 'TV1', '5');
+  const pedido = await crearPedido(db, tiendaId, [{ sku: 'TV1', cantidad: 1 }], DATOS_PEDIDO);
+  await nav.enviar('/admin/productos/borrar-varios/confirmar', [['ids', idDeUbicacion(ubicacion)]], { desde: '/admin/productos' });
+  assert.doesNotMatch(await (await nav.pedir('/admin/productos')).text(), /Taza Vendida/);
+  const vista = await nav.pedir(`/admin/pedidos/${pedido.id}`);
+  assert.equal(vista.status, 200);
+  assert.match(await vista.text(), /Taza Vendida/);
 });
 
 test('buscar y filtrar en el listado', async () => {

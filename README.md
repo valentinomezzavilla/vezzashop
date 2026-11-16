@@ -14,7 +14,7 @@ es manual (link de pago de Mercado Pago que manda la tienda; ver [Qué falta](#q
 |---|---|
 | **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. |
 | **Pedidos** | Ve los pedidos que llegan desde la tienda (por atender, nuevos, pagados, enviados, entregados, cancelados), busca por número, nombre, teléfono o email, y en cada uno: productos, datos del cliente, entrega, pago, el próximo paso con un botón ("Marcar como pagado", "Enviado" / "Listo para retirar", "Entregado"), WhatsApp al cliente y cancelar (devuelve el stock). |
-| **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, sin stock, sin foto); oculta o destaca con un clic; crea, edita y borra productos. |
+| **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, sin stock, sin foto); oculta o destaca con un clic; crea, edita y borra productos, también varios a la vez (se marcan en la lista y se confirma viendo cuáles). |
 | **Editor de producto** | Nombre, descripción, marca, visible, destacado, categorías y variantes (hasta 3 tipos, por ejemplo Talle y Color) con SKU, precio, oferta y stock. Crea todas las combinaciones de una vez y aplica un precio o stock a todas las variantes. Hasta 10 fotos por producto, ordenables; la primera es la principal. |
 | **Categorías** | Crea, renombra, mueve dentro de otra y borra (con sus subcategorías; los productos no se borran). |
 | **Carga masiva** | Ver más abajo. |

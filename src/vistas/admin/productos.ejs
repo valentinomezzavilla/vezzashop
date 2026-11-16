@@ -46,10 +46,21 @@
       <a class="boton boton-secundario" href="/admin/productos">Ver todos</a>
     </section>
   <% } else { %>
+    <%# Las casillas de cada fila se asocian a este formulario con el atributo form: las filas ya tienen sus propios formularios. %>
+    <form id="borrar-varios" class="barra-seleccion" method="post" action="/admin/productos/borrar-varios" data-barra-seleccion>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="volver" value="<%= volver %>">
+      <button class="boton boton-peligro-suave boton-chico" type="submit">
+        <%- icono('basura', { tamano: 16 }) %> <span>Borrar seleccionados (<span data-cuenta-seleccion>0</span>)</span>
+      </button>
+    </form>
     <div class="tabla-contenedor">
       <table class="tabla tabla-productos">
         <thead>
           <tr>
+            <th scope="col" class="celda-seleccion">
+              <input type="checkbox" data-seleccionar-todos aria-label="Seleccionar todos los productos de la lista">
+            </th>
             <th scope="col">Producto</th>
             <th scope="col">Precio</th>
             <th scope="col" class="numero">Stock</th>
@@ -60,7 +71,10 @@
         <tbody>
         <% for (const p of productos) { %>
           <tr>
-            <td>
+            <td class="celda-seleccion">
+              <input type="checkbox" name="ids" value="<%= p.id %>" form="borrar-varios" aria-label="Seleccionar <%= p.nombre %>">
+            </td>
+            <td class="celda-producto-td">
               <a class="celda-producto" href="/admin/productos/<%= p.id %>">
                 <% if (p.urlFoto) { %><img class="miniatura" src="<%= p.urlFoto %>" alt="" loading="lazy">
                 <% } else { %><span class="miniatura" aria-hidden="true"><%- icono('imagen', { tamano: 16 }) %></span><% } %>

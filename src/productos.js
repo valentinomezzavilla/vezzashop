@@ -331,6 +331,43 @@ export function borrarProducto(db, tiendaId, id) {
   });
 }
 
+// ids que llegan de un formulario (uno, varios o ninguno): enteros positivos, sin repetir, hasta 1000.
+export function idsDeFormulario(valor) {
+  const lista = Array.isArray(valor) ? valor : valor === undefined || valor === null ? [] : [valor];
+  const ids = new Set();
+  for (const v of lista) {
+    const n = Number(v);
+    if (Number.isSafeInteger(n) && n > 0) ids.add(n);
+    if (ids.size >= 1000) break;
+  }
+  return [...ids];
+}
+
+// Los productos de la tienda entre esos ids, para mostrarlos antes de borrarlos. Los de otra tienda no aparecen.
+export async function productosParaBorrar(db, tiendaId, ids) {
+  if (ids.length === 0) return [];
+  return db
+    .prepare(
+      `SELECT p.id, p.nombre, ${PRIMERA_FOTO} AS foto,
+              (SELECT count(*) FROM variantes v WHERE v.producto_id = p.id) AS variantes
+       FROM productos p WHERE p.tienda_id = ? AND p.id = ANY(?)
+       ORDER BY lower(p.nombre), p.id`,
+    )
+    .all(tiendaId, ids);
+}
+
+// Borra juntos los productos de la tienda entre esos ids (con sus variantes y fotos, por ON DELETE CASCADE).
+// Devuelve cuántos se borraron y los archivos de sus fotos, para borrarlos del disco.
+export function borrarProductos(db, tiendaId, ids) {
+  if (ids.length === 0) return Promise.resolve({ borrados: 0, fotos: [] });
+  return enTransaccion(db, async (tx) => {
+    const fotos = (await tx.prepare('SELECT archivo FROM producto_fotos WHERE tienda_id = ? AND producto_id = ANY(?)').all(tiendaId, ids))
+      .map((f) => f.archivo);
+    const { rows } = await tx.prepare('DELETE FROM productos WHERE tienda_id = ? AND id = ANY(?) RETURNING id').run(tiendaId, ids);
+    return { borrados: rows.length, fotos };
+  });
+}
+
 // Cambia visible o destacado. Devuelve false si el producto no es de la tienda.
 export async function cambiarMarca(db, tiendaId, id, campo, valor) {
   if (campo !== 'visible' && campo !== 'destacado') throw new Error(`Campo inválido: ${campo}`);
