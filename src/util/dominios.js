@@ -3,7 +3,7 @@
 // (por ejemplo panel en tiendas.vezzadev.com y tiendas en <nombre>.vezzadev.com).
 
 // Subdominios que no pueden ser tiendas: se usan para el panel u otros servicios.
-export const SUBDOMINIOS_RESERVADOS = new Set(['www', 'admin', 'panel', 'api', 'app', 'mail', 'tiendas', 'coolify']);
+export const SUBDOMINIOS_RESERVADOS = new Set(['www', 'admin', 'panel', 'api', 'app', 'mail', 'tiendas', 'coolify', 'plataforma', 'superadmin']);
 
 // El dominio donde viven las tiendas (<slug>.<dominio>): DOMINIO_TIENDAS, o DOMINIO si no se configuró.
 export const dominioDeTiendas = (config) => config.dominioTiendas ?? config.dominio;

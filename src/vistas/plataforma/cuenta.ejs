@@ -1,0 +1,34 @@
+<%- include('parciales/cabecera', { titulo: 'Mi cuenta' }) %>
+<%
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<header class="encabezado">
+  <div>
+    <h1>Mi cuenta</h1>
+    <p class="texto-suave"><span>Ingresás con <strong><%= superadmin.email %></strong>.</span></p>
+  </div>
+</header>
+<form method="post" action="/plataforma/cuenta/clave" class="tarjeta formulario formulario-angosto">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="text" name="usuario" value="<%= superadmin.email %>" autocomplete="username" hidden>
+  <h2>Cambiar mi clave</h2>
+  <div class="campo">
+    <label for="claveActual">Clave actual</label>
+    <input id="claveActual" type="password" name="claveActual" autocomplete="current-password" required<%- invalido('claveActual') %>>
+    <%- error('claveActual') %>
+  </div>
+  <div class="campo">
+    <label for="claveNueva">Clave nueva</label>
+    <input id="claveNueva" type="password" name="claveNueva" autocomplete="new-password" minlength="<%= largoMinimoClave %>" required<%- invalido('claveNueva') %>>
+    <span class="ayuda">Al menos <%= largoMinimoClave %> caracteres. Es la clave de todos tus clientes: elegí una larga.</span>
+    <%- error('claveNueva') %>
+  </div>
+  <div class="campo">
+    <label for="claveRepetida">Repetí la clave nueva</label>
+    <input id="claveRepetida" type="password" name="claveRepetida" autocomplete="new-password" required<%- invalido('claveRepetida') %>>
+    <%- error('claveRepetida') %>
+  </div>
+  <div><button class="boton" type="submit"><%- icono('candado', { tamano: 18 }) %> Cambiar clave</button></div>
+</form>
+<%- include('parciales/pie') %>

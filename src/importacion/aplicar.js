@@ -25,7 +25,12 @@ const aEnteroSQL = (booleano) => (booleano === null ? null : Number(booleano));
 // Identifica una foto nueva de un producto en el mapa de archivos ya guardados que recibe aplicarImportacion.
 export const claveFoto = (slug, huella) => `${slug}\u0000${huella}`;
 
-async function analizar(db, tiendaId, productos) {
+// limites (opcional): { maxProductos, maxFotos } del plan de la tienda. Sin ellos valen los máximos de siempre.
+async function analizar(db, tiendaId, productos, limites = {}) {
+  const maxFotos = Math.min(MAX_FOTOS, limites.maxFotos ?? MAX_FOTOS);
+  const topeProductos = limites.maxProductos ?? null;
+  const yaCargados = topeProductos === null ? 0 : Number((await db.prepare('SELECT count(*) AS n FROM productos WHERE tienda_id = ?').get(tiendaId)).n);
+  let avisoTope = false;
   const buscarProducto = db.prepare(
     'SELECT id, nombre, atributo1, atributo2, atributo3 FROM productos WHERE tienda_id = ? AND slug = ?',
   );
@@ -62,6 +67,14 @@ async function analizar(db, tiendaId, productos) {
     }
     if (existente) resumen.productosActualizados++;
     else resumen.productosNuevos++;
+    // Una sola vez, en el primer producto que se pasa del tope del plan.
+    if (!existente && !avisoTope && topeProductos !== null && yaCargados + resumen.productosNuevos > topeProductos) {
+      avisoTope = true;
+      errores.push({
+        fila: producto.primeraFila,
+        mensaje: `Tu plan permite hasta ${topeProductos} productos y ya tenés ${yaCargados}: no se pueden crear más. Sacá los productos nuevos de la planilla o ampliá tu plan`,
+      });
+    }
 
     const variantes = [];
     for (const variante of producto.variantes) {
@@ -94,10 +107,10 @@ async function analizar(db, tiendaId, productos) {
     const conocidas = new Set(huellasExistentes);
     const fotosNuevas = (producto.fotos ?? []).filter((foto) => !conocidas.has(foto.huella));
     const totalFotos = huellasExistentes.length + fotosNuevas.length;
-    if (fotosNuevas.length > 0 && totalFotos > MAX_FOTOS) {
+    if (fotosNuevas.length > 0 && totalFotos > maxFotos) {
       errores.push({
         fila: producto.primeraFila,
-        mensaje: `"${existente?.nombre ?? producto.nombre}" quedaría con ${totalFotos} fotos y el máximo es ${MAX_FOTOS}`,
+        mensaje: `"${existente?.nombre ?? producto.nombre}" quedaría con ${totalFotos} fotos y el máximo es ${maxFotos}`,
       });
     }
     resumen.fotosNuevas += fotosNuevas.length;
@@ -111,8 +124,8 @@ async function analizar(db, tiendaId, productos) {
 }
 
 // fotosAGuardar: las fotos que hay que escribir antes de aplicarImportacion (una por producto y huella).
-export async function previsualizar(db, tiendaId, productos) {
-  const { resumen, errores, fotosAGuardar } = await analizar(db, tiendaId, productos);
+export async function previsualizar(db, tiendaId, productos, limites = {}) {
+  const { resumen, errores, fotosAGuardar } = await analizar(db, tiendaId, productos, limites);
   return { resumen, errores, fotosAGuardar };
 }
 
@@ -129,9 +142,9 @@ async function obtenerCategoria(db, tiendaId, ruta) {
 }
 
 // archivos: claveFoto(slug, huella) -> nombre del archivo ya guardado. Las fotos nuevas sin archivo no se agregan.
-export function aplicarImportacion(db, tiendaId, productos, archivos = new Map()) {
+export function aplicarImportacion(db, tiendaId, productos, archivos = new Map(), limites = {}) {
   return enTransaccion(db, async (tx) => {
-    const { resumen, errores, plan } = await analizar(tx, tiendaId, productos);
+    const { resumen, errores, plan } = await analizar(tx, tiendaId, productos, limites);
     if (errores.length > 0) throw new ErrorDeImportacion(errores);
 
     const insertarProducto = tx.prepare(

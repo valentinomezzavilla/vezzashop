@@ -6,8 +6,10 @@ import path from 'node:path';
 import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
 import { rutasTienda } from './rutas/tienda.js';
+import { rutasPlataforma } from './rutas/plataforma.js';
 import { buscarTiendaPorSlug } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
+import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { dominioDeTiendas, slugDeHost, urlPanel } from './util/dominios.js';
 
@@ -22,6 +24,7 @@ export function crearApp({ db, config }) {
   app.set('view engine', 'ejs');
   Object.assign(app.locals, {
     formatearPrecio,
+    formatearDia,
     icono,
     usuario: null,
     aviso: null,
@@ -72,6 +75,11 @@ export function crearApp({ db, config }) {
     if (slug === null) return next();
     req.tienda = await buscarTiendaPorSlug(db, slug);
     if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });
+    // Tienda suspendida por quien administra la plataforma: los compradores ven un aviso (y los buscadores, que es temporal).
+    if (req.tienda.estado === 'suspendida') {
+      res.set('Cache-Control', 'no-store').set('Retry-After', '86400');
+      return res.status(503).render('tienda/suspendida', { nombre: req.tienda.nombre });
+    }
     vidriera(req, res, next);
   });
 
@@ -89,6 +97,7 @@ export function crearApp({ db, config }) {
   );
 
   app.use('/admin', rutasAdmin({ db, config }));
+  app.use('/plataforma', rutasPlataforma({ db, config }));
   app.get('/', (req, res) => res.redirect('/admin'));
 
   app.use((req, res) => {

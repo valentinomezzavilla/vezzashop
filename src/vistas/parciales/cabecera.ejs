@@ -70,3 +70,6 @@
 <% if (aviso && !aviso.seccion) { %>
   <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%- icono(aviso.tipo === 'ok' ? 'check' : 'alerta', { tamano: 18 }) %><span><%= aviso.texto %></span></p>
 <% } %>
+<% if (locals.suspendida) { %>
+  <p class="aviso aviso-error"><%- icono('candado', { tamano: 18 }) %><span><strong>Tu tienda está suspendida.</strong> Los compradores no pueden entrar. Podés mirar tus datos, pero no cambiarlos.<% if (locals.motivoSuspension) { %> Motivo: <%= motivoSuspension %>.<% } %><% if (locals.contactoPlataforma) { %> Para reactivarla, contactanos: <%= contactoPlataforma %>.<% } else { %> Contactanos para reactivarla.<% } %></span></p>
+<% } %>

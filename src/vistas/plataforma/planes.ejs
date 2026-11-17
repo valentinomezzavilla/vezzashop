@@ -1,0 +1,48 @@
+<%- include('parciales/cabecera', { titulo: 'Planes' }) %>
+<%
+  const tope = (valor, unidad) => (valor === null ? 'Sin tope' : `${valor} ${unidad}`);
+%>
+<header class="encabezado">
+  <div>
+    <h1>Planes</h1>
+    <p class="texto-suave">Cada cliente tiene un plan. Los topes se aplican en su panel: al llegar, no puede cargar más y le avisamos que amplíe.</p>
+  </div>
+  <div class="acciones">
+    <a class="boton" href="/plataforma/planes/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo plan</a>
+  </div>
+</header>
+
+<div class="tabla-contenedor">
+  <table class="tabla tabla-planes">
+    <thead>
+      <tr>
+        <th scope="col">Plan</th>
+        <th scope="col" class="numero">Precio por mes</th>
+        <th scope="col">Productos</th>
+        <th scope="col">Fotos por producto</th>
+        <th scope="col">Banners</th>
+        <th scope="col" class="numero">Clientes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (const p of planes) { %>
+        <tr>
+          <td>
+            <a class="celda-producto" href="/plataforma/planes/<%= p.id %>">
+              <span class="celda-producto-textos">
+                <span class="celda-producto-nombre"><%= p.nombre %></span>
+                <% if (!p.activo) { %><span class="ayuda">Ya no se ofrece</span><% } %>
+              </span>
+            </a>
+          </td>
+          <td data-etiqueta="Precio por mes" class="numero"><%= p.precioCentavos ? formatearPrecio(p.precioCentavos) : 'Gratis' %></td>
+          <td data-etiqueta="Productos"><%= tope(p.maxProductos, 'productos') %></td>
+          <td data-etiqueta="Fotos por producto"><%= tope(p.maxFotos, 'fotos') %></td>
+          <td data-etiqueta="Banners"><%= tope(p.maxBanners, 'banners') %></td>
+          <td data-etiqueta="Clientes" class="numero"><%= Number(p.clientes) %></td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+<%- include('parciales/pie') %>

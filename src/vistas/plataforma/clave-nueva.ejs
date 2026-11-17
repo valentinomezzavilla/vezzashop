@@ -1,0 +1,33 @@
+<%- include('parciales/cabecera', { titulo: 'Clave nueva' }) %>
+<%
+  const mensaje = [
+    `Hola! Te generé una clave nueva para tu panel de "${cliente.nombre}".`,
+    '',
+    `Panel: ${urlPanel}`,
+    `Usuario: ${email}`,
+    `Clave: ${clave}`,
+    '',
+    'Cuando entres, cambiala desde la sección Cuenta.',
+  ].join('\n');
+%>
+<header class="encabezado">
+  <div>
+    <h1>Clave nueva para <%= cliente.nombre %></h1>
+    <p class="texto-suave"><span>Guardala o copiá el mensaje ahora: <strong>no se vuelve a mostrar</strong>. La anterior ya no sirve.</span></p>
+  </div>
+</header>
+<section class="tarjeta seccion-editor formulario-angosto">
+  <dl class="datos-pedido">
+    <div><dt>Usuario</dt><dd><%= email %></dd></div>
+    <div><dt>Clave</dt><dd><code class="clave-generada"><%= clave %></code></dd></div>
+  </dl>
+  <div class="campo">
+    <label for="mensaje">Mensaje para mandarle</label>
+    <textarea id="mensaje" rows="7" readonly><%= mensaje %></textarea>
+  </div>
+  <div class="acciones">
+    <button class="boton" type="button" data-copiar="<%= mensaje %>"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar mensaje</span></button>
+    <a class="boton boton-secundario" href="/plataforma/clientes/<%= cliente.id %>">Volver al cliente</a>
+  </div>
+</section>
+<%- include('parciales/pie') %>

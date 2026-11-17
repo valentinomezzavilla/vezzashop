@@ -1,0 +1,100 @@
+<%- include('parciales/cabecera', { titulo: 'Clientes' }) %>
+<%
+  const textoCobro = (c) => {
+    const { estado, dias } = c.cobro;
+    if (estado === 'sin-vencimiento') return ['Sin vencimiento', ''];
+    if (estado === 'vencido') return [`Venció el ${formatearDia(c.venceEn)}`, 'pastilla-cancelado'];
+    if (estado === 'por-vencer') return [dias === 0 ? 'Vence hoy' : `Vence en ${plural(dias, 'día', 'días')}`, 'pastilla-ambar'];
+    return [`Al día hasta el ${formatearDia(c.venceEn)}`, 'pastilla-ok'];
+  };
+%>
+<header class="encabezado">
+  <div>
+    <h1>Clientes</h1>
+    <p class="texto-suave"><%= plural(resumen.clientes, 'cliente', 'clientes') %> en la plataforma</p>
+  </div>
+  <div class="acciones">
+    <a class="boton" href="/plataforma/clientes/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo cliente</a>
+  </div>
+</header>
+
+<section class="numeros" aria-label="Resumen">
+  <div class="numero-tarjeta">
+    <span class="numero-icono numero-icono-verde" aria-hidden="true"><%- icono('check') %></span>
+    <strong><%= resumen.activos %></strong><span>activos</span>
+  </div>
+  <div class="numero-tarjeta<%= resumen.suspendidos ? ' numero-alerta' : '' %>">
+    <span class="numero-icono numero-icono-rojo" aria-hidden="true"><%- icono('candado') %></span>
+    <strong><%= resumen.suspendidos %></strong><span>suspendidos</span>
+  </div>
+  <div class="numero-tarjeta">
+    <span class="numero-icono" aria-hidden="true"><%- icono('reloj') %></span>
+    <strong><%= resumen.porVencer + resumen.vencidos %></strong><span><%= resumen.vencidos ? `${resumen.vencidos} vencido${resumen.vencidos === 1 ? '' : 's'} y ${resumen.porVencer} por vencer` : 'por vencer en 7 días' %></span>
+  </div>
+  <div class="numero-tarjeta">
+    <span class="numero-icono numero-icono-azul" aria-hidden="true"><%- icono('billete') %></span>
+    <strong><%= formatearPrecio(resumen.ingresoMensualCentavos).replace(/,00$/, '') %></strong><span>por mes en planes activos</span>
+  </div>
+</section>
+
+<div class="barra-herramientas">
+  <nav class="pestanias" aria-label="Filtrar clientes">
+    <% for (const [clave, opcion] of Object.entries(filtros)) { %>
+      <a href="/plataforma/clientes?filtro=<%= clave %><%= busqueda ? `&q=${encodeURIComponent(busqueda)}` : '' %>"<%- clave === filtro ? ' class="activa" aria-current="page"' : '' %>>
+        <%= opcion.titulo %> <span class="pestania-cuenta"><%= cuentas[clave] %></span>
+      </a>
+    <% } %>
+  </nav>
+  <form class="buscador" method="get" action="/plataforma/clientes" role="search">
+    <input type="hidden" name="filtro" value="<%= filtro %>">
+    <label class="visualmente-oculto" for="q">Buscar clientes</label>
+    <%- icono('lupa', { tamano: 18 }) %>
+    <input id="q" type="search" name="q" value="<%= busqueda %>" placeholder="Nombre, link o email">
+  </form>
+</div>
+
+<% if (clientes.length === 0) { %>
+  <section class="tarjeta estado-vacio">
+    <div class="estado-vacio-icono" aria-hidden="true"><%- icono(resumen.clientes === 0 ? 'tienda' : 'lupa', { tamano: 28 }) %></div>
+    <h2><%= resumen.clientes === 0 ? 'Todavía no tenés clientes' : 'No hay clientes que coincidan' %></h2>
+    <p class="texto-suave"><%= resumen.clientes === 0 ? 'Dá de alta al primero: se crea su tienda y su acceso, y te mostramos la clave para que se la pases.' : 'Probá con otro filtro o con otra búsqueda.' %></p>
+    <a class="boton" href="<%= resumen.clientes === 0 ? '/plataforma/clientes/nuevo' : '/plataforma/clientes' %>"><%= resumen.clientes === 0 ? 'Nuevo cliente' : 'Ver todos' %></a>
+  </section>
+<% } else { %>
+  <div class="tabla-contenedor">
+    <table class="tabla tabla-clientes">
+      <thead>
+        <tr>
+          <th scope="col">Cliente</th>
+          <th scope="col">Plan</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Cobro</th>
+          <th scope="col" class="numero">Productos</th>
+          <th scope="col" class="numero">Pedidos</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const c of clientes) { %>
+          <% const [cobro, claseCobro] = textoCobro(c) %>
+          <tr>
+            <td>
+              <a class="celda-producto" href="/plataforma/clientes/<%= c.id %>">
+                <span class="miniatura" aria-hidden="true"><%= c.nombre.charAt(0).toUpperCase() %></span>
+                <span class="celda-producto-textos">
+                  <span class="celda-producto-nombre"><%= c.nombre %></span>
+                  <span class="ayuda"><%= c.email ?? 'sin usuario' %> · <%= c.slug %></span>
+                </span>
+              </a>
+            </td>
+            <td data-etiqueta="Plan"><%= c.planNombre ?? 'Sin plan' %></td>
+            <td data-etiqueta="Estado"><span class="pastilla <%= c.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= c.estado === 'activa' ? 'Activa' : 'Suspendida' %></span></td>
+            <td data-etiqueta="Cobro"><span class="pastilla <%= claseCobro %>"><%= cobro %></span></td>
+            <td data-etiqueta="Productos" class="numero"><%= c.productos %><% if (c.maxProductos) { %><span class="ayuda"> / <%= c.maxProductos %></span><% } %></td>
+            <td data-etiqueta="Pedidos" class="numero"><%= c.pedidos %></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+<%- include('parciales/pie') %>

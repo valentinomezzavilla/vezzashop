@@ -36,6 +36,38 @@
 
 <section class="ajuste">
   <div class="ajuste-intro">
+    <h2>Tu plan</h2>
+    <p class="texto-suave">Lo que incluye tu servicio y cuánto estás usando.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <dl class="datos-pedido">
+      <div><dt>Plan</dt><dd><%= limites.plan ? limites.plan.nombre : 'Sin plan' %></dd></div>
+      <div>
+        <dt>Vencimiento</dt>
+        <dd>
+          <% if (!limites.venceEn) { %>Sin vencimiento
+          <% } else if (limites.cobro.estado === 'vencido') { %><span class="pastilla pastilla-cancelado">Venció el <%= formatearDia(limites.venceEn) %></span>
+          <% } else if (limites.cobro.estado === 'por-vencer') { %><span class="pastilla pastilla-ambar">Vence el <%= formatearDia(limites.venceEn) %></span>
+          <% } else { %>Pago hasta el <%= formatearDia(limites.venceEn) %><% } %>
+        </dd>
+      </div>
+    </dl>
+    <div class="uso-plan">
+      <div>
+        <div class="uso-plan-fila"><span>Productos</span><strong><%= uso.productos %><%= limites.maxProductos === null ? '' : ` de ${limites.maxProductos}` %></strong></div>
+        <% if (limites.maxProductos !== null) { %>
+          <div class="progreso" role="progressbar" aria-label="Productos usados" aria-valuemin="0" aria-valuemax="<%= limites.maxProductos %>" aria-valuenow="<%= uso.productos %>"><span style="width: <%= Math.min(100, Math.round((uso.productos / limites.maxProductos) * 100)) %>%"></span></div>
+        <% } else { %><span class="ayuda">Sin límite</span><% } %>
+      </div>
+      <div class="uso-plan-fila"><span>Fotos por producto</span><strong>hasta <%= limites.maxFotos %></strong></div>
+      <div class="uso-plan-fila"><span>Banners en la portada</span><strong><%= uso.banners %> de <%= limites.maxBanners %></strong></div>
+    </div>
+    <p class="ayuda">¿Necesitás más? <%= contactoPlataforma ? `Contactanos: ${contactoPlataforma}.` : 'Contactanos para ampliar tu plan.' %></p>
+  </div>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
     <h2>Acceso</h2>
     <p class="texto-suave">Ingresás al panel con <strong><%= email %></strong>.</p>
   </div>

@@ -224,7 +224,7 @@
 <section class="ajuste" id="banners">
   <div class="ajuste-intro">
     <h2>Banners de bienvenida</h2>
-    <p class="texto-suave">Las imágenes grandes del carrusel de la portada, en este orden. Hasta <%= maxBanners %>.</p>
+    <p class="texto-suave">Las imágenes grandes del carrusel de la portada, en este orden. <%= maxBanners === 0 ? 'Tu plan no incluye banners.' : `Hasta ${maxBanners}.` %></p>
     <p class="ayuda">Tamaño recomendado: 1600 × 600 px para computadora y 800 × 1000 px para celular.</p>
   </div>
   <div class="tarjeta ajuste-campos">

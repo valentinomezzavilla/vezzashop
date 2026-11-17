@@ -1,0 +1,38 @@
+<%- include('parciales/cabecera', { titulo: 'Cliente creado' }) %>
+<%
+  const mensaje = [
+    `¡Hola! Ya está lista tu tienda "${tienda.nombre}".`,
+    '',
+    `Tu tienda: ${urlTienda}`,
+    `Para administrarla: ${urlPanel}`,
+    `Usuario: ${email}`,
+    `Clave: ${clave}`,
+    '',
+    'Cuando entres, cambiá la clave desde la sección Cuenta.',
+  ].join('\n');
+%>
+<header class="encabezado">
+  <div>
+    <h1>Creamos la tienda de <%= tienda.nombre %></h1>
+    <p class="texto-suave"><span>Guardá o copiá estos datos ahora: <strong>la clave no se vuelve a mostrar</strong>.</span></p>
+  </div>
+</header>
+
+<section class="tarjeta seccion-editor formulario-angosto">
+  <dl class="datos-pedido">
+    <div><dt>Tienda</dt><dd><a href="<%= urlTienda %>" target="_blank" rel="noopener"><%= urlTienda.replace(/^https?:\/\//, '') %></a></dd></div>
+    <div><dt>Panel</dt><dd><a href="<%= urlPanel %>" target="_blank" rel="noopener"><%= urlPanel.replace(/^https?:\/\//, '') %></a></dd></div>
+    <div><dt>Usuario</dt><dd><%= email %></dd></div>
+    <div><dt>Clave</dt><dd><code class="clave-generada"><%= clave %></code></dd></div>
+  </dl>
+  <div class="campo">
+    <label for="mensaje">Mensaje para mandarle al cliente</label>
+    <textarea id="mensaje" rows="8" readonly><%= mensaje %></textarea>
+  </div>
+  <div class="acciones">
+    <button class="boton" type="button" data-copiar="<%= mensaje %>"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar mensaje</span></button>
+    <a class="boton boton-secundario" href="/plataforma/clientes">Ir al listado</a>
+    <a class="boton boton-secundario" href="/plataforma/clientes/<%= tienda.id %>">Ver cliente</a>
+  </div>
+</section>
+<%- include('parciales/pie') %>

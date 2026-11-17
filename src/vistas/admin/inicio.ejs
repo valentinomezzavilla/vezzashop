@@ -12,6 +12,16 @@
   </div>
 </header>
 
+<%# Aviso de cobro: el administrador de la plataforma carga hasta cuándo tiene pago el plan. %>
+<% if (limites.cobro.estado === 'vencido' || limites.cobro.estado === 'por-vencer') { %>
+  <% const vencido = limites.cobro.estado === 'vencido' %>
+  <p class="aviso <%= vencido ? 'aviso-error' : 'aviso-info' %>">
+    <%- icono(vencido ? 'alerta' : 'reloj', { tamano: 18 }) %>
+    <span><strong><%= vencido ? `Tu plan venció el ${formatearDia(limites.venceEn)}.` : (limites.cobro.dias === 0 ? 'Tu plan vence hoy.' : `Tu plan vence el ${formatearDia(limites.venceEn)}.`) %></strong>
+    <%= vencido ? 'Para que tu tienda siga abierta, regularizá el pago.' : 'Para que no se corte el servicio, acordate de abonarlo.' %><% if (locals.contactoPlataforma) { %> Contacto: <%= contactoPlataforma %>.<% } %></span>
+  </p>
+<% } %>
+
 <% if (urlMiTienda) { %>
   <section class="tarjeta enlace-tienda">
     <div>

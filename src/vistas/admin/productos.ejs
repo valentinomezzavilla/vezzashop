@@ -3,7 +3,7 @@
 <header class="encabezado">
   <div>
     <h1>Productos</h1>
-    <p class="texto-suave"><%= cuentas.todos %> producto<%= cuentas.todos === 1 ? '' : 's' %> · <%= cuentas.visibles %> visible<%= cuentas.visibles === 1 ? '' : 's' %> en la tienda</p>
+    <p class="texto-suave"><%= cuentas.todos %> producto<%= cuentas.todos === 1 ? '' : 's' %> · <%= cuentas.visibles %> visible<%= cuentas.visibles === 1 ? '' : 's' %> en la tienda<% if (limites.maxProductos !== null) { %> · tu plan permite hasta <%= limites.maxProductos %><% } %></p>
   </div>
   <div class="acciones">
     <a class="boton boton-secundario" href="/admin/importar"><%- icono('subir', { tamano: 18 }) %> Carga masiva</a>

@@ -5,7 +5,8 @@ import { SUBDOMINIOS_RESERVADOS } from './util/dominios.js';
 
 const LARGO_MAXIMO_SUBDOMINIO = 63;
 
-export async function crearTienda(db, { nombre, email }) {
+// planId y venceEn son opcionales: una tienda sin plan no tiene topes, y sin vencimiento no vence.
+export async function crearTienda(db, { nombre, email, planId = null, venceEn = null }) {
   const slug = slugificar(nombre ?? '');
   if (!slug) throw new Error('El nombre de la tienda tiene que tener letras o números');
   // El slug es el subdominio de la tienda, así que tiene que ser un subdominio válido.
@@ -21,10 +22,14 @@ export async function crearTienda(db, { nombre, email }) {
     throw new Error(`Ya existe un usuario con el email ${email}`);
   }
 
+  if (planId !== null && !(await db.prepare('SELECT 1 FROM planes WHERE id = ?').get(planId))) throw new Error('El plan elegido no existe');
+
   const clave = generarClave();
   const hash = await hashClave(clave);
   return enTransaccion(db, async (tx) => {
-    const { rows } = await tx.prepare('INSERT INTO tiendas (nombre, slug) VALUES (?, ?) RETURNING id').run(nombre, slug);
+    const { rows } = await tx
+      .prepare('INSERT INTO tiendas (nombre, slug, plan_id, vence_en) VALUES (?, ?, ?, ?) RETURNING id')
+      .run(nombre, slug, planId, venceEn);
     const tiendaId = rows[0].id;
     await tx.prepare('INSERT INTO usuarios (tienda_id, email, hash_clave) VALUES (?, ?, ?)').run(tiendaId, email, hash);
     return { tienda: { id: tiendaId, nombre, slug }, email, clave };
@@ -32,11 +37,15 @@ export async function crearTienda(db, { nombre, email }) {
 }
 
 export async function buscarTiendaPorSlug(db, slug) {
-  return (await db.prepare('SELECT id, nombre, slug FROM tiendas WHERE slug = ?').get(slug)) ?? null;
+  return (await db.prepare('SELECT id, nombre, slug, estado FROM tiendas WHERE slug = ?').get(slug)) ?? null;
 }
 
 export async function buscarTienda(db, id) {
-  return (await db.prepare('SELECT id, nombre, slug FROM tiendas WHERE id = ?').get(id)) ?? null;
+  return (
+    (await db
+      .prepare('SELECT id, nombre, slug, estado, motivo_suspension AS "motivoSuspension" FROM tiendas WHERE id = ?')
+      .get(id)) ?? null
+  );
 }
 
 export function listarTiendas(db) {

@@ -1,0 +1,48 @@
+<%- include('parciales/cabecera', { titulo: 'Nuevo cliente' }) %>
+<%
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<header class="encabezado">
+  <div>
+    <a class="volver" href="/plataforma/clientes"><%- icono('izquierda', { tamano: 16 }) %> Clientes</a>
+    <h1>Nuevo cliente</h1>
+    <p class="texto-suave">Creamos su tienda y su acceso. Al terminar te mostramos la clave, una sola vez, para que se la pases.</p>
+  </div>
+</header>
+
+<% if (errores.general) { %>
+  <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= errores.general %></span></p>
+<% } %>
+
+<form method="post" action="/plataforma/clientes/nuevo" class="tarjeta formulario formulario-angosto">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="campo">
+    <label for="nombre">Nombre de la tienda</label>
+    <input id="nombre" type="text" name="nombre" value="<%= valores.nombre ?? '' %>" maxlength="80" required autofocus aria-describedby="ayuda-nombre">
+    <span class="ayuda" id="ayuda-nombre">Define el link de la tienda, que después no cambia (por ejemplo "Ufo Ambos" → ufo-ambos).</span>
+  </div>
+  <div class="campo">
+    <label for="email">Email del dueño</label>
+    <input id="email" type="email" name="email" value="<%= valores.email ?? '' %>" autocomplete="off" required aria-describedby="ayuda-email">
+    <span class="ayuda" id="ayuda-email">Con este email ingresa a su panel. No puede estar en otra tienda.</span>
+  </div>
+  <div class="campo">
+    <label for="planId">Plan</label>
+    <select id="planId" name="planId" required<%- invalido('planId') %>>
+      <option value="">Elegí un plan</option>
+      <% for (const plan of planes) { %>
+        <option value="<%= plan.id %>"<%= String(valores.planId) === String(plan.id) ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %></option>
+      <% } %>
+    </select>
+    <%- error('planId') %>
+  </div>
+  <div class="campo">
+    <label for="venceEn">Vence el <span class="opcional">(opcional)</span></label>
+    <input id="venceEn" type="date" name="venceEn" value="<%= valores.venceEn ?? '' %>"<%- invalido('venceEn') %> aria-describedby="ayuda-venceEn">
+    <span class="ayuda" id="ayuda-venceEn">Hasta cuándo tiene pago el servicio. Si lo dejás vacío, no vence. Después lo extendés registrando pagos.</span>
+    <%- error('venceEn') %>
+  </div>
+  <div><button class="boton boton-grande" type="submit"><%- icono('mas', { tamano: 18 }) %> Crear cliente</button></div>
+</form>
+<%- include('parciales/pie') %>

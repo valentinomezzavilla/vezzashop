@@ -1,0 +1,73 @@
+<%- include('parciales/cabecera', { titulo: plan ? plan.nombre : 'Nuevo plan' }) %>
+<%
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<header class="encabezado">
+  <div>
+    <a class="volver" href="/plataforma/planes"><%- icono('izquierda', { tamano: 16 }) %> Planes</a>
+    <h1><%= plan ? plan.nombre : 'Nuevo plan' %></h1>
+    <p class="texto-suave">Dejá un tope vacío para no limitarlo.</p>
+  </div>
+</header>
+
+<form method="post" action="/plataforma/planes/<%= plan ? plan.id : 'nuevo' %>" class="tarjeta formulario formulario-angosto">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="campo">
+    <label for="nombre">Nombre del plan</label>
+    <input id="nombre" type="text" name="nombre" value="<%= valores.nombre %>" maxlength="40" required autofocus<%- invalido('nombre') %>>
+    <%- error('nombre') %>
+  </div>
+  <div class="campo">
+    <label for="precio">Precio por mes</label>
+    <div class="campo-con-prefijo campo-con-sufijo">
+      <span class="sufijo">$</span>
+      <input id="precio" type="text" name="precio" value="<%= valores.precio %>" inputmode="decimal" placeholder="0" autocomplete="off"<%- invalido('precio') %>>
+    </div>
+    <span class="ayuda">Para tu resumen de ingresos; el cobro lo hacés vos. Vacío o 0: gratis.</span>
+    <%- error('precio') %>
+  </div>
+  <div class="ajuste-campos-dos">
+    <div class="campo">
+      <label for="maxProductos">Productos</label>
+      <input id="maxProductos" type="text" name="maxProductos" value="<%= valores.maxProductos %>" inputmode="numeric" placeholder="Sin tope"<%- invalido('maxProductos') %>>
+      <%- error('maxProductos') %>
+    </div>
+    <div class="campo">
+      <label for="maxFotos">Fotos por producto</label>
+      <input id="maxFotos" type="text" name="maxFotos" value="<%= valores.maxFotos %>" inputmode="numeric" placeholder="Hasta 10"<%- invalido('maxFotos') %>>
+      <%- error('maxFotos') %>
+    </div>
+    <div class="campo">
+      <label for="maxBanners">Banners de la portada</label>
+      <input id="maxBanners" type="text" name="maxBanners" value="<%= valores.maxBanners %>" inputmode="numeric" placeholder="Hasta 6"<%- invalido('maxBanners') %>>
+      <%- error('maxBanners') %>
+    </div>
+  </div>
+  <label class="interruptor">
+    <input type="checkbox" name="activo" value="1"<%= valores.activo === true || valores.activo === '1' || valores.activo === 'on' ? ' checked' : '' %>>
+    <span class="interruptor-pista" aria-hidden="true"></span>
+    <span class="interruptor-texto"><strong>Se ofrece a clientes nuevos</strong><span class="ayuda">Si lo apagás, los clientes que ya lo tienen lo conservan, pero no se puede elegir para otros.</span></span>
+  </label>
+  <div class="acciones">
+    <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar plan</button>
+  </div>
+</form>
+
+<% if (plan) { %>
+  <section class="tarjeta seccion-editor zona-peligro formulario-angosto separado">
+    <h2>Borrar plan</h2>
+    <p class="ayuda"><%= Number(plan.clientes) ? `Tiene ${plural(Number(plan.clientes), 'cliente', 'clientes')}: para borrarlo, primero cambialos de plan. Mientras tanto, podés desactivarlo.` : 'No lo usa ningún cliente.' %></p>
+    <% if (!Number(plan.clientes)) { %>
+      <details class="confirmar">
+        <summary class="boton boton-peligro-suave boton-chico"><%- icono('basura', { tamano: 16 }) %> Borrar plan</summary>
+        <form method="post" action="/plataforma/planes/<%= plan.id %>/borrar" class="confirmar-cuerpo">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <p>¿Seguro que querés borrar el plan "<%= plan.nombre %>"?</p>
+          <button class="boton boton-peligro boton-chico" type="submit">Sí, borrar</button>
+        </form>
+      </details>
+    <% } %>
+  </section>
+<% } %>
+<%- include('parciales/pie') %>

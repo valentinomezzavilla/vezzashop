@@ -31,6 +31,7 @@ import {
   MAX_BANNERS,
 } from '../diseno.js';
 import { arbolCategoriasAdmin } from '../categorias.js';
+import { limitesDeTienda, ampliarPlan } from '../limites.js';
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { ORDENES } from '../vidriera.js';
 
@@ -99,7 +100,7 @@ export function rutasAdmin({ db, config }) {
       // Categorías de primer nivel, para elegir cuáles van en el menú de arriba de la tienda.
       categoriasMenu: await arbolCategoriasAdmin(db, tiendaId),
       banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
-      maxBanners: MAX_BANNERS,
+      maxBanners: (await limitesDeTienda(db, tiendaId)).maxBanners,
       megasImagen: MEGAS_IMAGEN,
     });
   }
@@ -110,6 +111,10 @@ export function rutasAdmin({ db, config }) {
     const tienda = req.session.usuario ? await buscarTienda(db, req.session.usuario.tiendaId) : null;
     res.locals.urlMiTienda = tienda ? urlTienda(req, dominioDeTiendas(config), tienda.slug) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
+    // Una tienda suspendida puede entrar a mirar su panel, pero no cambiar nada (ver más abajo).
+    res.locals.suspendida = tienda?.estado === 'suspendida';
+    res.locals.motivoSuspension = tienda?.motivoSuspension ?? '';
+    res.locals.contactoPlataforma = config.contactoPlataforma;
     // Para el número al lado de "Pedidos" en el menú.
     res.locals.pedidosNuevos = tienda ? await contarPedidosNuevos(db, tienda.id) : 0;
     // Para marcar en el menú la sección en la que se está: "/productos" -> "productos", "/importar/x" -> "importar".
@@ -145,6 +150,15 @@ export function rutasAdmin({ db, config }) {
   router.use((req, res, next) => {
     if (!req.session.usuario) return res.redirect('/admin/ingresar');
     next();
+  });
+
+  // Tienda suspendida: solo lectura. Se puede navegar y salir, pero cualquier cambio vuelve con un aviso.
+  router.use((req, res, next) => {
+    const soloLee = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    if (!res.locals.suspendida || soloLee || req.path === '/salir') return next();
+    const contacto = config.contactoPlataforma ? ` Contactanos para reactivarla: ${config.contactoPlataforma}.` : ' Contactanos para reactivarla.';
+    req.session.aviso = { tipo: 'error', texto: `Tu tienda está suspendida: por ahora podés ver tus datos, pero no cambiarlos.${contacto}` };
+    res.redirect('/admin/inicio');
   });
 
   router.get('/', (req, res) => res.redirect('/admin/inicio'));
@@ -188,7 +202,7 @@ export function rutasAdmin({ db, config }) {
       const { fotosPorFila, errores: erroresFotos } = await obtenerFotos({ productos, columnaImg, fotosExcel, descargar });
       asignarFotos(productos, fotosPorFila);
       await completarHuellas(db, config.dirSubidas, tiendaId);
-      const { resumen, errores: erroresBase } = await previsualizar(db, tiendaId, productos);
+      const { resumen, errores: erroresBase } = await previsualizar(db, tiendaId, productos, await limitesDeTienda(db, tiendaId));
       const filasConError = new Set(erroresFormato.map((e) => e.fila));
       const errores = [
         ...erroresFormato,
@@ -242,7 +256,8 @@ export function rutasAdmin({ db, config }) {
       if (erroresFormato.length > 0) throw new ErrorDeImportacion(erroresFormato);
       asignarFotos(productos, leida.fotosPorFila);
       await completarHuellas(db, config.dirSubidas, tiendaId);
-      const { errores, fotosAGuardar } = await previsualizar(db, tiendaId, productos);
+      const limites = await limitesDeTienda(db, tiendaId);
+      const { errores, fotosAGuardar } = await previsualizar(db, tiendaId, productos, limites);
       if (errores.length > 0) throw new ErrorDeImportacion(errores);
 
       // Los archivos se escriben antes de la transacción; si algo falla, se borran.
@@ -252,7 +267,7 @@ export function rutasAdmin({ db, config }) {
         guardadas.push(archivo);
         archivos.set(claveFoto(foto.slug, foto.huella), archivo);
       }
-      const resumen = await aplicarImportacion(db, tiendaId, productos, archivos);
+      const resumen = await aplicarImportacion(db, tiendaId, productos, archivos, limites);
       aplicada = true;
       // Si entre medio el producto ya recibió esa foto, su archivo quedó sin usar.
       const usado = db.prepare('SELECT 1 FROM producto_fotos WHERE tienda_id = ? AND archivo = ?');
@@ -315,8 +330,13 @@ export function rutasAdmin({ db, config }) {
         res.redirect('/admin/diseno#banners');
       };
 
-      if ((await listarBanners(db, tiendaId)).length >= MAX_BANNERS) {
-        return volverConError(`Podés tener hasta ${MAX_BANNERS} banners. Borrá alguno para agregar otro.`);
+      const { maxBanners } = await limitesDeTienda(db, tiendaId);
+      if ((await listarBanners(db, tiendaId)).length >= maxBanners) {
+        return volverConError(
+          maxBanners === 0
+            ? `Tu plan no incluye banners.${ampliarPlan(config)}`
+            : `Podés tener hasta ${maxBanners} banners. Borrá alguno para agregar otro.${maxBanners < MAX_BANNERS ? ampliarPlan(config) : ''}`,
+        );
       }
       const imagen = req.files?.imagen?.[0];
       const imagenMovil = req.files?.imagenMovil?.[0];

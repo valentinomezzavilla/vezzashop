@@ -650,7 +650,7 @@ code { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospac
 .campo > label, .etiqueta { font-weight: 600; font-size: .88rem; }
 .campo-ancho { grid-column: 1 / -1; }
 
-input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="number"], select, textarea {
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="number"], input[type="date"], select, textarea {
   width: 100%;
   min-height: 42px;
   padding: 0 .85rem;
@@ -1426,6 +1426,38 @@ button.pastilla-boton:hover { box-shadow: inset 0 0 0 1px currentColor; transfor
   .tabla-variantes .fila-errores { display: block; margin-bottom: .6rem; padding: .5rem .95rem; border: 1px solid var(--error-borde); border-top: 0; border-radius: 0 0 16px 16px; background: var(--error-fondo); }
   .tabla-variantes .fila-errores td { padding: 0 !important; background: none; }
   .tabla-variantes tbody tr:hover { background: var(--superficie-solida); }
+}
+
+/* ---------- Administración de la plataforma (/plataforma) ---------- */
+
+.menu-clientes { --color-seccion: linear-gradient(160deg, #5ac8fa, #0a84ff); }
+.menu-planes { --color-seccion: linear-gradient(160deg, #ffb340, #ff9500); }
+.formulario-angosto { max-width: 560px; }
+.formulario-angosto.separado { margin-top: 1.25rem; }
+/* Un campo con su botón al lado, alineados por abajo. */
+.cambiar-estado:has(.campo) { align-items: flex-end; }
+.cambiar-estado .campo { flex: 1; }
+.clave-generada { display: inline-block; padding: .3rem .7rem; border-radius: 10px; background: var(--superficie-suave); font-size: 1.05rem; font-weight: 600; letter-spacing: .02em; user-select: all; }
+.uso-plan { display: grid; gap: 1rem; }
+.uso-plan-fila { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .35rem; font-size: .92rem; }
+.uso-plan-fila span { color: var(--texto-suave); }
+.tabla-clientes .celda-producto { color: var(--texto); text-decoration: none; }
+.tabla-clientes .celda-producto:hover .celda-producto-nombre, .tabla-planes .celda-producto:hover .celda-producto-nombre { color: var(--primario-texto); }
+.tabla-planes .celda-producto { color: var(--texto); text-decoration: none; }
+
+/* En el celular, cada fila de clientes y de planes es una tarjeta con sus datos rotulados. */
+@media (max-width: 700px) {
+  .tabla-clientes, .tabla-clientes tbody, .tabla-planes, .tabla-planes tbody { display: block; }
+  .tabla-clientes thead, .tabla-planes thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tabla-clientes tbody tr, .tabla-planes tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem 1rem; padding: .95rem 1.05rem; border-bottom: 1px solid var(--borde); }
+  .tabla-clientes tbody tr:last-child, .tabla-planes tbody tr:last-child { border-bottom: 0; }
+  .tabla-clientes td, .tabla-planes td { display: block; padding: 0; border: 0; white-space: normal; min-width: 0; }
+  .tabla-clientes td:first-child, .tabla-planes td:first-child { grid-column: 1 / -1; }
+  .tabla-clientes td[data-etiqueta]::before, .tabla-planes td[data-etiqueta]::before {
+    content: attr(data-etiqueta); display: block; margin-bottom: .15rem;
+    font-size: .68rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--texto-tenue);
+  }
+  .tabla-clientes .numero, .tabla-planes .numero { text-align: left; }
 }
 
 /* ---------- Menos movimiento ---------- */

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex, nofollow">
+  <%# Aplica la apariencia elegida antes de pintar, para que no parpadee. %>
+  <script>try{var t=localStorage.getItem("tema");if(t==="claro"||t==="oscuro")document.documentElement.dataset.tema=t}catch(e){}</script>
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <title><%= titulo %> · Plataforma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+<a class="saltar" href="#contenido">Ir al contenido</a>
+<% if (superadmin) { %>
+  <%# [sección, texto, ícono] %>
+  <% const secciones = [['clientes', 'Clientes', 'tienda'], ['planes', 'Planes', 'etiqueta'], ['cuenta', 'Mi cuenta', 'usuario']] %>
+  <div class="app">
+    <aside class="lateral">
+      <div class="lateral-marca">
+        <span class="lateral-logo" aria-hidden="true"><%- icono('candado', { tamano: 18 }) %></span>
+        <span class="lateral-textos">
+          <span class="lateral-tienda">Plataforma</span>
+          <span class="lateral-sub">Administración</span>
+        </span>
+      </div>
+      <nav class="lateral-menu" aria-label="Secciones">
+        <% for (const [seccion, texto, nombreIcono] of secciones) { %>
+          <a href="/plataforma/<%= seccion %>" class="menu-<%= seccion %><%= seccion === seccionActual ? ' activo' : '' %>"<%- seccion === seccionActual ? ' aria-current="page"' : '' %>>
+            <%- icono(nombreIcono) %>
+            <span><%= texto %></span>
+          </a>
+        <% } %>
+      </nav>
+      <div class="lateral-pie">
+        <%- include('../../parciales/tema') %>
+        <form method="post" action="/plataforma/salir">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-fantasma boton-bloque" type="submit"><%- icono('salir', { tamano: 16 }) %> Salir</button>
+        </form>
+      </div>
+    </aside>
+    <main class="contenido" id="contenido">
+<% } else { %>
+  <%- include('../../parciales/tema', { flotante: true }) %>
+  <main class="contenido contenido-solo" id="contenido">
+<% } %>
+<% if (aviso) { %>
+  <p class="aviso aviso-<%= aviso.tipo %>" role="status"><%- icono(aviso.tipo === 'ok' ? 'check' : 'alerta', { tamano: 18 }) %><span><%= aviso.texto %></span></p>
+<% } %>

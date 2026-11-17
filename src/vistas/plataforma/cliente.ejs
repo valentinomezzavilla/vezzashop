@@ -1,0 +1,197 @@
+<%- include('parciales/cabecera', { titulo: cliente.nombre }) %>
+<%
+  const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  const { estado: estadoCobro, dias } = cliente.cobro;
+  const textoCobro = estadoCobro === 'sin-vencimiento' ? 'Sin vencimiento'
+    : estadoCobro === 'vencido' ? `Venció el ${formatearDia(cliente.venceEn)} (hace ${plural(-dias, 'día', 'días')})`
+    : estadoCobro === 'por-vencer' ? (dias === 0 ? 'Vence hoy' : `Vence el ${formatearDia(cliente.venceEn)} (en ${plural(dias, 'día', 'días')})`)
+    : `Al día hasta el ${formatearDia(cliente.venceEn)}`;
+  const claseCobro = { vencido: 'pastilla-cancelado', 'por-vencer': 'pastilla-ambar', 'al-dia': 'pastilla-ok' }[estadoCobro] ?? '';
+  // Barra de uso frente al tope del plan.
+  const uso_ = (usado, tope) => (tope === null ? 0 : Math.min(100, Math.round((usado / tope) * 100)));
+%>
+<header class="encabezado">
+  <div>
+    <a class="volver" href="/plataforma/clientes"><%- icono('izquierda', { tamano: 16 }) %> Clientes</a>
+    <h1><%= cliente.nombre %> <span class="pastilla <%= cliente.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= cliente.estado === 'activa' ? 'Activa' : 'Suspendida' %></span></h1>
+    <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton-secundario" href="<%= urlTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver su tienda</a>
+  </div>
+</header>
+
+<% if (cliente.estado === 'suspendida') { %>
+  <p class="aviso aviso-error"><%- icono('alerta', { tamano: 18 }) %><span><strong>Esta tienda está suspendida.</strong> Los compradores ven un aviso y el dueño puede mirar su panel, pero no cambiar nada.<% if (cliente.motivoSuspension) { %> Motivo: <%= cliente.motivoSuspension %>.<% } %></span></p>
+<% } %>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Plan y uso</h2>
+    <p class="texto-suave">Los topes del plan se aplican en el panel del cliente apenas lo cambiás.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/plan" class="cambiar-estado">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="visualmente-oculto" for="planId">Plan</label>
+      <select id="planId" name="planId"<%- invalido('planId') %>>
+        <% for (const plan of planes) { %>
+          <option value="<%= plan.id %>"<%= plan.id === cliente.planId ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %><%= plan.activo ? '' : ' (ya no se ofrece)' %></option>
+        <% } %>
+        <% if (cliente.planId === null) { %><option value="" selected disabled>Sin plan</option><% } %>
+      </select>
+      <button class="boton boton-secundario" type="submit">Cambiar plan</button>
+    </form>
+    <%- error('planId') %>
+    <div class="uso-plan">
+      <div>
+        <div class="uso-plan-fila"><span>Productos</span><strong><%= uso.productos %><%= limites.maxProductos === null ? '' : ` de ${limites.maxProductos}` %></strong></div>
+        <% if (limites.maxProductos !== null) { %><div class="progreso" role="progressbar" aria-label="Productos usados" aria-valuemin="0" aria-valuemax="<%= limites.maxProductos %>" aria-valuenow="<%= uso.productos %>"><span style="width: <%= uso_(uso.productos, limites.maxProductos) %>%"></span></div><% } else { %><span class="ayuda">Sin tope</span><% } %>
+      </div>
+      <div>
+        <div class="uso-plan-fila"><span>Fotos por producto</span><strong>hasta <%= limites.maxFotos %></strong></div>
+      </div>
+      <div>
+        <div class="uso-plan-fila"><span>Banners</span><strong><%= uso.banners %> de <%= limites.maxBanners %></strong></div>
+      </div>
+    </div>
+    <dl class="datos-pedido">
+      <div><dt>Pedidos recibidos</dt><dd><%= cliente.pedidos %></dd></div>
+      <div><dt>Link</dt><dd><a href="<%= urlTienda %>" target="_blank" rel="noopener"><%= urlTienda.replace(/^https?:\/\//, '') %></a></dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Cobro</h2>
+    <p class="texto-suave">Cobrás por fuera; acá registrás hasta cuándo tiene pago. Un cliente vencido no se suspende solo: lo decidís vos.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <p><span class="pastilla <%= claseCobro %>"><%= textoCobro %></span></p>
+
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/pago" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <h3>Registrar un pago</h3>
+      <div class="ajuste-campos-dos">
+        <div class="campo">
+          <label for="meses">Meses que cubre</label>
+          <select id="meses" name="meses">
+            <% for (const m of [1, 2, 3, 6, 12]) { %><option value="<%= m %>"<%= String(valores.meses ?? 1) === String(m) ? ' selected' : '' %>><%= plural(m, 'mes', 'meses') %></option><% } %>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="monto">Monto cobrado <span class="opcional">(opcional)</span></label>
+          <div class="campo-con-prefijo campo-con-sufijo">
+            <span class="sufijo">$</span>
+            <input id="monto" type="text" name="monto" value="<%= valores.monto ?? (cliente.precioCentavos ? precioParaEditar(cliente.precioCentavos) : '') %>" inputmode="decimal" autocomplete="off"<%- invalido('pago') %>>
+          </div>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="nota">Nota <span class="opcional">(opcional)</span></label>
+        <input id="nota" type="text" name="nota" value="<%= valores.nota ?? '' %>" maxlength="200" placeholder="Transferencia del 12/11, comprobante 4521…">
+        <%- error('pago') %>
+      </div>
+      <span class="ayuda">El vencimiento se extiende desde la fecha en que vence (si todavía no venció) o desde hoy.</span>
+      <div><button class="boton" type="submit"><%- icono('billete', { tamano: 18 }) %> Registrar pago</button></div>
+    </form>
+
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/vencimiento" class="cambiar-estado">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="venceEn">Fijar el vencimiento a mano</label>
+        <input id="venceEn" type="date" name="venceEn" value="<%= cliente.venceEn ?? '' %>"<%- invalido('venceEn') %>>
+        <span class="ayuda">Vacío: sin vencimiento.</span>
+        <%- error('venceEn') %>
+      </div>
+      <button class="boton boton-secundario" type="submit">Guardar fecha</button>
+    </form>
+
+    <% if (pagos.length) { %>
+      <div class="tabla-contenedor">
+        <table class="tabla tabla-planes">
+          <thead><tr><th scope="col">Registrado</th><th scope="col">Cubre</th><th scope="col" class="numero">Monto</th><th scope="col">Vence</th><th scope="col">Nota</th></tr></thead>
+          <tbody>
+            <% for (const p of pagos) { %>
+              <tr>
+                <td data-etiqueta="Registrado"><%= formatearFecha(p.creadoEn) %></td>
+                <td data-etiqueta="Cubre"><%= plural(p.meses, 'mes', 'meses') %></td>
+                <td data-etiqueta="Monto" class="numero"><%= p.montoCentavos ? formatearPrecio(p.montoCentavos) : '—' %></td>
+                <td data-etiqueta="Vence"><%= formatearDia(p.venceDespues) %></td>
+                <td data-etiqueta="Nota" class="celda-envolver"><%= p.nota || '—' %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Estado de la tienda</h2>
+    <p class="texto-suave">Suspender cierra la tienda para los compradores y deja el panel del cliente en solo lectura. Reactivar la vuelve a abrir.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (cliente.estado === 'activa') { %>
+      <details class="confirmar">
+        <summary class="boton boton-peligro-suave"><%- icono('candado', { tamano: 16 }) %> Suspender la tienda</summary>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suspender" class="confirmar-cuerpo">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <p>Los compradores van a ver que la tienda no está disponible.</p>
+          <label class="visualmente-oculto" for="motivo">Motivo</label>
+          <input id="motivo" type="text" name="motivo" maxlength="300" placeholder="Motivo (solo lo ves vos y el cliente en su panel)">
+          <button class="boton boton-peligro boton-chico" type="submit">Sí, suspender</button>
+        </form>
+      </details>
+    <% } else { %>
+      <form method="post" action="/plataforma/clientes/<%= cliente.id %>/reactivar">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Reactivar la tienda</button>
+      </form>
+    <% } %>
+  </div>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Acceso</h2>
+    <p class="texto-suave">El email con el que entra a su panel, y una clave nueva si la olvidó (no hay recuperación por email).</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/email" class="cambiar-estado">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" value="<%= valores.email ?? cliente.email ?? '' %>" autocomplete="off" required<%- invalido('email') %>>
+        <%- error('email') %>
+      </div>
+      <button class="boton boton-secundario" type="submit">Cambiar email</button>
+    </form>
+    <details class="confirmar">
+      <summary class="boton boton-secundario"><%- icono('candado', { tamano: 16 }) %> Generar una clave nueva</summary>
+      <form method="post" action="/plataforma/clientes/<%= cliente.id %>/clave" class="confirmar-cuerpo">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <p>La clave actual deja de servir y te mostramos una nueva, una sola vez, para que se la pases.</p>
+        <button class="boton boton-peligro boton-chico" type="submit">Sí, generar clave nueva</button>
+      </form>
+    </details>
+  </div>
+</section>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Notas</h2>
+    <p class="texto-suave">Solo las ves vos: acuerdos, descuentos, lo que te pidió.</p>
+  </div>
+  <form method="post" action="/plataforma/clientes/<%= cliente.id %>/notas" class="tarjeta ajuste-campos">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="visualmente-oculto" for="notas">Notas</label>
+    <textarea id="notas" name="notas" rows="5" maxlength="2000"><%= cliente.notas %></textarea>
+    <div><button class="boton boton-secundario" type="submit">Guardar notas</button></div>
+  </form>
+</section>
+<%- include('parciales/pie') %>

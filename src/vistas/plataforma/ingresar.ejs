@@ -1,0 +1,22 @@
+<%- include('parciales/cabecera', { titulo: 'Ingresar' }) %>
+<section class="ingreso">
+  <div class="ingreso-icono" aria-hidden="true"><%- icono('candado', { tamano: 24 }) %></div>
+  <h1>Administración de la plataforma</h1>
+  <p class="texto-suave">Acceso solo para quien administra la plataforma.</p>
+  <% if (error) { %>
+    <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= error %></span></p>
+  <% } %>
+  <form method="post" action="/plataforma/ingresar" class="formulario">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="campo">
+      <label for="email">Email</label>
+      <input id="email" type="email" name="email" value="<%= email %>" autocomplete="username" required autofocus>
+    </div>
+    <div class="campo">
+      <label for="clave">Clave</label>
+      <input id="clave" type="password" name="clave" autocomplete="current-password" required>
+    </div>
+    <button class="boton boton-bloque boton-grande" type="submit">Ingresar</button>
+  </form>
+</section>
+<%- include('parciales/pie') %>

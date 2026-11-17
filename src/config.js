@@ -46,5 +46,7 @@ export function leerConfig(env = process.env) {
     urlBase: leerUrlBase(env),
     dirImportaciones: env.DIR_IMPORTACIONES ?? path.join(RAIZ, 'data', 'importaciones'),
     dirSubidas: env.DIR_SUBIDAS ?? path.join(RAIZ, 'data', 'subidas'),
+    // Cómo contactarte, para los avisos que ven los clientes (tienda suspendida, tope del plan): por ejemplo "WhatsApp 351 123 4567".
+    contactoPlataforma: (env.CONTACTO_PLATAFORMA ?? '').trim(),
   };
 }

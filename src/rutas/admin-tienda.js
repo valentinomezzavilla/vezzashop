@@ -28,6 +28,7 @@ import { arbolCategoriasAdmin, aplanar, validarCategoria, crearCategoria, editar
 import { buscarTienda, renombrarTienda, cambiarClave, LARGO_MINIMO_CLAVE } from '../tiendas.js';
 import { guardarImagen, borrarImagen, urlMiniatura, huellaDe, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
+import { limitesDeTienda, usoDeTienda, llegoAlTopeDeProductos, ampliarPlan } from '../limites.js';
 import { plural } from '../util/formato.js';
 
 const MEGAS_IMAGEN = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
@@ -52,7 +53,7 @@ export function rutasAdminTienda({ db, config }) {
 
   router.get('/inicio', async (req, res) => {
     const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
-    res.render('admin/inicio', { resumen: await resumenTienda(db, tienda.id), tienda });
+    res.render('admin/inicio', { resumen: await resumenTienda(db, tienda.id), tienda, limites: await limitesDeTienda(db, tienda.id) });
   });
 
   // ---------- Productos ----------
@@ -64,6 +65,7 @@ export function rutasAdminTienda({ db, config }) {
     res.render('admin/productos', {
       productos: (await listarProductosAdmin(db, tiendaId, { busqueda, filtro })).map((p) => ({ ...p, urlFoto: urlMiniatura(tiendaId, p.foto, 's') })),
       cuentas: await contarPorFiltro(db, tiendaId),
+      limites: await limitesDeTienda(db, tiendaId),
       filtros: FILTROS,
       filtro,
       busqueda,
@@ -81,16 +83,30 @@ export function rutasAdminTienda({ db, config }) {
       fotos: producto ? (await listarFotos(db, tiendaId, producto.id)).map((f) => ({ ...f, url: urlMiniatura(tiendaId, f.archivo, 'm') })) : [],
       urlEnTienda: producto ? `${urlTienda(req, dominioDeTiendas(config), tienda.slug)}/producto/${producto.slug}` : null,
       maxAtributos: MAX_ATRIBUTOS,
-      maxFotos: MAX_FOTOS,
+      maxFotos: (await limitesDeTienda(db, tiendaId)).maxFotos,
       megasImagen: MEGAS_IMAGEN,
     });
   }
 
   const hayErrores = (errores) => Object.keys(errores).length > 0;
 
-  router.get('/productos/nuevo', (req, res) => mostrarEditor(req, res, { formulario: formularioDesdeProducto(null) }));
+  // El plan puede limitar cuántos productos tiene la tienda: al llegar al tope no se crean más (editar sigue andando).
+  async function avisarSiLlegoAlTope(req, res) {
+    const { tiendaId } = req.session.usuario;
+    const limites = await limitesDeTienda(db, tiendaId);
+    if (!(await llegoAlTopeDeProductos(db, tiendaId, limites))) return false;
+    avisar(req, 'error', `Llegaste al máximo de tu plan: hasta ${limites.maxProductos} productos.${ampliarPlan(config)}`);
+    res.redirect('/admin/productos');
+    return true;
+  }
+
+  router.get('/productos/nuevo', async (req, res) => {
+    if (await avisarSiLlegoAlTope(req, res)) return;
+    mostrarEditor(req, res, { formulario: formularioDesdeProducto(null) });
+  });
 
   router.post('/productos/nuevo', verificarCsrf, async (req, res) => {
+    if (await avisarSiLlegoAlTope(req, res)) return;
     const { tiendaId } = req.session.usuario;
     const { datos, formulario, errores } = await validarProducto(db, tiendaId, null, req.body);
     if (hayErrores(errores)) return mostrarEditor(req, res, { formulario, errores, status: 400 });
@@ -197,9 +213,10 @@ export function rutasAdminTienda({ db, config }) {
         avisar(req, 'error', 'Elegí al menos una foto.', 'fotos');
         return volverAFotos(req, res);
       }
-      const lugar = MAX_FOTOS - (await listarFotos(db, tiendaId, req.producto.id)).length;
+      const { maxFotos } = await limitesDeTienda(db, tiendaId);
+      const lugar = Math.max(0, maxFotos - (await listarFotos(db, tiendaId, req.producto.id)).length);
       if (archivos.length > lugar) {
-        avisar(req, 'error', lugar ? `Podés agregar ${plural(lugar, 'foto más', 'fotos más')}.` : `Ya tiene ${MAX_FOTOS} fotos, el máximo.`, 'fotos');
+        avisar(req, 'error', lugar ? `Podés agregar ${plural(lugar, 'foto más', 'fotos más')}.` : `Ya tiene ${maxFotos} fotos, el máximo de tu plan.${maxFotos < MAX_FOTOS ? ampliarPlan(config) : ''}`, 'fotos');
         return volverAFotos(req, res);
       }
       // Primero se revisan todas, así no queda una carga a medias si una no es imagen.
@@ -285,6 +302,9 @@ export function rutasAdminTienda({ db, config }) {
       urlTienda: urlTienda(req, dominioDeTiendas(config), tienda.slug),
       errores,
       largoMinimoClave: LARGO_MINIMO_CLAVE,
+      limites: await limitesDeTienda(db, tienda.id),
+      uso: await usoDeTienda(db, tienda.id),
+      contactoPlataforma: config.contactoPlataforma,
     });
   }
 

@@ -62,6 +62,7 @@ obligatoria. En tu compu dejala vacía y se usa PGlite. Las migraciones (`src/mi
 |---|---|
 | `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com` | Da de alta un cliente: crea la tienda y su usuario, y muestra la clave **una sola vez**. |
 | `npm run migrar-imagenes -- --dry-run` | Muestra qué haría para pasar las imágenes subidas antes del formato WebP al formato nuevo (ver [Imágenes](#imágenes)). Sin `--dry-run` las convierte. |
+| `npm run crear-superadmin -- --email vos@ejemplo.com` | Crea **tu** cuenta de administrador de la plataforma (ver [Administración de la plataforma](#administración-de-la-plataforma)). Con `--resetear` genera una clave nueva si la olvidás. |
 | `npm run dev` | Levanta el servidor y lo reinicia cuando cambia el código. Panel en http://localhost:3000/admin y cada tienda en http://&lt;slug&gt;.localhost:3000 |
 | `npm start` | Levanta el servidor (para producción). |
 | `npm test` | Corre todos los tests (con PGlite, sin instalar nada). Para probar contra un PostgreSQL de verdad: `PRUEBAS_DATABASE_URL=postgres://usuario:clave@host:5432/base npm test` (cada prueba usa su propio esquema y lo borra al terminar). |
@@ -178,6 +179,41 @@ tiene al menos una forma de entrega y una de pago activas (si no, el carrito sig
 
 Los pedidos guardan una copia de lo comprado (productos, precios, entrega, dirección), así no cambian si después
 cambia el catálogo. Cancelar un pedido devuelve el stock de lo que todavía existe.
+
+## Administración de la plataforma
+
+Quien opera la plataforma tiene su propio panel en **`/plataforma`** (en el dominio principal, no en un subdominio), con una
+cuenta aparte de las de los clientes: un superadministrador no pertenece a ninguna tienda, y ningún dueño de tienda puede
+entrar ahí. Se crea con un comando, desde la Terminal del servidor:
+
+```bash
+npm run crear-superadmin -- --email vos@ejemplo.com
+```
+
+Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plataforma` y cambiala en **Mi cuenta**
+(mínimo 12 caracteres). Si la olvidás: el mismo comando con `--resetear`. El ingreso frena a quien prueba claves
+(8 intentos fallidos en 15 minutos, por IP y por email).
+
+- **Clientes.** Listado con filtros (activos, suspendidos, por vencer, vencidos), búsqueda y el ingreso mensual esperado.
+  **Nuevo cliente** crea la tienda y su acceso, y te muestra la clave **una sola vez** junto con un mensaje listo para
+  mandarle (con el link de la tienda y del panel). Desde la ficha de cada cliente: cambiarle el plan, registrar pagos,
+  fijar el vencimiento, suspender o reactivar, generarle una clave nueva, cambiarle el email y tomar notas internas.
+- **Planes.** Nombre, precio por mes y topes: **productos**, **fotos por producto** (hasta 10) y **banners** (hasta 6).
+  Un tope vacío es "sin límite". Al llegar a un tope, el cliente no puede cargar más y se le avisa que amplíe su plan;
+  editar lo que ya tiene sigue andando, y vale también para la carga masiva por Excel. Las tiendas que ya existían quedaron
+  en el plan **Sin límites**, para que nada cambie para ellas. Un plan con clientes no se puede borrar: se desactiva.
+- **Cobro manual.** Cobrás por fuera (transferencia, Mercado Pago…). Cada pago que registrás extiende el vencimiento
+  desde la fecha en que vence (si todavía no venció) o desde hoy, y queda en un historial. Un cliente figura *al día*,
+  *por vencer* (faltan 7 días o menos) o *vencido*, y él lo ve en su Inicio y en Cuenta. **Un vencimiento solo avisa**: no
+  suspende solo, lo decidís vos.
+- **Suspender.** La tienda deja de estar disponible para los compradores (página de aviso, HTTP 503) y el panel del cliente
+  queda **en solo lectura**: puede mirar sus datos y pedidos, pero cualquier cambio vuelve con un aviso. Ve el motivo que
+  anotaste. Reactivar la vuelve a abrir. No hay un botón de borrar clientes: borrar una tienda arrastraría sus productos,
+  pedidos y fotos, así que se suspende.
+
+Para que los avisos a los clientes digan cómo contactarte, definí `CONTACTO_PLATAFORMA` (por ejemplo `WhatsApp 351 123 4567`).
+Los datos viven en las tablas `planes`, `superadmins`, `pagos_plataforma` y en columnas nuevas de `tiendas`; la migración
+`007` se aplica sola al arrancar.
 
 ## Imágenes
 
@@ -305,6 +341,8 @@ src/
   pagos.js               formas de entrega y de pago (Envíos y pagos)
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
   imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
+  plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
+  limites.js             topes del plan de cada tienda, uso y estado de cobro
   migrar-imagenes.js     convierte al formato nuevo las imágenes subidas antes (lo usa scripts/migrar-imagenes.js)
   util/dominios.js       qué tienda corresponde a cada subdominio
   importacion/
@@ -321,10 +359,12 @@ src/
   rutas/admin-tienda.js  panel /admin: inicio, productos, fotos, categorías y cuenta
   rutas/admin-pedidos.js panel /admin: pedidos, y envíos y pagos
   rutas/tienda.js        vidriera (catálogo, destacados, categorías, ficha, checkout y pedido)
+  rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   util/iconos.js         íconos SVG de las vistas
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/
   publico/               CSS y scripts del panel (admin.js) y de la vidriera (tienda.js)
 scripts/crear-tienda.js
+scripts/crear-superadmin.js
 scripts/migrar-imagenes.js
 test/                    tests (node:test)
 ```
@@ -340,6 +380,7 @@ Etapas siguientes, en orden sugerido:
 3. Cotizar envíos con Correo Argentino / Andreani según el código postal (hoy: costo fijo o "a coordinar").
 4. Dominio propio por cliente.
 5. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
-6. Achicar las fotos al subirlas (hoy se guardan tal cual) y foto por color en las variantes.
-7. Para producción: límite de intentos de login, recuperar clave, cerrar otras sesiones al cambiar la clave,
+6. Foto por color en las variantes.
+7. Para producción: límite de intentos de login en el panel de cada tienda (el de `/plataforma` ya lo tiene), que cada dueño
+   recupere su clave solo (hoy se la genera el administrador desde `/plataforma`), cerrar otras sesiones al cambiar la clave,
    programar las copias de seguridad de la base en Coolify (pestaña Backups del recurso PostgreSQL).
