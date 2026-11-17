@@ -11,6 +11,7 @@
   --superficie-suave: rgb(118 118 128 / .09);
   --superficie-hover: rgb(118 118 128 / .15);
   --campo: #fff;
+  --campo-solido: #fff; /* para los desplegables: su lista la pinta el navegador y no admite transparencias */
   --texto: #1d1d1f;
   --texto-suave: #4f4f55;
   --texto-tenue: #6e6e73;
@@ -81,14 +82,17 @@
   --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
 }
 
+/* Apariencia: sigue al sistema (Automático) o se elige a mano con el selector del menú, que pone data-tema="claro" u "oscuro"
+   en <html>. Los valores del tema oscuro están dos veces porque CSS no deja compartirlos entre una media query y un atributo. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --fondo: #000;
     --superficie: rgb(28 28 30 / .74);
     --superficie-solida: #1c1c1e;
     --superficie-suave: rgb(118 118 128 / .18);
     --superficie-hover: rgb(118 118 128 / .28);
     --campo: rgb(118 118 128 / .14);
+    --campo-solido: #2c2c2e;
     --texto: #f5f5f7;
     --texto-suave: #c7c7cc;
     --texto-tenue: #98989d;
@@ -144,6 +148,70 @@
     --sombra-flotante: 0 0 0 .5px rgb(255 255 255 / .08), 0 20px 60px -10px rgb(0 0 0 / .7);
   }
 }
+:root[data-tema="oscuro"] {
+  --fondo: #000;
+  --superficie: rgb(28 28 30 / .74);
+  --superficie-solida: #1c1c1e;
+  --superficie-suave: rgb(118 118 128 / .18);
+  --superficie-hover: rgb(118 118 128 / .28);
+  --campo: rgb(118 118 128 / .14);
+  --campo-solido: #2c2c2e;
+  --texto: #f5f5f7;
+  --texto-suave: #c7c7cc;
+  --texto-tenue: #98989d;
+  --texto-placeholder: #7c7c82;
+  --borde: rgb(255 255 255 / .09);
+  --borde-fuerte: rgb(255 255 255 / .16);
+  --borde-hover: rgb(255 255 255 / .28);
+  --borde-tarjeta: rgb(255 255 255 / .07);
+
+  --primario: #0a7cff;
+  --primario-hover: #2b8fff;
+  --primario-texto: #4da3ff;
+  --primario-suave: rgb(10 132 255 / .18);
+  --primario-borde: rgb(10 132 255 / .4);
+
+  --ok: #4ade80;
+  --ok-solido: #30d158;
+  --ok-fondo: rgb(48 209 88 / .16);
+  --ok-borde: rgb(48 209 88 / .35);
+  --error: #ff6961;
+  --error-solido: #ff453a;
+  --peligro: #e0241b;
+  --peligro-hover: #ff3b30;
+  --error-fondo: rgb(255 69 58 / .16);
+  --error-borde: rgb(255 69 58 / .38);
+  --ambar: #ffb340;
+  --ambar-solido: #ff9f0a;
+  --ambar-fondo: rgb(255 159 10 / .16);
+  --ambar-borde: rgb(255 159 10 / .38);
+  --violeta: #d9a2ff;
+  --violeta-fondo: rgb(191 90 242 / .2);
+  --info-texto: #8cc4ff;
+
+  --vidrio: rgb(30 30 32 / .62);
+  --vidrio-fuerte: rgb(36 36 38 / .78);
+  --vidrio-borde: rgb(255 255 255 / .1);
+  --brillo: inset 0 1px 0 rgb(255 255 255 / .07);
+  --brillo-cursor: rgb(255 255 255 / .07);
+  --segmento: rgb(118 118 128 / .24);
+  --segmento-activo: #636366;
+  --interruptor-apagado: rgb(120 120 128 / .36);
+  --fila-hover: rgb(255 255 255 / .04);
+
+  --mancha-1: rgb(10 132 255 / .3);
+  --mancha-2: rgb(191 90 242 / .24);
+  --mancha-3: rgb(255 55 95 / .16);
+  --mancha-4: rgb(64 200 224 / .18);
+
+  --foco: 0 0 0 4px rgb(10 132 255 / .4);
+  --anillo: rgb(10 132 255 / .75);
+  --sombra: 0 1px 2px rgb(0 0 0 / .3), 0 6px 20px -6px rgb(0 0 0 / .5);
+  --sombra-alta: 0 2px 8px rgb(0 0 0 / .35), 0 18px 40px -10px rgb(0 0 0 / .6);
+  --sombra-flotante: 0 0 0 .5px rgb(255 255 255 / .08), 0 20px 60px -10px rgb(0 0 0 / .7);
+}
+:root[data-tema="claro"] { color-scheme: light; }
+:root[data-tema="oscuro"] { color-scheme: dark; }
 
 /* ---------- Base ---------- */
 
@@ -247,6 +315,54 @@ code { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospac
 .contenido > :nth-child(5) { animation-delay: 180ms; }
 .contenido > :nth-child(6) { animation-delay: 225ms; }
 .contenido > :nth-child(n + 7) { animation-delay: 270ms; }
+
+/* ---------- Selector de apariencia (Automático / Claro / Oscuro) ---------- */
+/* Un control segmentado con una pastilla que se desliza. La opción marcada sale del atributo data-tema de <html>,
+   así se ve bien desde el primer cuadro, antes de que cargue el JavaScript. */
+
+.tema {
+  --posicion: 0%;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--segmento);
+}
+.tema::before {
+  content: "";
+  position: absolute;
+  top: 3px; bottom: 3px; left: 3px;
+  width: calc((100% - 6px) / 3);
+  border-radius: 9px;
+  background: var(--segmento-activo);
+  box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), inset 0 0 0 .5px rgb(0 0 0 / .04);
+  transform: translateX(var(--posicion));
+  transition: transform 460ms var(--resorte);
+}
+:root[data-tema="claro"] .tema { --posicion: 100%; }
+:root[data-tema="oscuro"] .tema { --posicion: 200%; }
+.tema button {
+  position: relative;
+  display: grid; place-items: center;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--texto-tenue);
+  cursor: pointer;
+  transition: color var(--transicion), transform var(--transicion-resorte);
+  -webkit-tap-highlight-color: transparent;
+}
+.tema button:hover { color: var(--texto); }
+.tema button:active { transform: scale(.88); }
+:root:not([data-tema]) .tema [data-tema-elegir="auto"],
+:root[data-tema="claro"] .tema [data-tema-elegir="claro"],
+:root[data-tema="oscuro"] .tema [data-tema-elegir="oscuro"] { color: var(--texto); }
+.tema-flotante { position: fixed; top: max(1rem, env(safe-area-inset-top)); right: max(1rem, env(safe-area-inset-right)); z-index: 20; width: 112px; background: var(--vidrio); -webkit-backdrop-filter: var(--desenfoque); backdrop-filter: var(--desenfoque); }
+.lateral-pie .tema { margin-bottom: .15rem; }
+@media (max-width: 860px) { .lateral-pie .tema { width: 100px; margin: 0; } }
 
 /* ---------- Estructura: menú lateral + contenido ---------- */
 
@@ -554,6 +670,11 @@ select {
   background-position: right .8rem center;
   cursor: pointer;
 }
+/* La lista desplegable la dibuja el navegador: sin colores propios, en tema oscuro quedaba texto claro sobre fondo claro. */
+select { background-color: var(--campo-solido); }
+select option, select optgroup { background-color: var(--campo-solido); color: var(--texto); }
+select option:checked { background-color: color-mix(in srgb, var(--primario) 18%, var(--campo-solido)); }
+select option:disabled { color: var(--texto-tenue); }
 input::placeholder, textarea::placeholder { color: var(--texto-placeholder); }
 input:hover, select:hover, textarea:hover { border-color: var(--borde-hover); }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--primario); box-shadow: var(--foco); }

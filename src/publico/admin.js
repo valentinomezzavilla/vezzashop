@@ -339,3 +339,41 @@ if (!menosMovimiento) {
     { passive: true },
   );
 }
+
+// ---------- Apariencia: Automático / Claro / Oscuro ----------
+// El atributo data-tema de <html> lo pone antes de pintar un script del <head> (ver cabecera.ejs); acá se cambia al
+// elegir una opción y se guarda en este navegador. Automático = sin atributo: manda la preferencia del sistema.
+
+{
+  const raiz = document.documentElement;
+  const botones = [...document.querySelectorAll('[data-tema-elegir]')];
+  const colorBarra = { claro: '#f2f2f7', oscuro: '#000000' };
+  const barras = [...document.querySelectorAll('meta[name="theme-color"]')];
+  const originales = barras.map((meta) => meta.content);
+  const marcar = () => {
+    const actual = raiz.dataset.tema ?? 'auto';
+    for (const boton of botones) boton.setAttribute('aria-pressed', String(boton.dataset.temaElegir === actual));
+    // El color de la barra del navegador en el celular acompaña a la elección (Automático vuelve a los de siempre).
+    barras.forEach((meta, n) => (meta.content = colorBarra[actual] ?? originales[n]));
+  };
+  for (const boton of botones) {
+    boton.addEventListener('click', () => {
+      const elegido = boton.dataset.temaElegir;
+      // Con View Transitions el cambio se funde en vez de saltar (donde el navegador la soporta).
+      const aplicar = () => {
+        if (elegido === 'auto') delete raiz.dataset.tema;
+        else raiz.dataset.tema = elegido;
+        try {
+          if (elegido === 'auto') localStorage.removeItem('tema');
+          else localStorage.setItem('tema', elegido);
+        } catch {
+          // Sin almacenamiento (modo privado): vale mientras la página esté abierta.
+        }
+        marcar();
+      };
+      if (document.startViewTransition && !menosMovimiento) document.startViewTransition(aplicar);
+      else aplicar();
+    });
+  }
+  marcar();
+}

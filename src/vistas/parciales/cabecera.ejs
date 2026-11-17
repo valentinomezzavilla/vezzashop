@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
+  <%# Aplica la apariencia elegida antes de pintar, para que no parpadee entre claro y oscuro al cambiar de página. %>
+  <script>try{var t=localStorage.getItem("tema");if(t==="claro"||t==="oscuro")document.documentElement.dataset.tema=t}catch(e){}</script>
   <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title><%= titulo %> · Panel</title>
@@ -47,6 +49,7 @@
         <% } %>
       </nav>
       <div class="lateral-pie">
+        <%- include('tema') %>
         <% if (urlMiTienda) { %>
           <a class="boton boton-secundario boton-bloque" href="<%= urlMiTienda %>" target="_blank" rel="noopener">
             <%- icono('externo', { tamano: 16 }) %> Ver mi tienda
@@ -60,6 +63,7 @@
     </aside>
     <main class="contenido" id="contenido">
 <% } else { %>
+  <%- include('tema', { flotante: true }) %>
   <main class="contenido contenido-solo" id="contenido">
 <% } %>
 <%# Un aviso con sección se muestra dentro de esa sección (por ejemplo, los de banners). %>

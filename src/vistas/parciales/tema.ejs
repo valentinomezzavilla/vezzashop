@@ -1,0 +1,6 @@
+<%# Selector de apariencia. Lo resaltado lo decide admin.css según data-tema de <html>; admin.js guarda la elección. %>
+<div class="tema<%= locals.flotante ? ' tema-flotante' : '' %>" role="group" aria-label="Apariencia">
+  <button type="button" data-tema-elegir="auto" title="Automático: como tu dispositivo" aria-label="Automático, como tu dispositivo"><%- icono('pantalla', { tamano: 16 }) %></button>
+  <button type="button" data-tema-elegir="claro" title="Claro" aria-label="Claro"><%- icono('sol', { tamano: 16 }) %></button>
+  <button type="button" data-tema-elegir="oscuro" title="Oscuro" aria-label="Oscuro"><%- icono('luna', { tamano: 16 }) %></button>
+</div>
