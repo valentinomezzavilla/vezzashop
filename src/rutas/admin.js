@@ -281,7 +281,7 @@ export function rutasAdmin({ db, config }) {
     let logo = req.body.quitarLogo ? null : logoAnterior;
     if (req.file) {
       try {
-        logo = await guardarImagen(config.dirSubidas, tiendaId, req.file.buffer);
+        logo = await guardarImagen(config.dirSubidas, tiendaId, req.file.buffer, { perfil: 'logo' });
       } catch (error) {
         if (!(error instanceof ErrorDeImagen)) throw error;
         return mostrarDiseno(req, res, { valores: req.body, errores: { logo: error.message }, status: 400 });
@@ -317,8 +317,8 @@ export function rutasAdmin({ db, config }) {
 
       const guardadas = [];
       try {
-        for (const archivo of [imagen, imagenMovil].filter(Boolean)) {
-          guardadas.push(await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer));
+        for (const [archivo, perfil] of [[imagen, 'banner'], [imagenMovil, 'bannerMovil']]) {
+          if (archivo) guardadas.push(await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer, { perfil }));
         }
       } catch (error) {
         if (!(error instanceof ErrorDeImagen)) throw error;

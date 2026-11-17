@@ -5,8 +5,10 @@
     <%# conTransicion: la foto "viaja" a la ficha al entrar. Solo en una grilla por página, porque el nombre tiene que ser único. %>
     <div class="foto<%= p.urlFoto ? ' con-foto' : '' %><%= p.urlFotoAlternativa ? ' con-alternativa' : '' %>"<%- locals.conTransicion ? ` style="view-transition-name: foto-${p.slug}"` : '' %>>
       <% if (p.urlFoto) { %>
-        <img src="<%= p.urlFoto %>" alt="<%= p.nombre %>" loading="lazy" decoding="async">
-        <% if (p.urlFotoAlternativa) { %><img class="foto-alternativa" src="<%= p.urlFotoAlternativa %>" alt="" loading="lazy" decoding="async"><% } %>
+        <%# 540 x 675: la caja es 4:5, así que el navegador reserva el lugar antes de que llegue la foto. %>
+        <img src="<%= p.urlFoto %>" alt="<%= p.nombre %>" width="540" height="675"<%- locals.prioridad ? '' : ' loading="lazy"' %> decoding="async">
+        <%# La foto de al pasar el mouse no se descarga hasta que hace falta (la carga tienda.js al primer hover o foco). %>
+        <% if (p.urlFotoAlternativa) { %><img class="foto-alternativa" data-src="<%= p.urlFotoAlternativa %>" alt="" width="540" height="675" decoding="async"><% } %>
       <% } else { %>
         <span aria-hidden="true"><%= p.nombre.charAt(0) %></span>
       <% } %>

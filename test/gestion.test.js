@@ -342,8 +342,12 @@ test('fotos: subir varias, elegir la principal, verlas en la tienda y borrarlas 
   const subida = await nav.enviarArchivos(`${ubicacion}/fotos`, { fotos: [{ contenido: PNG, nombre: 'a.png' }, { contenido: PNG, nombre: 'b.png' }] }, { desde: ubicacion });
   assert.equal(subida.status, 302);
   const carpeta = path.join(dirSubidas, String(tiendaId));
+  // Cada foto se guarda en tres versiones: la grande (<uuid>.webp) y las miniaturas -m y -s.
   const archivos = readdirSync(carpeta);
-  assert.equal(archivos.length, 2);
+  assert.equal(archivos.length, 6);
+  assert.equal(archivos.filter((n) => /^[0-9a-f-]{36}\.webp$/.test(n)).length, 2, 'dos versiones grandes');
+  assert.equal(archivos.filter((n) => /-m\.webp$/.test(n)).length, 2);
+  assert.equal(archivos.filter((n) => /-s\.webp$/.test(n)).length, 2);
   assert.deepEqual((await db.prepare('SELECT huella FROM producto_fotos WHERE tienda_id = ?').all(tiendaId)).map((f) => f.huella), [huellaDe(PNG), huellaDe(PNG)]);
 
   const editor = await (await nav.pedir(ubicacion)).text();
@@ -360,7 +364,7 @@ test('fotos: subir varias, elegir la principal, verlas en la tienda y borrarlas 
   assert.match(portada, /class="foto-alternativa"/);
 
   await nav.enviar(`${ubicacion}/fotos/${primera}/borrar`, {}, { desde: ubicacion });
-  assert.equal(readdirSync(carpeta).length, 1);
+  assert.equal(readdirSync(carpeta).length, 3, 'borrar una foto borra sus tres versiones');
   await nav.enviar(`${ubicacion}/borrar`, {}, { desde: ubicacion });
   assert.equal(readdirSync(carpeta).length, 0, 'borrar el producto borra sus fotos');
   assert.equal((await vidriera('confotos', '/producto/remera-basica')).status, 404);

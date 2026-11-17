@@ -6,8 +6,9 @@
         <div class="carrusel-diapositiva" role="group" aria-roledescription="diapositiva" aria-label="<%= n + 1 %> de <%= banners.length %>">
           <% if (banner.enlace) { %><a href="<%= banner.enlace %>"><% } %>
           <picture>
-            <% if (banner.urlImagenMovil) { %><source media="(max-width: 640px)" srcset="<%= banner.urlImagenMovil %>"><% } %>
-            <img src="<%= banner.urlImagen %>" alt="<%= banner.textoAlternativo %>"<%- n > 0 ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+            <% if (banner.urlImagenMovil) { %><source media="(max-width: 640px)" srcset="<%= banner.urlImagenMovil %>"<%- banner.medidasMovil ? ` width="${banner.medidasMovil.ancho}" height="${banner.medidasMovil.alto}"` : '' %>><% } %>
+            <%# Width y height reservan el alto del banner antes de que cargue. El primero es la imagen principal de la portada: sin lazy y con prioridad. %>
+            <img src="<%= banner.urlImagen %>" alt="<%= banner.textoAlternativo %>"<%- banner.medidas ? ` width="${banner.medidas.ancho}" height="${banner.medidas.alto}"` : '' %> decoding="async"<%- n > 0 ? ' loading="lazy"' : ' fetchpriority="high"' %>>
           </picture>
           <% if (banner.enlace) { %></a><% } %>
         </div>
@@ -159,7 +160,9 @@
   </section>
 <% } else { %>
   <ul class="grilla" data-grilla>
-    <% for (const p of productos) { %><%- include('tarjeta-producto', { p, conTransicion: true }) %><% } %>
+    <%# Las primeras fotos van sin lazy (se ven apenas abre la página), salvo que haya banners o destacados arriba, o sea la página 2. %>
+    <% const hayArriba = pagina !== 1 || banners.length > 0 || destacados.length > 0 %>
+    <% for (const [n, p] of productos.entries()) { %><%- include('tarjeta-producto', { p, conTransicion: true, prioridad: !hayArriba && n < 4 }) %><% } %>
   </ul>
   <% if (urlSiguiente) { %>
     <div class="paginacion">

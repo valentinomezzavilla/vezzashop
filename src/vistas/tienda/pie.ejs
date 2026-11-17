@@ -3,7 +3,7 @@
 <footer class="pie">
   <div class="pie-interior">
     <div class="pie-columna pie-marca">
-      <a class="marca" href="/"><% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"><% } else { %><%= tienda.nombre %><% } %></a>
+      <a class="marca" href="/"><% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"<%- medidasLogo ? ` width="${medidasLogo.ancho}" height="${medidasLogo.alto}"` : '' %> loading="lazy" decoding="async"><% } else { %><%= tienda.nombre %><% } %></a>
       <% if (ajustes.direccion) { %>
         <p class="pie-dato"><%- icono('ubicacion', { tamano: 18 }) %><span><%= ajustes.direccion %></span></p>
       <% } %>

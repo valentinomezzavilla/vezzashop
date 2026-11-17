@@ -12,7 +12,7 @@ import {
   esOrden,
 } from '../vidriera.js';
 import { leerAjustes, listarBanners, colorDeTextoSobre, precioConDescuento, valorCuota } from '../diseno.js';
-import { urlImagen } from '../imagenes.js';
+import { dimensionesDe, urlImagen, urlMiniatura } from '../imagenes.js';
 import { formatearPrecio } from '../util/formato.js';
 import { urlPanel } from '../util/dominios.js';
 import { crearLimite } from '../util/limite.js';
@@ -144,6 +144,8 @@ export function rutasTienda({ db, config }) {
       origen,
       urlActual: `${origen}${req.path}`,
       urlLogo: urlImagen(req.tienda.id, ajustes.logo),
+      // Ancho y alto del logo, para reservarle su lugar en la cabecera antes de que cargue.
+      medidasLogo: await dimensionesDe(config.dirSubidas, req.tienda.id, ajustes.logo),
       colorTexto: colorDeTextoSobre(ajustes.colorPrincipal),
       urlCategoria,
       estadoStock,
@@ -165,7 +167,7 @@ export function rutasTienda({ db, config }) {
   router.use('/admin', (req, res) => res.redirect(`${urlPanel(req, config.dominio)}/admin`));
 
   const conFotos = (tiendaId, productos) =>
-    productos.map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto), urlFotoAlternativa: urlImagen(tiendaId, p.fotoAlternativa) }));
+    productos.map((p) => ({ ...p, urlFoto: urlMiniatura(tiendaId, p.foto), urlFotoAlternativa: urlMiniatura(tiendaId, p.fotoAlternativa) }));
 
   // Una página del catálogo con filtros, orden y paginación. `base` son los filtros fijos (categoría o búsqueda).
   async function listado(req, base) {
@@ -209,11 +211,15 @@ export function rutasTienda({ db, config }) {
     // Los destacados y los banners van arriba solo en la primera vista de la portada, sin filtros ni orden elegido.
     const portada = !req.query.orden && !datos.hayFiltros && datos.pagina === 1;
     const banners = portada
-      ? (await listarBanners(db, req.tienda.id)).map((b) => ({
-          ...b,
-          urlImagen: urlImagen(req.tienda.id, b.imagen),
-          urlImagenMovil: urlImagen(req.tienda.id, b.imagenMovil),
-        }))
+      ? await Promise.all(
+          (await listarBanners(db, req.tienda.id)).map(async (b) => ({
+            ...b,
+            urlImagen: urlImagen(req.tienda.id, b.imagen),
+            urlImagenMovil: urlImagen(req.tienda.id, b.imagenMovil),
+            medidas: await dimensionesDe(config.dirSubidas, req.tienda.id, b.imagen),
+            medidasMovil: await dimensionesDe(config.dirSubidas, req.tienda.id, b.imagenMovil),
+          })),
+        )
       : [];
     const destacados = portada
       ? await productosVisibles(db, req.tienda.id, { soloDestacados: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS })
@@ -273,7 +279,7 @@ export function rutasTienda({ db, config }) {
         nombre: p.nombre,
         url: `/producto/${p.slug}`,
         precio: `${p.precioHasta !== p.precioDesde ? 'Desde ' : ''}${formatearPrecio(p.precioDesde)}`,
-        foto: urlImagen(req.tienda.id, p.foto),
+        foto: urlMiniatura(req.tienda.id, p.foto, 's'),
       })),
     });
   });
@@ -284,7 +290,7 @@ export function rutasTienda({ db, config }) {
     res.json({
       variantes: (await variantesParaCarrito(db, req.tienda.id, skus)).map((v) => ({
         ...v,
-        foto: urlImagen(req.tienda.id, v.foto),
+        foto: urlMiniatura(req.tienda.id, v.foto, 's'),
         url: `/producto/${v.slug}`,
         disponibles: Math.min(v.stock, MAX_EN_CARRITO),
       })),
@@ -298,7 +304,10 @@ export function rutasTienda({ db, config }) {
     const variantes = producto.variantes.map((v) => datosVariante(v, producto, req.ajustes));
     const inicial = variantes.find((v) => v.hayStock) ?? variantes[0];
     const valoresPorAtributo = producto.atributos.map((_, n) => [...new Set(producto.variantes.map((v) => v.valores[n]))]);
+    // fotos: la versión grande (visor, datos para Google y vista previa al compartir). Las otras, para la ficha.
     const fotos = producto.fotos.map((archivo) => urlImagen(req.tienda.id, archivo));
+    const fotosMedianas = producto.fotos.map((archivo) => urlMiniatura(req.tienda.id, archivo, 'm'));
+    const fotosChicas = producto.fotos.map((archivo) => urlMiniatura(req.tienda.id, archivo, 's'));
     const relacionados = await productosRelacionados(db, req.tienda.id, { slug: producto.slug, categoriaIds: producto.categoriaIds });
 
     // Para la vista previa al compartir el link y para Google.
@@ -335,6 +344,8 @@ export function rutasTienda({ db, config }) {
       valoresPorAtributo,
       categoriasProducto: producto.categoriaIds.map((id) => indice.get(id)).filter(Boolean),
       fotos,
+      fotosMedianas,
+      fotosChicas,
       relacionados: conFotos(req.tienda.id, relacionados),
       variantesJson: jsonEnScript(variantes),
       datosEstructurados: jsonEnScript(datosEstructurados),
@@ -384,7 +395,7 @@ export function rutasTienda({ db, config }) {
     res.status(status).render('tienda/checkout', {
       titulo: 'Finalizar compra',
       sinWhatsappFlotante: true,
-      lineas: lineas.map((l) => ({ ...l, urlFoto: urlImagen(req.tienda.id, l.foto) })),
+      lineas: lineas.map((l) => ({ ...l, urlFoto: urlMiniatura(req.tienda.id, l.foto, 's') })),
       cambios,
       valores: { provincia: '', ...valores, ...elegida },
       errores,

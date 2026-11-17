@@ -168,7 +168,7 @@ function panelCarrito() {
     };
     return el('li', { class: 'carrito-linea' },
       el('a', { class: 'carrito-foto', href: l.url, tabindex: '-1', 'aria-hidden': 'true' },
-        l.foto ? el('img', { src: l.foto, alt: '', loading: 'lazy' }) : el('span', { texto: l.nombre.charAt(0) })),
+        l.foto ? el('img', { src: l.foto, alt: '', width: 128, height: 160, loading: 'lazy', decoding: 'async' }) : el('span', { texto: l.nombre.charAt(0) })),
       el('div', { class: 'carrito-datos' },
         el('a', { class: 'carrito-nombre', href: l.url, texto: l.nombre }),
         l.detalle ? el('span', { class: 'carrito-detalle', texto: l.detalle }) : null,
@@ -525,7 +525,7 @@ function buscador() {
           el('li', {},
             el('a', { class: 'sugerencia', href: p.url },
               el('span', { class: 'sugerencia-foto', 'aria-hidden': 'true' },
-                p.foto ? el('img', { src: p.foto, alt: '', loading: 'lazy' }) : el('span', { texto: p.nombre.charAt(0) })),
+                p.foto ? el('img', { src: p.foto, alt: '', width: 128, height: 160, loading: 'lazy', decoding: 'async' }) : el('span', { texto: p.nombre.charAt(0) })),
               el('span', { class: 'sugerencia-nombre', texto: p.nombre }),
               el('span', { class: 'sugerencia-precio', texto: p.precio }))))),
       total > productos.length
@@ -577,6 +577,24 @@ function verMas() {
       boton.removeAttribute('aria-busy');
     }
   });
+}
+
+// ---------- Catálogo: la segunda foto de cada tarjeta ----------
+// La foto que aparece al pasar el mouse viene con data-src y no se descarga hasta el primer hover (o foco con el
+// teclado). En el celular, sin mouse, no se pide nunca: no se vería. Con delegación, también vale para las tarjetas
+// que agrega "Ver más".
+
+function fotosAlternativas() {
+  const cargar = (evento) => {
+    if (evento.pointerType && evento.pointerType !== 'mouse') return;
+    const tarjeta = evento.target.closest?.('.tarjeta-producto');
+    const foto = tarjeta && $('img[data-src]', tarjeta);
+    if (!foto) return;
+    foto.src = foto.dataset.src;
+    foto.removeAttribute('data-src');
+  };
+  document.addEventListener('pointerover', cargar, { passive: true });
+  document.addEventListener('focusin', cargar);
 }
 
 // ---------- Portada: carrusel de banners ----------
@@ -699,6 +717,7 @@ botonCompartir();
 buscador();
 selectorDeOrden();
 verMas();
+fotosAlternativas();
 carrusel();
 galeria();
 menuMovil();

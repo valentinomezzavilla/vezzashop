@@ -26,7 +26,7 @@ import {
 } from '../productos.js';
 import { arbolCategoriasAdmin, aplanar, validarCategoria, crearCategoria, editarCategoria, borrarCategoria } from '../categorias.js';
 import { buscarTienda, renombrarTienda, cambiarClave, LARGO_MINIMO_CLAVE } from '../tiendas.js';
-import { guardarImagen, borrarImagen, urlImagen, huellaDe, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
+import { guardarImagen, borrarImagen, urlMiniatura, huellaDe, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { plural } from '../util/formato.js';
 
@@ -62,7 +62,7 @@ export function rutasAdminTienda({ db, config }) {
     const filtro = esFiltro(req.query.filtro) ? req.query.filtro : 'todos';
     const busqueda = String(req.query.q ?? '').slice(0, 100);
     res.render('admin/productos', {
-      productos: (await listarProductosAdmin(db, tiendaId, { busqueda, filtro })).map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto) })),
+      productos: (await listarProductosAdmin(db, tiendaId, { busqueda, filtro })).map((p) => ({ ...p, urlFoto: urlMiniatura(tiendaId, p.foto, 's') })),
       cuentas: await contarPorFiltro(db, tiendaId),
       filtros: FILTROS,
       filtro,
@@ -78,7 +78,7 @@ export function rutasAdminTienda({ db, config }) {
       formulario,
       errores,
       categorias: aplanar(await arbolCategoriasAdmin(db, tiendaId)),
-      fotos: producto ? (await listarFotos(db, tiendaId, producto.id)).map((f) => ({ ...f, url: urlImagen(tiendaId, f.archivo) })) : [],
+      fotos: producto ? (await listarFotos(db, tiendaId, producto.id)).map((f) => ({ ...f, url: urlMiniatura(tiendaId, f.archivo, 'm') })) : [],
       urlEnTienda: producto ? `${urlTienda(req, dominioDeTiendas(config), tienda.slug)}/producto/${producto.slug}` : null,
       maxAtributos: MAX_ATRIBUTOS,
       maxFotos: MAX_FOTOS,
@@ -118,7 +118,7 @@ export function rutasAdminTienda({ db, config }) {
       return res.redirect(volver);
     }
     res.render('admin/borrar-productos', {
-      productos: productos.map((p) => ({ ...p, urlFoto: urlImagen(tiendaId, p.foto) })),
+      productos: productos.map((p) => ({ ...p, urlFoto: urlMiniatura(tiendaId, p.foto, 's') })),
       volver,
     });
   });

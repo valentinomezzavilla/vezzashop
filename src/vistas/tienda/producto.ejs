@@ -14,7 +14,9 @@
       <div class="galeria-pista" data-galeria-pista tabindex="0" aria-label="Fotos de <%= producto.nombre %>" style="view-transition-name: foto-<%= producto.slug %>">
         <% fotos.forEach((url, n) => { %>
           <button type="button" class="galeria-boton" data-ampliar="<%= n %>" aria-label="Ver la foto <%= n + 1 %> en grande">
-            <img class="galeria-foto" src="<%= url %>" alt="<%= producto.nombre %>, foto <%= n + 1 %> de <%= fotos.length %>"<%- n ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+            <%# Mediana en pantallas chicas de resolución y grande en las retina (srcset). La primera es la imagen principal: sin lazy y con prioridad. %>
+            <img class="galeria-foto" src="<%= fotosMedianas[n] %>" srcset="<%= fotosMedianas[n] %> 540w, <%= url %> 1600w" sizes="(min-width: 860px) 540px, 100vw"
+                 alt="<%= producto.nombre %>, foto <%= n + 1 %> de <%= fotos.length %>" width="540" height="675" decoding="async"<%- n ? ' loading="lazy"' : ' fetchpriority="high"' %>>
           </button>
         <% }) %>
       </div>
@@ -23,7 +25,7 @@
         <div class="galeria-miniaturas">
           <% fotos.forEach((url, n) => { %>
             <button type="button" class="galeria-miniatura" data-galeria-ir="<%= n %>" aria-label="Ver foto <%= n + 1 %>"<%- n === 0 ? ' aria-current="true"' : '' %>>
-              <img src="<%= url %>" alt="" loading="lazy">
+              <img src="<%= fotosChicas[n] %>" alt="" width="128" height="160" loading="lazy" decoding="async">
             </button>
           <% }) %>
         </div>
@@ -148,7 +150,8 @@
       <button class="boton-icono visor-anterior" type="button" data-visor-paso="-1" aria-label="Foto anterior"><%- icono('izquierda', { tamano: 26 }) %></button>
       <button class="boton-icono visor-siguiente" type="button" data-visor-paso="1" aria-label="Foto siguiente"><%- icono('derecha', { tamano: 26 }) %></button>
     <% } %>
-    <img class="visor-foto" src="<%= fotos[0] %>" alt="" data-visor-foto>
+    <%# El visor se abre al tocar una foto: tienda.js le pone la versión grande recién ahí, así no se descarga antes. %>
+    <img class="visor-foto" alt="" decoding="async" data-visor-foto>
     <p class="visor-contador" data-visor-contador aria-live="polite"></p>
     <script type="application/json" data-visor-fotos><%- JSON.stringify(fotos).replace(/</g, '\\u003c') %></script>
   </dialog>

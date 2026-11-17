@@ -61,6 +61,7 @@ obligatoria. En tu compu dejala vacía y se usa PGlite. Las migraciones (`src/mi
 | Comando | Qué hace |
 |---|---|
 | `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com` | Da de alta un cliente: crea la tienda y su usuario, y muestra la clave **una sola vez**. |
+| `npm run migrar-imagenes -- --dry-run` | Muestra qué haría para pasar las imágenes subidas antes del formato WebP al formato nuevo (ver [Imágenes](#imágenes)). Sin `--dry-run` las convierte. |
 | `npm run dev` | Levanta el servidor y lo reinicia cuando cambia el código. Panel en http://localhost:3000/admin y cada tienda en http://&lt;slug&gt;.localhost:3000 |
 | `npm start` | Levanta el servidor (para producción). |
 | `npm test` | Corre todos los tests (con PGlite, sin instalar nada). Para probar contra un PostgreSQL de verdad: `PRUEBAS_DATABASE_URL=postgres://usuario:clave@host:5432/base npm test` (cada prueba usa su propio esquema y lo borra al terminar). |
@@ -173,6 +174,49 @@ tiene al menos una forma de entrega y una de pago activas (si no, el carrito sig
 Los pedidos guardan una copia de lo comprado (productos, precios, entrega, dirección), así no cambian si después
 cambia el catálogo. Cancelar un pedido devuelve el stock de lo que todavía existe.
 
+## Imágenes
+
+Los clientes suben fotos de hasta 5 MB (JPG, PNG o WEBP; las de cámara pesan 2 a 5 MB y miden 4000 a 6000 px de lado).
+Para que la tienda cargue rápido **no se guarda el original**: cada subida se convierte con `sharp` a WebP, se endereza
+según la orientación de la cámara (EXIF) y se descartan los metadatos, como la ubicación. Se guardan en
+`<DIR_SUBIDAS>/<tiendaId>/` y se sirven en `/subidas/<tiendaId>/<archivo>`:
+
+| Imagen | Archivos | Medidas |
+|---|---|---|
+| Foto de producto | `<uuid>.webp` · `<uuid>-m.webp` · `<uuid>-s.webp` | 1600 px de ancho (la que se abre al ampliar) · 540 px (grilla y ficha) · 128 px (carrito, buscador, tira de fotos) |
+| Banner | `<uuid>.webp` | 1200 px de ancho (800 px el de celular) |
+| Logo | `<uuid>.webp` | hasta 360 × 80 px, el doble de lo que se muestra |
+
+La base de datos sigue guardando un solo nombre (el de la versión grande, `archivo` / `logo` / `imagen`); las miniaturas
+se encuentran por nombre. En la vidriera, las grillas usan las miniaturas, la ficha usa `srcset` (mediana o grande según la
+pantalla) y la versión grande solo se baja al tocar una foto para ampliarla. La segunda foto de cada tarjeta (la que aparece al
+pasar el mouse) no se descarga hasta el primer hover. Todos los `<img>` llevan `width` y `height` para que la página no salte.
+
+**Imágenes subidas antes de este formato.** Siguen funcionando: si falta una miniatura, `/subidas` redirige al original
+(con caché corta). Para convertirlas, dentro del contenedor (Terminal de Coolify):
+
+```bash
+npm run migrar-imagenes -- --dry-run   # muestra qué haría, sin escribir nada
+npm run migrar-imagenes                # convierte todas las tiendas (o --tienda 3 para una sola)
+```
+
+- No borra nada: los originales quedan donde están. Cuando verifiques que todo se ve bien, `--mover-originales` los
+  pasa a `data/subidas-originales/` (o a la carpeta de `--respaldo <carpeta>`) para ocupar menos lugar en `/subidas`.
+- Se puede correr varias veces: lo ya convertido se saltea, y si se corta a la mitad se completa en la siguiente.
+- La base solo cambia cuando los archivos nuevos ya están escritos, así que la tienda sigue andando mientras corre.
+- Antes de convertir completa la huella de las fotos que no tenían, para que la carga masiva siga sin repetir fotos.
+- Informa los archivos que la base usa pero ya no existen en disco (y sale con código 2 si hay alguno).
+
+**Compresión y caché.** La app comprime con gzip o brotli el HTML, CSS, JS y JSON (`compression`), y sirve `/subidas`
+con `Cache-Control: public, max-age=31536000, immutable`: los nombres llevan un UUID y nunca se reutilizan. Las imágenes
+WebP no se vuelven a comprimir. El repo no trae configuración de Nginx: en Coolify el proxy es Traefik, que no hace falta
+tocar. Para comprobarlo en producción:
+
+```bash
+curl -sI -H 'Accept-Encoding: br, gzip' https://tienda.ejemplo.com/tienda.css | grep -i 'content-encoding\|cache-control'
+curl -sI https://tienda.ejemplo.com/subidas/1/<archivo>.webp | grep -i 'cache-control'
+```
+
 ## Publicar en Coolify
 
 El repo trae un `Dockerfile` (Node 24 Alpine, corre sin root y responde `ok` en `/salud` para el chequeo de
@@ -255,7 +299,8 @@ src/
   diseno.js              ajustes de diseño de cada tienda y banners
   pagos.js               formas de entrega y de pago (Envíos y pagos)
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
-  imagenes.js            imágenes subidas (validación y guardado)
+  imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
+  migrar-imagenes.js     convierte al formato nuevo las imágenes subidas antes (lo usa scripts/migrar-imagenes.js)
   util/dominios.js       qué tienda corresponde a cada subdominio
   importacion/
     valores.js           interpreta celdas (precios, números, sí/no)
@@ -275,6 +320,7 @@ src/
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/
   publico/               CSS y scripts del panel (admin.js) y de la vidriera (tienda.js)
 scripts/crear-tienda.js
+scripts/migrar-imagenes.js
 test/                    tests (node:test)
 ```
 

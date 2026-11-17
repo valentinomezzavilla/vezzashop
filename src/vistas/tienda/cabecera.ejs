@@ -29,7 +29,7 @@
   <% } %>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&family=Rubik:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Rubik:wght@600;700&display=swap">
   <link rel="stylesheet" href="/tienda.css">
   <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; }</style>
   <script src="/tienda.js" defer></script>
@@ -42,7 +42,7 @@
 <header class="cabecera">
   <div class="cabecera-interior">
     <a class="marca" href="/" aria-label="<%= tienda.nombre %>, inicio">
-      <% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"><% } else { %><%= tienda.nombre %><% } %>
+      <% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"<%- medidasLogo ? ` width="${medidasLogo.ancho}" height="${medidasLogo.alto}"` : '' %> decoding="async"><% } else { %><%= tienda.nombre %><% } %>
     </a>
 
     <% if (categorias.length) { %>

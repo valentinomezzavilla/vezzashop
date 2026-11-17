@@ -159,7 +159,7 @@
         <% for (const l of lineas) { %>
           <li class="resumen-linea">
             <span class="resumen-foto" aria-hidden="true">
-              <% if (l.urlFoto) { %><img src="<%= l.urlFoto %>" alt="" loading="lazy"><% } else { %><span><%= l.nombre.charAt(0) %></span><% } %>
+              <% if (l.urlFoto) { %><img src="<%= l.urlFoto %>" alt="" width="128" height="160" loading="lazy" decoding="async"><% } else { %><span><%= l.nombre.charAt(0) %></span><% } %>
               <span class="resumen-cantidad"><%= l.cantidad %></span>
             </span>
             <span class="resumen-textos">

@@ -1,5 +1,7 @@
 import express from 'express';
 import session from 'express-session';
+import compression from 'compression';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
@@ -36,9 +38,31 @@ export function crearApp({ db, config }) {
     res.type('text').send('ok');
   });
 
+  // gzip o brotli para HTML, CSS, JS y JSON. Las imágenes ya vienen comprimidas (WebP) y no se tocan.
+  app.use(compression());
+
   app.use(express.static(path.join(import.meta.dirname, 'publico')));
   // Imágenes subidas por los clientes. Cada archivo tiene un nombre nuevo, así que se pueden cachear para siempre.
   app.use('/subidas', express.static(config.dirSubidas, { immutable: true, maxAge: '365d', index: false }));
+  // Las imágenes subidas antes de las miniaturas (<uuid>.jpg) no tienen <uuid>-m.webp ni <uuid>-s.webp: hasta que
+  // scripts/migrar-imagenes.js las convierta, se manda al original. El redirect va con caché corta: con `immutable`
+  // el navegador se quedaría un año con el original pesado aunque después exista la miniatura.
+  app.get('/subidas/:tiendaId/:archivo', async (req, res, next) => {
+    const { tiendaId, archivo } = req.params;
+    const partes = /^([A-Za-z0-9-]+)-[ms]\.webp$/.exec(archivo);
+    if (!partes || !/^\d+$/.test(tiendaId)) return next();
+    for (const extension of ['jpg', 'png', 'webp']) {
+      const original = `${partes[1]}.${extension}`;
+      try {
+        await access(path.join(config.dirSubidas, tiendaId, original));
+      } catch {
+        continue;
+      }
+      res.set('Cache-Control', 'public, max-age=300');
+      return res.redirect(302, `/subidas/${tiendaId}/${original}`);
+    }
+    next();
+  });
 
   // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:
   // la vidriera no las usa y así las visitas no crean sesiones.
