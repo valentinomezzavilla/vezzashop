@@ -893,6 +893,21 @@ body:has(.ingreso) {
 .vista-previa-cuerpo { padding: 1.1rem; display: flex; justify-content: center; background: #fafafa; }
 .vista-previa-boton { padding: .55rem 1.2rem; border-radius: 99px; background: var(--muestra); color: var(--muestra-texto); font-weight: 600; font-size: .9rem; transition: background 400ms var(--suave), color 400ms var(--suave); }
 
+/* Vista previa de la cabecera: el logo (con su tamaño) y el menú, que cambian al elegir las opciones de arriba. */
+.vista-previa-cab { --logo-prev: 36px; }
+.vista-previa-cab[data-logo="chico"] { --logo-prev: 26px; }
+.vista-previa-cab[data-logo="grande"] { --logo-prev: 50px; }
+.vista-previa-cab .vista-previa-cabecera { gap: 1.1rem; min-height: 76px; }
+.vista-previa-marca { display: flex; align-items: center; flex-shrink: 0; }
+.vista-previa-cab .vista-previa-logo { height: var(--logo-prev); transition: height 420ms var(--resorte); }
+.vista-previa-cab .vista-previa-nombre { font-size: calc(var(--logo-prev) * .5); transition: font-size 420ms var(--resorte); }
+.vista-previa-menu { display: flex; gap: .15rem; flex: 1; min-width: 0; overflow: hidden; font-size: .78rem; font-weight: 500; color: #515154; white-space: nowrap; }
+.vista-previa-menu span { padding: .25rem .6rem; border-radius: 99px; animation: aviso-entrar 360ms var(--suave) backwards; }
+.vista-previa-iconos { display: flex; align-items: center; gap: .7rem; margin-left: auto; color: #1d1d1f; }
+.vista-previa-hamburguesa { display: none; }
+.vista-previa-cab[data-menu="desplegable"] .vista-previa-menu { display: none; }
+.vista-previa-cab[data-menu="desplegable"] .vista-previa-hamburguesa { display: inline-flex; }
+
 /* Barra para guardar: una cápsula de vidrio que flota abajo mientras se completa el formulario. */
 .barra-guardar {
   position: sticky;
@@ -1340,6 +1355,8 @@ button.pastilla-boton:hover { box-shadow: inset 0 0 0 1px currentColor; transfor
 .tipos-entrega { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 0; padding: 0; border: 0; min-width: 0; }
 .tipos-entrega legend { margin-bottom: .5rem; padding: 0; }
 @media (max-width: 560px) { .tipos-entrega { grid-template-columns: minmax(0, 1fr); } }
+.tipos-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 560px) { .tipos-tres { grid-template-columns: minmax(0, 1fr); } }
 .opcion-tipo { position: relative; display: grid; gap: .2rem; padding: .9rem 1rem; border: 1px solid var(--borde-fuerte); border-radius: 16px; background: var(--campo); cursor: pointer; transition: border-color var(--transicion), background var(--transicion), box-shadow var(--transicion), transform var(--transicion-resorte); }
 .opcion-tipo input { position: absolute; opacity: 0; }
 .opcion-tipo > span:first-of-type { display: inline-flex; gap: .45rem; align-items: center; }

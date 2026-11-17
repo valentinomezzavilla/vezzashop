@@ -184,15 +184,20 @@ p { margin: 0; }
   max-width: var(--ancho);
   margin: 0 auto;
   padding: 0 var(--margen);
-  min-height: 66px;
+  min-height: max(66px, calc(var(--logo-alto, 40px) + 26px));
   display: flex; align-items: center; gap: 2.5rem;
 }
 .marca { font: 700 1.3rem/1 var(--fuente-titulos); letter-spacing: -.035em; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
-.logo { display: block; height: 40px; width: auto; max-width: 180px; object-fit: contain; }
+/* El tamaño lo elige cada tienda en Diseño (--logo-alto, ver cabecera.ejs). En el celular no pasa de 44 px. */
+.logo { display: block; height: var(--logo-alto, 40px); width: auto; max-width: calc(var(--logo-alto, 40px) * 4.5); object-fit: contain; }
+@media (max-width: 900px) { .logo { height: min(var(--logo-alto, 40px), 44px); } }
 
-.navegacion-lista { list-style: none; display: flex; gap: .15rem; margin: 0; padding: 0; }
-.navegacion-item { position: relative; }
-.navegacion-item > a {
+/* Una sola línea y sin encoger: lo que no entra se recorta (nunca pisa los íconos de la derecha) hasta que tienda.js lo
+   junta en "Más" y suelta el recorte (.ajustada), para que se vean los submenús. */
+.navegacion-lista { list-style: none; display: flex; flex-wrap: nowrap; gap: .15rem; margin: 0; padding: 0; }
+.navegacion-item { position: relative; flex-shrink: 0; }
+.navegacion-item > :is(a, button) {
+  font-family: inherit; border: 0; background: none; cursor: pointer; white-space: nowrap;
   display: inline-flex; gap: .25rem; align-items: center;
   min-height: 40px;
   padding: 0 .9rem;
@@ -203,9 +208,9 @@ p { margin: 0; }
   text-decoration: none;
   transition: color var(--rapido), background var(--rapido);
 }
-.navegacion-item > a .icono { transition: transform var(--resorte-medio); }
-.navegacion-item > a:hover, .navegacion-item:focus-within > a { color: var(--texto); background: var(--superficie-hover); }
-.con-submenu:hover > a .icono, .con-submenu:focus-within > a .icono { transform: rotate(180deg); }
+.navegacion-item > :is(a, button) .icono { transition: transform var(--resorte-medio); }
+.navegacion-item > :is(a, button):hover, .navegacion-item:focus-within > :is(a, button) { color: var(--texto); background: var(--superficie-hover); }
+.con-submenu:hover > :is(a, button) .icono, .con-submenu:focus-within > :is(a, button) .icono { transform: rotate(180deg); }
 /* Los menús van casi opacos: adentro de la cabecera de vidrio, un segundo desenfoque no vería la página. */
 .submenu {
   position: absolute; top: calc(100% + 6px); left: 0;
@@ -225,7 +230,13 @@ p { margin: 0; }
 .submenu a:hover { background: var(--superficie-hover); color: var(--texto); }
 .submenu li:first-child a { font-weight: 650; color: var(--texto); }
 
-.navegacion { flex: 1; min-width: 0; }
+.navegacion { flex: 1; min-width: 0; overflow: hidden; }
+.navegacion.ajustada { overflow: visible; }
+/* "Más": el último de la barra abre su lista hacia la izquierda, para no salirse de la pantalla. */
+.navegacion-mas .submenu { left: auto; right: 0; transform-origin: top right; max-height: 70vh; overflow-y: auto; }
+.submenu a.submenu-sub { padding-left: 1.6rem; font-size: .92rem; }
+.submenu li:first-child a.submenu-sub { font-weight: 400; color: var(--texto-suave); }
+.submenu a.submenu-categoria { font-weight: 650; color: var(--texto); }
 .cabecera-acciones { display: flex; align-items: center; gap: .15rem; margin-left: auto; }
 .boton-carrito { position: relative; }
 .contador-carrito {
@@ -267,7 +278,18 @@ p { margin: 0; }
 @media (max-width: 900px) {
   .navegacion { display: none; }
   .menu-movil { display: block; }
-  .cabecera-interior { min-height: 58px; }
+  .cabecera-interior { min-height: max(58px, calc(min(var(--logo-alto, 40px), 44px) + 20px)); }
+}
+
+/* Menú desplegable (se elige en Diseño): sin barra, el botón de menú abre la lista también en la computadora. */
+.cabecera[data-menu="desplegable"] .navegacion { display: none; }
+.cabecera[data-menu="desplegable"] .menu-movil { display: block; }
+@media (min-width: 901px) {
+  .cabecera[data-menu="desplegable"] .menu-movil-panel {
+    left: auto;
+    right: max(.6rem, calc((100vw - var(--ancho)) / 2 + var(--margen) - .6rem));
+    width: min(380px, calc(100vw - 1.2rem));
+  }
 }
 
 /* ---------- Contenido ---------- */

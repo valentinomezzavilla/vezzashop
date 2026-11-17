@@ -2,11 +2,11 @@
 import { enTransaccion } from './db.js';
 import { slugificar } from './util/slug.js';
 
-// Árbol completo (incluye las vacías). Cada nodo: { id, nombre, slug, padreId, productos, nivel, hijas }.
+// Árbol completo (incluye las vacías). Cada nodo: { id, nombre, slug, padreId, enMenu, productos, nivel, hijas }.
 export async function arbolCategoriasAdmin(db, tiendaId) {
   const filas = await db
     .prepare(
-      `SELECT c.id, c.nombre, c.slug, c.padre_id AS "padreId",
+      `SELECT c.id, c.nombre, c.slug, c.padre_id AS "padreId", (c.en_menu = 1) AS "enMenu",
               (SELECT count(*) FROM producto_categorias pc WHERE pc.categoria_id = c.id) AS productos
        FROM categorias c WHERE c.tienda_id = ? ORDER BY lower(c.nombre), c.id`,
     )

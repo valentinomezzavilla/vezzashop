@@ -686,6 +686,63 @@ function galeria() {
   });
 }
 
+// ---------- Cabecera: el menú de categorías y el botón "Más" ----------
+// Las categorías que no entran en la barra pasan solas a "Más" (con sus subcategorías), y se recalcula al achicar o agrandar
+// la ventana. Hasta que esto corre, el CSS recorta lo que sobra: nunca se pisa con los íconos de la derecha.
+
+function menuDeCategorias() {
+  const nav = $('[data-navegacion]');
+  const lista = nav && $('.navegacion-lista', nav);
+  if (!lista) return;
+  const items = [...lista.children];
+  const submenu = el('ul', { class: 'submenu' });
+  const mas = el('li', { class: 'navegacion-item con-submenu navegacion-mas', hidden: true },
+    el('button', { type: 'button', 'aria-haspopup': 'true', 'aria-label': 'Más categorías' }, 'Más'),
+    submenu);
+  $('button', mas).insertAdjacentHTML('beforeend',
+    '<svg class="icono" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>');
+  lista.append(mas);
+
+  // Una categoría y sus subcategorías, como filas de la lista de "Más".
+  const filasDe = (li) => [
+    el('li', {}, el('a', { class: 'submenu-categoria', href: $(':scope > a', li).getAttribute('href'), texto: $(':scope > a', li).textContent.trim() })),
+    ...$$('.submenu li:not(:first-child) a', li).map((a) => el('li', {}, el('a', { class: 'submenu-sub', href: a.getAttribute('href'), texto: a.textContent.trim() }))),
+  ];
+
+  const ajustar = () => {
+    if (getComputedStyle(nav).display === 'none') return; // en el celular la barra no se muestra
+    for (const li of items) li.hidden = false;
+    mas.hidden = true;
+    submenu.replaceChildren();
+    if (lista.scrollWidth <= nav.clientWidth + 1) return;
+
+    mas.hidden = false;
+    const separacion = parseFloat(getComputedStyle(lista).columnGap) || 0;
+    const limite = nav.clientWidth - mas.offsetWidth - separacion;
+    let usado = 0;
+    const corte = items.findIndex((li) => (usado += li.offsetWidth + separacion) - separacion > limite);
+    if (corte === -1) {
+      mas.hidden = true;
+      return;
+    }
+    const ocultos = items.slice(corte);
+    for (const li of ocultos) li.hidden = true;
+    submenu.replaceChildren(...ocultos.flatMap(filasDe));
+  };
+
+  let pendiente = false;
+  const siguiente = () => {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(() => ((pendiente = false), ajustar()));
+  };
+  ajustar();
+  nav.classList.add('ajustada');
+  new ResizeObserver(siguiente).observe(nav);
+  // Cuando llega la tipografía los textos cambian de ancho.
+  document.fonts?.ready.then(siguiente);
+}
+
 // ---------- Desplegables (menú del celular y filtros) ----------
 // Se cierran con Escape o al tocar afuera.
 
@@ -721,3 +778,4 @@ fotosAlternativas();
 carrusel();
 galeria();
 menuMovil();
+menuDeCategorias();

@@ -8,7 +8,7 @@
 //           <uuid>-m.webp    miniatura de 540 px (grillas de productos y portada de la ficha)
 //           <uuid>-s.webp    miniatura de 128 px (carrito, buscador, tira de fotos, listados del panel)
 //   banner  <uuid>.webp      hasta 1200 px de ancho (800 px la versión para celular)
-//   logo    <uuid>.webp      hasta 360 × 80 px: el doble de lo que se muestra, para pantallas retina
+//   logo    <uuid>.webp      hasta 504 × 112 px: el doble del tamaño más grande que se puede elegir (56 px de alto)
 //
 // La base de datos guarda solo el nombre de la versión grande (<uuid>.webp); las miniaturas se encuentran por nombre
 // (urlMiniatura). Las imágenes subidas antes de este formato (<uuid>.jpg / .png) siguen funcionando tal cual
@@ -31,7 +31,7 @@ export const PERFILES = {
   foto: { ancho: 1600, calidad: 78, miniaturas: [['m', 540], ['s', 128]] },
   banner: { ancho: 1200, calidad: 80, miniaturas: [] },
   bannerMovil: { ancho: 800, calidad: 80, miniaturas: [] },
-  logo: { ancho: 360, alto: 80, calidad: 88, miniaturas: [] },
+  logo: { ancho: 504, alto: 112, calidad: 88, miniaturas: [] },
 };
 
 // El tipo se decide por el contenido, no por el nombre del archivo. No se aceptan SVG: pueden traer scripts.

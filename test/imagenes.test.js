@@ -91,12 +91,12 @@ test('los metadatos (como la ubicación) no llegan a lo guardado', async () => {
   assert.equal((await sharp(path.join(carpeta(12), archivo)).metadata()).exif, undefined);
 });
 
-test('el logo queda a 2x de lo que se muestra y conserva la transparencia', async () => {
+test('el logo queda a 2x del tamaño más grande que se puede elegir y conserva la transparencia', async () => {
   const logo = await sharp({ create: { width: 1536, height: 1024, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 0.5 } } }).png().toBuffer();
   const archivo = await guardarImagen(dirSubidas, 13, logo, { perfil: 'logo' });
   assert.deepEqual(readdirSync(carpeta(13)), [archivo], 'el logo no lleva miniaturas');
   const { ancho, alto } = await medidas(13, archivo);
-  assert.ok(ancho <= 360 && alto <= 80 && (ancho === 360 || alto === 80), `${ancho}x${alto}`);
+  assert.ok(ancho <= 504 && alto <= 112 && (ancho === 504 || alto === 112), `${ancho}x${alto}`);
   assert.equal((await sharp(path.join(carpeta(13), archivo)).metadata()).hasAlpha, true);
   assert.ok(peso(13, archivo) < 10 * 1024);
 });
@@ -225,7 +225,7 @@ test('la vidriera usa miniaturas con width y height, y carga la foto alternativa
   // El logo, con las medidas del archivo guardado (2x de lo que se muestra).
   const { ancho, alto } = await dimensionesDe(dirSubidas, id, logo);
   assert.match(portada, new RegExp(`<img class="logo"[^>]*width="${ancho}" height="${alto}"`));
-  assert.ok(ancho <= 360 && alto <= 80);
+  assert.ok(ancho <= 504 && alto <= 112);
 
   // La ficha: la primera foto sin lazy y con prioridad, srcset con mediana y grande, tira con las chicas, visor sin foto hasta abrirlo.
   const ficha = (await pedirConHost(puerto, 'fotos-vidriera.localhost', '/producto/p0')).cuerpo;
@@ -317,7 +317,7 @@ test('migración: convierte, actualiza la base, conserva los originales y las hu
     assert.ok((await medidas(id, foto)).ancho <= 1600);
     assert.ok(peso(id, nombreMiniatura(foto, 'm')) <= 100 * 1024);
   }
-  assert.ok((await medidas(id, 'logo-g.webp')).ancho <= 360);
+  assert.ok((await medidas(id, 'logo-g.webp')).ancho <= 504);
   assert.equal((await medidas(id, 'banner-g.webp')).ancho, 1200);
   assert.equal((await medidas(id, 'banner-movil-g.webp')).ancho, 800);
   // La huella de la foto que no tenía es la del ORIGINAL (la que usa la carga masiva para no repetir fotos).

@@ -25,8 +25,12 @@ import {
   agregarBanner,
   moverBanner,
   borrarBanner,
+  guardarCategoriasEnMenu,
+  ESTILOS_MENU,
+  TAMANOS_LOGO,
   MAX_BANNERS,
 } from '../diseno.js';
+import { arbolCategoriasAdmin } from '../categorias.js';
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { ORDENES } from '../vidriera.js';
 
@@ -90,6 +94,10 @@ export function rutasAdmin({ db, config }) {
       errores,
       urlLogo: urlImagen(tiendaId, ajustes.logo),
       ordenes: ORDENES,
+      estilosMenu: ESTILOS_MENU,
+      tamanosLogo: TAMANOS_LOGO,
+      // Categorías de primer nivel, para elegir cuáles van en el menú de arriba de la tienda.
+      categoriasMenu: await arbolCategoriasAdmin(db, tiendaId),
       banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
       maxBanners: MAX_BANNERS,
       megasImagen: MEGAS_IMAGEN,
@@ -288,6 +296,8 @@ export function rutasAdmin({ db, config }) {
       }
     }
     await actualizarAjustes(db, tiendaId, { ...ajustes, logo });
+    // Las casillas sin marcar no viajan en el formulario: por eso viene un campo que avisa que esa sección se envió.
+    if (req.body.menuCategoriasEnviado === '1') await guardarCategoriasEnMenu(db, tiendaId, req.body.menuCategorias ?? []);
     if (logo !== logoAnterior) await borrarImagen(config.dirSubidas, tiendaId, logoAnterior);
 
     req.session.aviso = { tipo: 'ok', texto: 'Listo, guardamos los cambios. Ya se ven en tu tienda.' };

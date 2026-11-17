@@ -31,7 +31,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/tienda.css">
-  <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; }</style>
+  <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; --logo-alto: <%= locals.logoAlto ?? 40 %>px; }</style>
+  <%# Sin JavaScript no se puede juntar lo que no entra en "Más": las categorías pasan a una segunda línea en vez de quedar tapadas. %>
+  <noscript><style>.navegacion { overflow: visible; } .navegacion-lista { flex-wrap: wrap; }</style></noscript>
   <script src="/tienda.js" defer></script>
 </head>
 <body>
@@ -39,16 +41,18 @@
 <% if (ajustes.franjaTexto) { %>
   <div class="franja"><p><%= ajustes.franjaTexto %></p></div>
 <% } %>
-<header class="cabecera">
+<%# Las categorías del menú de arriba son las que la tienda eligió en Diseño; el pie las muestra todas. %>
+<% const enMenu = categorias.filter((c) => c.enMenu) %>
+<header class="cabecera" data-menu="<%= ajustes.menuEstilo %>">
   <div class="cabecera-interior">
     <a class="marca" href="/" aria-label="<%= tienda.nombre %>, inicio">
       <% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"<%- medidasLogo ? ` width="${medidasLogo.ancho}" height="${medidasLogo.alto}"` : '' %> decoding="async"><% } else { %><%= tienda.nombre %><% } %>
     </a>
 
-    <% if (categorias.length) { %>
-      <nav class="navegacion" aria-label="Categorías">
+    <% if (enMenu.length) { %>
+      <nav class="navegacion" aria-label="Categorías" data-navegacion>
         <ul class="navegacion-lista">
-          <% for (const categoria of categorias) { %>
+          <% for (const categoria of enMenu) { %>
             <li class="navegacion-item<%= categoria.hijas.length ? ' con-submenu' : '' %>">
               <a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %><% if (categoria.hijas.length) { %><%- icono('abajo', { tamano: 14 }) %><% } %></a>
               <% if (categoria.hijas.length) { %>
@@ -71,12 +75,12 @@
           <span class="contador-carrito" data-contador-carrito hidden>0</span>
         </button>
       <% } %>
-      <% if (categorias.length) { %>
+      <% if (enMenu.length) { %>
         <details class="menu-movil" data-menu-movil>
           <summary class="boton-icono" aria-label="Abrir el menú"><%- icono('menu', { tamano: 22 }) %></summary>
           <nav class="menu-movil-panel" aria-label="Categorías">
             <a class="menu-movil-inicio" href="/">Todos los productos</a>
-            <% for (const categoria of categorias) { %>
+            <% for (const categoria of enMenu) { %>
               <a class="menu-movil-categoria" href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a>
               <% for (const hija of categoria.hijas) { %>
                 <a class="menu-movil-subcategoria" href="<%= urlCategoria(hija) %>"><%= hija.nombre %></a>

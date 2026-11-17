@@ -5,8 +5,21 @@ import { esOrden } from './vidriera.js';
 export const MAX_BANNERS = 6;
 const LARGO_FRANJA = 200;
 
+// Cómo se muestra el menú de categorías y el tamaño del logo (alto en la cabecera, en px).
+export const ESTILOS_MENU = {
+  barra: { titulo: 'Barra de categorías', ayuda: 'Las categorías van en una barra arriba. Las que no entran pasan solas a un botón "Más".' },
+  desplegable: { titulo: 'Menú desplegable', ayuda: 'Un botón de menú abre la lista de categorías. Queda más limpio si tenés muchas.' },
+};
+export const TAMANOS_LOGO = {
+  chico: { titulo: 'Chico', alto: 32 },
+  mediano: { titulo: 'Mediano', alto: 40 },
+  grande: { titulo: 'Grande', alto: 56 },
+};
+
 const AJUSTES_POR_DEFECTO = {
   logo: null,
+  menuEstilo: 'barra',
+  logoTamano: 'mediano',
   colorPrincipal: '#1a1a1a',
   franjaTexto: '',
   descuentoTransferencia: 0,
@@ -36,6 +49,8 @@ const BOOLEANOS = new Set(['pagoTransferencia', 'pagoEfectivo', 'pagoMercadopago
 // Las claves de AJUSTES_POR_DEFECTO, como columnas de ajustes_tienda.
 const COLUMNAS = {
   logo: 'logo',
+  menuEstilo: 'menu_estilo',
+  logoTamano: 'logo_tamano',
   colorPrincipal: 'color_principal',
   franjaTexto: 'franja_texto',
   descuentoTransferencia: 'descuento_transferencia',
@@ -143,7 +158,29 @@ export function validarAjustes(campos) {
   ajustes.direccion = texto(campos.direccion);
   if (ajustes.direccion.length > 300) errores.direccion = 'Máximo 300 caracteres';
 
+  // Cabecera: si el campo no viene, el ajuste queda como estaba (otro formulario, o uno anterior a estas opciones).
+  if (campos.menuEstilo !== undefined) {
+    if (Object.hasOwn(ESTILOS_MENU, texto(campos.menuEstilo))) ajustes.menuEstilo = texto(campos.menuEstilo);
+    else errores.menuEstilo = 'Elegí una de las opciones';
+  }
+  if (campos.logoTamano !== undefined) {
+    if (Object.hasOwn(TAMANOS_LOGO, texto(campos.logoTamano))) ajustes.logoTamano = texto(campos.logoTamano);
+    else errores.logoTamano = 'Elegí una de las opciones';
+  }
+
   return { ajustes, errores };
+}
+
+// Las categorías de primer nivel que aparecen en el menú de arriba de la tienda.
+// `ids` son las que se marcaron (cualquier valor que venga del formulario: se descarta lo que no sea de la tienda).
+export async function guardarCategoriasEnMenu(db, tiendaId, ids) {
+  const marcadas = [...new Set([ids].flat().map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  await db
+    .prepare(
+      `UPDATE categorias SET en_menu = CASE WHEN id = ANY(?::int[]) THEN 1 ELSE 0 END
+       WHERE tienda_id = ? AND padre_id IS NULL`,
+    )
+    .run(marcadas, tiendaId);
 }
 
 // Un link de banner puede ser una página de la tienda ("/categoria/ofertas") o una dirección completa.

@@ -83,6 +83,75 @@
     </div>
   </section>
 
+  <section class="ajuste" id="cabecera">
+    <%
+      const estiloActual = Object.hasOwn(estilosMenu, valores.menuEstilo) ? valores.menuEstilo : 'barra';
+      const tamanoActual = Object.hasOwn(tamanosLogo, valores.logoTamano) ? valores.logoTamano : 'mediano';
+      // Si el formulario ya se envió (y volvió con errores), se respeta lo que se había marcado; si no, lo guardado.
+      const marcadas = valores.menuCategoriasEnviado === '1'
+        ? new Set([].concat(valores.menuCategorias ?? []).map(Number))
+        : new Set(categoriasMenu.filter((c) => c.enMenu).map((c) => c.id));
+    %>
+    <div class="ajuste-intro">
+      <h2>Cabecera y menú</h2>
+      <p class="texto-suave">Cómo se ve la parte de arriba de tu tienda: el menú de categorías y el tamaño del logo.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="vista-previa vista-previa-cab" data-vista-menu data-menu="<%= estiloActual %>" data-logo="<%= tamanoActual %>" aria-hidden="true">
+        <span class="vista-previa-titulo">Vista previa</span>
+        <div class="vista-previa-cabecera">
+          <div class="vista-previa-marca">
+            <% if (urlLogo) { %><img class="vista-previa-logo" src="<%= urlLogo %>" alt=""><% } else { %><span class="vista-previa-nombre"><%= nombreTienda %></span><% } %>
+          </div>
+          <div class="vista-previa-menu" data-menu-lista></div>
+          <span class="vista-previa-iconos"><%- icono('lupa', { tamano: 18 }) %><%- icono('bolsa', { tamano: 18 }) %><span class="vista-previa-hamburguesa"><%- icono('menu', { tamano: 18 }) %></span></span>
+        </div>
+      </div>
+
+      <fieldset class="tipos-entrega">
+        <legend class="etiqueta">Estilo del menú</legend>
+        <% for (const [clave, estilo] of Object.entries(estilosMenu)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="menuEstilo" value="<%= clave %>"<%= estiloActual === clave ? ' checked' : '' %>>
+            <span><%- icono(clave === 'barra' ? 'filtros' : 'menu', { tamano: 20 }) %> <strong><%= estilo.titulo %></strong></span>
+            <span class="ayuda"><%= estilo.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('menuEstilo') %>
+      </fieldset>
+
+      <fieldset class="tipos-entrega tipos-tres">
+        <legend class="etiqueta">Tamaño del logo</legend>
+        <% for (const [clave, tamano] of Object.entries(tamanosLogo)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="logoTamano" value="<%= clave %>"<%= tamanoActual === clave ? ' checked' : '' %>>
+            <span><strong><%= tamano.titulo %></strong></span>
+            <span class="ayuda"><%= tamano.alto %> px de alto</span>
+          </label>
+        <% } %>
+        <%- error('logoTamano') %>
+      </fieldset>
+
+      <fieldset class="campo">
+        <legend class="etiqueta">Categorías en el menú</legend>
+        <input type="hidden" name="menuCategoriasEnviado" value="1">
+        <% if (categoriasMenu.length === 0) { %>
+          <p class="estado-vacio-chico"><%- icono('carpeta', { tamano: 18 }) %> Todavía no creaste categorías. Cuando las tengas, elegís acá cuáles aparecen en el menú.</p>
+        <% } else { %>
+          <div class="lista-categorias">
+            <% for (const categoria of categoriasMenu) { %>
+              <label class="casilla">
+                <input type="checkbox" name="menuCategorias" value="<%= categoria.id %>" data-categoria-menu data-nombre="<%= categoria.nombre %>"<%= marcadas.has(categoria.id) ? ' checked' : '' %>>
+                <%= categoria.nombre %><% if (categoria.hijas.length) { %> <span class="ayuda">· con <%= categoria.hijas.length %> subcategoría<%= categoria.hijas.length === 1 ? '' : 's' %></span><% } %>
+              </label>
+            <% } %>
+          </div>
+          <span class="ayuda">Las subcategorías aparecen adentro de su categoría. Una categoría sin productos visibles no se muestra, la elijas o no. <a class="enlace-chico" href="/admin/categorias">Administrar categorías</a></span>
+        <% } %>
+      </fieldset>
+    </div>
+  </section>
+
   <section class="ajuste">
     <div class="ajuste-intro">
       <h2>Catálogo</h2>

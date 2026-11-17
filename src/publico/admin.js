@@ -377,3 +377,31 @@ if (!menosMovimiento) {
   }
   marcar();
 }
+
+// ---------- Diseño: vista previa de la cabecera y el menú ----------
+
+const vistaMenu = document.querySelector('[data-vista-menu]');
+if (vistaMenu) {
+  const lista = vistaMenu.querySelector('[data-menu-lista]');
+  const casillas = [...document.querySelectorAll('[data-categoria-menu]')];
+  const pintar = () => {
+    vistaMenu.dataset.menu = document.querySelector('input[name="menuEstilo"]:checked')?.value ?? 'barra';
+    vistaMenu.dataset.logo = document.querySelector('input[name="logoTamano"]:checked')?.value ?? 'mediano';
+    const nombres = casillas.filter((c) => c.checked).map((c) => c.dataset.nombre);
+    // Entran unas pocas; el resto se junta en "Más", como en la tienda.
+    const hechos = nombres.slice(0, 4).map((nombre) => Object.assign(document.createElement('span'), { textContent: nombre }));
+    if (nombres.length > 4) hechos.push(Object.assign(document.createElement('span'), { textContent: 'Más ▾' }));
+    lista.replaceChildren(...hechos);
+  };
+  document.addEventListener('change', (evento) => {
+    if (evento.target.matches('input[name="menuEstilo"], input[name="logoTamano"], [data-categoria-menu]')) pintar();
+  });
+  pintar();
+  // Si se elige un logo nuevo, la vista previa de la cabecera también lo muestra.
+  document.querySelector('[data-previsualizar="logo"]')?.addEventListener('change', (evento) => {
+    const archivo = evento.target.files[0];
+    if (!archivo || !archivo.type.startsWith('image/')) return;
+    const imagen = Object.assign(document.createElement('img'), { className: 'vista-previa-logo', alt: '', src: URL.createObjectURL(archivo) });
+    vistaMenu.querySelector('.vista-previa-marca').replaceChildren(imagen);
+  });
+}

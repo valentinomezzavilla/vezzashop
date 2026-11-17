@@ -2,11 +2,11 @@
 import { slugificar } from './util/slug.js';
 
 // Árbol de categorías de la tienda, sin las que no tienen productos visibles (ni ellas ni sus hijas).
-// Cada nodo: { id, nombre, slug, ruta: ['ropa', 'remeras'], hijas: [...] }
+// Cada nodo: { id, nombre, slug, ruta: ['ropa', 'remeras'], enMenu, hijas: [...] }
 export async function arbolCategorias(db, tiendaId) {
   const categorias = await db
     .prepare(
-      `SELECT c.id, c.padre_id AS "padreId", c.nombre, c.slug,
+      `SELECT c.id, c.padre_id AS "padreId", c.nombre, c.slug, (c.en_menu = 1) AS "enMenu",
               exists (SELECT 1 FROM producto_categorias pc
                       JOIN productos p ON p.id = pc.producto_id AND p.visible = 1
                       WHERE pc.categoria_id = c.id
@@ -22,7 +22,7 @@ export async function arbolCategorias(db, tiendaId) {
       .map((c) => {
         const ruta = [...rutaPadre, c.slug];
         const hijas = armar(c.id, ruta);
-        return { id: c.id, nombre: c.nombre, slug: c.slug, ruta, hijas, conProductos: c.conProductos || hijas.length > 0 };
+        return { id: c.id, nombre: c.nombre, slug: c.slug, ruta, hijas, enMenu: c.enMenu, conProductos: c.conProductos || hijas.length > 0 };
       })
       .filter((c) => c.conProductos);
   return armar(0, []);

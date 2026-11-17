@@ -142,6 +142,11 @@ En el panel, **Diseño**: cada cliente configura cómo se ve su vidriera.
 - **Identidad:** logo y color principal (franja de anuncios y botones; el color del texto se elige solo
   para que se lea bien).
 - **Franja de anuncios:** el texto de arriba de todo (envío gratis, descuentos, etc.).
+- **Cabecera y menú:** con vista previa en vivo. El **estilo del menú** puede ser una *barra de categorías* (las
+  que no entran en la pantalla pasan solas a un botón "Más", con sus subcategorías) o un *menú desplegable* (un botón
+  abre la lista, también en la computadora). Se elige el **tamaño del logo** (32, 40 o 56 px de alto; en el celular no
+  pasa de 44) y **qué categorías de primer nivel aparecen en el menú de arriba** (el pie de página las muestra todas).
+  Una categoría sin productos visibles no se muestra, la elijan o no.
 - **Orden del catálogo** por defecto: nombre, más nuevos o precio. El visitante lo puede cambiar.
 - **Contacto y redes:** WhatsApp (botón flotante), Instagram, Facebook, TikTok, email y dirección.
 - **Banners de bienvenida:** hasta 6 imágenes para el carrusel de la portada, con imagen opcional
@@ -185,7 +190,7 @@ según la orientación de la cámara (EXIF) y se descartan los metadatos, como l
 |---|---|---|
 | Foto de producto | `<uuid>.webp` · `<uuid>-m.webp` · `<uuid>-s.webp` | 1600 px de ancho (la que se abre al ampliar) · 540 px (grilla y ficha) · 128 px (carrito, buscador, tira de fotos) |
 | Banner | `<uuid>.webp` | 1200 px de ancho (800 px el de celular) |
-| Logo | `<uuid>.webp` | hasta 360 × 80 px, el doble de lo que se muestra |
+| Logo | `<uuid>.webp` | hasta 504 × 112 px: el doble del tamaño más grande que se puede elegir en Diseño (56 px de alto) |
 
 La base de datos sigue guardando un solo nombre (el de la versión grande, `archivo` / `logo` / `imagen`); las miniaturas
 se encuentran por nombre. En la vidriera, las grillas usan las miniaturas, la ficha usa `srcset` (mediana o grande según la

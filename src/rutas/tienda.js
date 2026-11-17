@@ -11,7 +11,7 @@ import {
   ORDENES,
   esOrden,
 } from '../vidriera.js';
-import { leerAjustes, listarBanners, colorDeTextoSobre, precioConDescuento, valorCuota } from '../diseno.js';
+import { leerAjustes, listarBanners, colorDeTextoSobre, precioConDescuento, valorCuota, TAMANOS_LOGO } from '../diseno.js';
 import { dimensionesDe, urlImagen, urlMiniatura } from '../imagenes.js';
 import { formatearPrecio } from '../util/formato.js';
 import { urlPanel } from '../util/dominios.js';
@@ -146,6 +146,7 @@ export function rutasTienda({ db, config }) {
       urlLogo: urlImagen(req.tienda.id, ajustes.logo),
       // Ancho y alto del logo, para reservarle su lugar en la cabecera antes de que cargue.
       medidasLogo: await dimensionesDe(config.dirSubidas, req.tienda.id, ajustes.logo),
+      logoAlto: TAMANOS_LOGO[ajustes.logoTamano]?.alto ?? TAMANOS_LOGO.mediano.alto,
       colorTexto: colorDeTextoSobre(ajustes.colorPrincipal),
       urlCategoria,
       estadoStock,
