@@ -301,3 +301,41 @@ for (const formulario of document.querySelectorAll('form[data-un-solo-envio]')) 
     for (const boton of formulario.querySelectorAll('button[type="submit"]')) boton.disabled = true;
   });
 }
+
+// ---------- Detalles visuales ----------
+// Solo adornos: si el sistema pide menos movimiento, no se hace nada de esto.
+
+const menosMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Los números del inicio cuentan desde cero hasta su valor ("1.234", "25%").
+if (!menosMovimiento) {
+  for (const numero of document.querySelectorAll('.numero-tarjeta strong, .progreso-numero')) {
+    const partes = numero.textContent.trim().match(/^(\d{1,3}(?:\.\d{3})*|\d+)(%?)$/);
+    const final = partes && Number(partes[1].replace(/\./g, ''));
+    if (!final) continue;
+    const inicio = performance.now();
+    const duracion = 900;
+    const paso = (ahora) => {
+      const avance = Math.min(1, (ahora - inicio) / duracion);
+      const suavizado = 1 - (1 - avance) ** 4;
+      numero.textContent = Math.round(final * suavizado).toLocaleString('es-AR') + partes[2];
+      if (avance < 1) requestAnimationFrame(paso);
+    };
+    requestAnimationFrame(paso);
+  }
+}
+
+// Brillo que sigue al puntero en las tarjetas de números (ver .numero-tarjeta::after en admin.css).
+if (!menosMovimiento) {
+  document.addEventListener(
+    'pointermove',
+    (evento) => {
+      const tarjeta = evento.target.closest?.('.numero-tarjeta, .dato');
+      if (!tarjeta) return;
+      const caja = tarjeta.getBoundingClientRect();
+      tarjeta.style.setProperty('--x', `${evento.clientX - caja.left}px`);
+      tarjeta.style.setProperty('--y', `${evento.clientY - caja.top}px`);
+    },
+    { passive: true },
+  );
+}

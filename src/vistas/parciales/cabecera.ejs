@@ -2,11 +2,14 @@
 <html lang="es-AR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title><%= titulo %> · Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap">
   <link rel="stylesheet" href="/admin.css">
   <script src="/admin.js" defer></script>
 </head>
@@ -35,7 +38,7 @@
       </div>
       <nav class="lateral-menu" aria-label="Secciones del panel">
         <% for (const [seccion, texto, nombreIcono, corto] of secciones) { %>
-          <a href="/admin/<%= seccion %>"<%- seccion === seccionActual ? ' class="activo" aria-current="page"' : '' %>>
+          <a href="/admin/<%= seccion %>" class="menu-<%= seccion %><%= seccion === seccionActual ? ' activo' : '' %>"<%- seccion === seccionActual ? ' aria-current="page"' : '' %>>
             <%- icono(nombreIcono) %>
             <% if (corto) { %><span class="texto-largo"><%= texto %></span><span class="texto-corto"><%= corto %></span>
             <% } else { %><span><%= texto %></span><% } %>
