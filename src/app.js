@@ -11,6 +11,7 @@ import { buscarTiendaPorSlug } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
 import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
+import { vezza } from './util/vezza.js';
 import { dominioDeTiendas, slugDeHost, urlPanel } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
@@ -26,6 +27,7 @@ export function crearApp({ db, config }) {
     formatearPrecio,
     formatearDia,
     icono,
+    vezza,
     usuario: null,
     aviso: null,
     csrf: '',

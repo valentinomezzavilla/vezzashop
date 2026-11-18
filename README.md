@@ -226,6 +226,18 @@ Para que los avisos a los clientes digan cómo contactarte, definí `CONTACTO_PL
 Los datos viven en las tablas `planes`, `superadmins`, `pagos_plataforma` y en columnas nuevas de `tiendas`; la migración
 `007` se aplica sola al arrancar.
 
+## Logo de Vezza
+
+La firma "Desarrollado por VEZZA" aparece en la pantalla de ingreso y en el menú de la plataforma (donde además es el
+logo de la administración), en el ingreso y el menú de cada panel de tienda y en el pie de cada vidriera. La pestaña del
+navegador de los paneles usa el ícono `/vezza/icono.svg`.
+
+Los archivos están en `src/publico/vezza/`: `logo.svg` (símbolo y nombre), `marca.svg` (solo el símbolo), sus versiones
+`*-oscuro.svg` / `*-oscura.svg` para fondos oscuros (para usar afuera de la app, por ejemplo en un mail) e `icono.svg`.
+Dentro de la app el SVG se incrusta con `vezza()` (`src/util/vezza.js`) y toma los colores del CSS (`--vezza-tinta` y
+`--vezza-acento`), así que sigue solo el modo claro u oscuro. Para cambiar el logo se reemplazan esos SVG, con el negro
+`#13121a` y el índigo `#3b2ee4` como únicos colores; el helper los reemplaza por los del tema.
+
 ## Imágenes
 
 Los clientes suben fotos de hasta 5 MB (JPG, PNG o WEBP; las de cámara pesan 2 a 5 MB y miden 4000 a 6000 px de lado).
@@ -373,6 +385,7 @@ src/
   rutas/tienda.js        vidriera (catálogo, destacados, categorías, ficha, checkout y pedido)
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   util/iconos.js         íconos SVG de las vistas
+  util/vezza.js          logo y firma de Vezza (SVG de publico/vezza/ incrustado en las vistas)
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/
   publico/               CSS y scripts del panel (admin.js) y de la vidriera (tienda.js)
 scripts/crear-tienda.js

@@ -35,7 +35,10 @@
       </div>
     <% } %>
   </div>
-  <p class="pie-copyright">© <%= new Date().getFullYear() %> <%= tienda.nombre %>. Todos los derechos reservados.</p>
+  <p class="pie-copyright">
+    <span>© <%= new Date().getFullYear() %> <%= tienda.nombre %>. Todos los derechos reservados.</span>
+    <%- vezza({ etiqueta: true }) %>
+  </p>
 </footer>
 <%# En la ficha no va el botón flotante: ya está "Consultar por WhatsApp", con el producto en el mensaje. %>
 <% if (ajustes.whatsapp && !locals.sinWhatsappFlotante) { %>

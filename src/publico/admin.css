@@ -40,6 +40,10 @@
   --primario-suave: rgb(37 99 235 / .08);
   --primario-borde: rgb(37 99 235 / .32);
 
+  /* Logo de Vezza */
+  --vezza-tinta: #13121a;
+  --vezza-acento: #3b2ee4;
+
   /* Estados */
   --ok: #15803d;
   --ok-solido: #16a34a;
@@ -103,6 +107,8 @@
     --primario-texto: #6ea8fe;
     --primario-suave: rgb(59 130 246 / .14);
     --primario-borde: rgb(59 130 246 / .42);
+    --vezza-tinta: #f5f5f7;
+    --vezza-acento: #7a72ff;
     --ok: #4ade80;
     --ok-solido: #22c55e;
     --ok-fondo: rgb(34 197 94 / .12);
@@ -158,6 +164,8 @@
     --primario-texto: #6ea8fe;
     --primario-suave: rgb(59 130 246 / .14);
     --primario-borde: rgb(59 130 246 / .42);
+    --vezza-tinta: #f5f5f7;
+    --vezza-acento: #7a72ff;
     --ok: #4ade80;
     --ok-solido: #22c55e;
     --ok-fondo: rgb(34 197 94 / .12);
@@ -406,6 +414,21 @@ code { font-family: var(--fuente-mono); font-size: .85em; }
 .lateral-pie .tema { margin-bottom: .25rem; }
 .lateral-pie form { display: grid; }
 
+/* ---------- Logo de Vezza ---------- */
+/* El SVG se incrusta con el texto en currentColor y el índigo en .vz-a (ver src/util/vezza.js): los dos siguen al tema. */
+.vezza-logo, .vezza-marca { display: block; height: auto; flex-shrink: 0; color: var(--vezza-tinta); overflow: visible; }
+polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
+line.vz-a { stroke: var(--vezza-acento); }
+.vezza-firma { display: inline-grid; justify-items: center; gap: .55rem; }
+.vezza-etiqueta { font-size: .6875rem; line-height: 1; letter-spacing: .01em; color: var(--texto-tenue); }
+.vezza-firma .vezza-logo { width: 54px; }
+.vezza-grande { gap: .75rem; }
+.vezza-grande .vezza-etiqueta { font-size: .75rem; }
+.vezza-grande .vezza-logo { width: 88px; }
+.lateral-vezza { display: grid; place-items: center; width: 34px; height: 32px; flex-shrink: 0; }
+.lateral-vezza .vezza-marca { width: 32px; }
+.lateral-firma { display: grid; justify-items: center; padding: .9rem 0 .15rem; }
+
 .contenido { grid-column: 2; grid-row: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 2rem clamp(1.25rem, 3.2vw, 2.75rem) 4rem; min-width: 0; }
 .contenido-solo { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem 1rem; }
 
@@ -430,6 +453,8 @@ code { font-family: var(--fuente-mono); font-size: .85em; }
   }
   .barra-superior-marca { display: flex; align-items: center; gap: .65rem; min-width: 0; margin-right: auto; color: var(--texto); text-decoration: none; }
   .barra-superior-marca .lateral-logo { width: 28px; height: 28px; border-radius: 8px; }
+  .barra-superior-marca .lateral-vezza { width: 32px; height: 28px; }
+  .barra-superior-marca .lateral-vezza .vezza-marca { width: 30px; }
   .barra-superior-nombre { font-weight: 600; font-size: 1rem; letter-spacing: -.015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .barra-superior .boton-icono { width: 40px; height: 40px; }
 
@@ -843,6 +868,8 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
 .ingreso .aviso { margin: 1rem 0 0; text-align: left; }
 .ingreso input { min-height: 42px; }
 .ingreso .boton-grande { margin-top: .35rem; }
+.ingreso-vezza { display: grid; justify-items: center; margin-bottom: 1rem; }
+.ingreso-firma { display: grid; justify-items: center; margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--borde); }
 .ingreso-icono {
   display: grid; place-items: center;
   width: 44px; height: 44px;

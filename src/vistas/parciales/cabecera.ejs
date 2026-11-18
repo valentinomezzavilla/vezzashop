@@ -9,6 +9,7 @@
   <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">
   <title><%= titulo %> · Panel</title>
+  <link rel="icon" href="/vezza/icono.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -74,6 +75,7 @@
           <input type="hidden" name="_csrf" value="<%= csrf %>">
           <button class="boton boton-fantasma boton-bloque" type="submit"><%- icono('salir', { tamano: 16 }) %> Salir</button>
         </form>
+        <div class="lateral-firma"><%- vezza({ etiqueta: true }) %></div>
       </div>
     </aside>
 

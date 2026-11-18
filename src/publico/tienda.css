@@ -626,6 +626,14 @@ p { margin: 0; }
 .red:hover { background: var(--acento); color: var(--acento-texto); box-shadow: inset 0 0 0 1px var(--acento); }
 .pie-copyright { width: calc(100% - 2 * var(--margen)); max-width: calc(var(--ancho) - 2 * var(--margen)); margin: 0 auto; padding: 1.25rem 0 calc(1.5rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--borde); font-size: .8125rem; color: var(--texto-tenue); }
 
+/* Firma de Vezza: conserva los colores de la marca, sean cuales sean los de la tienda (ver src/util/vezza.js). */
+.pie-copyright { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .9rem 1.5rem; }
+.vezza-firma { --vezza-tinta: #13121a; --vezza-acento: #3b2ee4; display: inline-grid; justify-items: center; gap: .5rem; }
+.vezza-etiqueta { font-size: .6875rem; line-height: 1; letter-spacing: .01em; color: var(--texto-tenue); }
+.vezza-logo { display: block; width: 50px; height: auto; color: var(--vezza-tinta); overflow: visible; }
+polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
+line.vz-a { stroke: var(--vezza-acento); }
+
 /* Que el botón flotante no tape el texto del final de la página. */
 .pie:has(~ .boton-whatsapp) .pie-copyright { padding-right: 4.5rem; }
 
