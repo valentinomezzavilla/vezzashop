@@ -50,6 +50,26 @@ test('los SVG del logo: la versión para fondo oscuro es la misma figura con otr
   assert.match(icono, /@media \(prefers-color-scheme:dark\)/);
 });
 
+test('el símbolo es simétrico (los dos corchetes son espejo) y el logo trae las formas del original', () => {
+  const marca = archivo('publico/vezza/marca.svg');
+  const corchetes = [...marca.matchAll(/<polygon fill="#13121a" points="([^"]+)"/g)].map((m) => m[1].split(' ').map((p) => p.split(',').map(Number)));
+  assert.equal(corchetes.length, 2, 'dos corchetes');
+  const [izquierdo, derecho] = corchetes;
+  const ancho = Math.max(...derecho.map(([x]) => x)); // el símbolo mide lo que mide el borde derecho del corchete derecho
+  const ordenar = (puntos) => [...puntos].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const espejo = ordenar(izquierdo.map(([x, y]) => [ancho - x, y]));
+  assert.equal(espejo.length, derecho.length, 'mismos vértices');
+  ordenar(derecho).forEach(([x, y], i) => {
+    assert.ok(Math.abs(x - espejo[i][0]) < 0.06 && Math.abs(y - espejo[i][1]) < 0.06, `el derecho es el izquierdo dado vuelta (vértice ${i})`);
+  });
+  assert.equal([...marca.matchAll(/<polygon fill="#3b2ee4"/g)].length, 1, 'una raya índigo');
+
+  const logo = archivo('publico/vezza/logo.svg');
+  assert.equal([...logo.matchAll(/<polygon fill="#13121a"/g)].length, 4, 'los dos corchetes y las letras V y E');
+  assert.equal([...logo.matchAll(/<polygon fill="#3b2ee4"/g)].length, 3, 'la raya y las dos Z');
+  assert.equal([...logo.matchAll(/<path fill="#13121a" fill-rule="evenodd"/g)].length, 1, 'la A, con su hueco');
+});
+
 test('vezza(): el SVG se incrusta con los colores del tema, sin tamaño fijo, y la firma lleva "Desarrollado por"', () => {
   const logo = vezza();
   assert.match(logo, /^<svg class="vezza-logo" /);

@@ -418,7 +418,6 @@ code { font-family: var(--fuente-mono); font-size: .85em; }
 /* El SVG se incrusta con el texto en currentColor y el índigo en .vz-a (ver src/util/vezza.js): los dos siguen al tema. */
 .vezza-logo, .vezza-marca { display: block; height: auto; flex-shrink: 0; color: var(--vezza-tinta); overflow: visible; }
 polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
-line.vz-a { stroke: var(--vezza-acento); }
 .vezza-firma { display: inline-grid; justify-items: center; gap: .55rem; }
 .vezza-etiqueta { font-size: .6875rem; line-height: 1; letter-spacing: .01em; color: var(--texto-tenue); }
 .vezza-firma .vezza-logo { width: 54px; }

@@ -265,7 +265,8 @@ navegador de los paneles usa el ícono `/vezza/icono.svg`.
 
 Los archivos están en `src/publico/vezza/`: `logo.svg` (símbolo y nombre), `marca.svg` (solo el símbolo), sus versiones
 `*-oscuro.svg` / `*-oscura.svg` para fondos oscuros (para usar afuera de la app, por ejemplo en un mail) e `icono.svg`.
-Dentro de la app el SVG se incrusta con `vezza()` (`src/util/vezza.js`) y toma los colores del CSS (`--vezza-tinta` y
+Están trazados a partir del PNG original del logo (`imgs/vezza-logo.png` del repo `vezza`) y coinciden con él en más de un 99 % de
+los píxeles. Dentro de la app el SVG se incrusta con `vezza()` (`src/util/vezza.js`) y toma los colores del CSS (`--vezza-tinta` y
 `--vezza-acento`), así que sigue solo el modo claro u oscuro. Para cambiar el logo se reemplazan esos SVG, con el negro
 `#13121a` y el índigo `#3b2ee4` como únicos colores; el helper los reemplaza por los del tema.
 

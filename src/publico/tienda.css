@@ -669,7 +669,6 @@ p { margin: 0; }
 .vezza-etiqueta { font-size: .6875rem; line-height: 1; letter-spacing: .01em; color: var(--texto-tenue); }
 .vezza-logo { display: block; width: 50px; height: auto; color: var(--vezza-tinta); overflow: visible; }
 polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
-line.vz-a { stroke: var(--vezza-acento); }
 .pie-copyright .vezza-firma { display: inline-flex; align-items: center; gap: .6rem; }
 .pie-copyright .vezza-logo { width: 40px; }
 
