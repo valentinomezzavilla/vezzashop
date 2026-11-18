@@ -7,12 +7,12 @@ import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
 import { rutasTienda } from './rutas/tienda.js';
 import { rutasPlataforma } from './rutas/plataforma.js';
-import { buscarTiendaPorSlug } from './tiendas.js';
+import { buscarTiendaPorSlug, enlaceActualDeAnterior } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
 import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { vezza } from './util/vezza.js';
-import { dominioDeTiendas, slugDeHost, urlPanel } from './util/dominios.js';
+import { dominioDeTiendas, slugDeHost, urlPanel, urlTienda } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 const QUINCE_DIAS_MS = 15 * 24 * 60 * 60 * 1000;
@@ -77,6 +77,16 @@ export function crearApp({ db, config }) {
     const slug = slugDeHost(req.hostname, dominioDeTiendas(config), config.dominio);
     if (slug === null) return next();
     req.tienda = await buscarTiendaPorSlug(db, slug);
+    if (!req.tienda) {
+      // Un link que la tienda usó antes redirige al actual, con el mismo camino y las mismas búsquedas. Sin caché: si el link
+      // vuelve a cambiar, nadie se queda con una redirección vieja. Con 308 los pedidos que no son de lectura conservan el método.
+      const actual = await enlaceActualDeAnterior(db, slug);
+      if (actual) {
+        const soloLee = req.method === 'GET' || req.method === 'HEAD';
+        res.set('Cache-Control', 'no-store');
+        return res.redirect(soloLee ? 301 : 308, `${urlTienda(req, dominioDeTiendas(config), actual)}${req.originalUrl}`);
+      }
+    }
     if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });
     // Tienda suspendida por quien administra la plataforma: los compradores ven un aviso (y los buscadores, que es temporal).
     if (req.tienda.estado === 'suspendida') {

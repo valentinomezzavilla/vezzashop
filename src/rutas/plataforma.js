@@ -36,6 +36,7 @@ import {
   FILTROS_CLIENTES,
   esFiltroClientes,
 } from '../plataforma.js';
+import { cambiarLinkDeTienda, listarEnlacesAnteriores, soltarEnlaceAnterior } from '../tiendas.js';
 
 const id = (valor) => (/^\d+$/.test(String(valor)) ? Number(valor) : null);
 const regenerarSesion = (req) =>
@@ -156,6 +157,9 @@ export function rutasPlataforma({ db, config }) {
       pagos: await listarPagos(db, cliente.id),
       ...(await usoDeCliente(db, cliente.id)),
       urlTienda: urlTienda(req, dominioDeTiendas(config), cliente.slug),
+      // El link se arma como "https://" + slug + ".dominio" (con el puerto en local): las dos puntas para mostrarlas alrededor del campo.
+      partesLink: urlTienda(req, dominioDeTiendas(config), '\0').split('\0'),
+      enlacesAnteriores: await listarEnlacesAnteriores(db, cliente.id),
       sugerido: sumarMeses(cliente.venceEn && cliente.venceEn >= hoy() ? cliente.venceEn : hoy(), 1),
       errores,
       valores,
@@ -173,6 +177,21 @@ export function rutasPlataforma({ db, config }) {
     avisar(req, 'ok', prueba
       ? `Cambiamos el plan y empezó una prueba de ${plural(prueba.dias, 'día', 'días')}: vence el ${formatearDia(prueba.venceEn)}. Los topes nuevos valen desde ya.`
       : 'Cambiamos el plan. Los topes nuevos valen desde ya.');
+    volverAlCliente(req, res);
+  });
+
+  router.post('/clientes/:clienteId/enlace', cargarCliente, verificarCsrf, async (req, res) => {
+    const resultado = await cambiarLinkDeTienda(db, req.cliente.id, req.body.slug);
+    if (resultado.error) return mostrarCliente(req, res, { errores: { enlace: resultado.error }, valores: req.body, status: 400 });
+    const nuevo = urlTienda(req, dominioDeTiendas(config), resultado.slug).replace(/^https?:\/\//, '');
+    avisar(req, 'ok', `Cambiamos el link: ahora la tienda está en ${nuevo}. El anterior (${resultado.anterior}) redirige al nuevo.`);
+    volverAlCliente(req, res);
+  });
+
+  router.post('/clientes/:clienteId/enlaces/soltar', cargarCliente, verificarCsrf, async (req, res) => {
+    const soltado = await soltarEnlaceAnterior(db, req.cliente.id, req.body.slug);
+    if (soltado) avisar(req, 'ok', `"${req.body.slug}" dejó de redirigir: ya lo puede usar otra tienda.`);
+    else avisar(req, 'error', 'Ese link no estaba entre los anteriores de esta tienda.');
     volverAlCliente(req, res);
   });
 

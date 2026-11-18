@@ -217,6 +217,14 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
   **Nuevo cliente** crea la tienda y su acceso, y te muestra la clave **una sola vez** junto con un mensaje listo para
   mandarle (con el link de la tienda y del panel). Desde la ficha de cada cliente: cambiarle el plan, registrar pagos,
   fijar el vencimiento, suspender o reactivar, generarle una clave nueva, cambiarle el email y tomar notas internas.
+- **Link de la tienda.** El link (subdominio) sale del nombre al dar de alta, o se elige a mano en el campo *Link*. Se cambia desde
+  la ficha del cliente, en **Link de la tienda**: el link se normaliza (sin tildes ni espacios), tiene que ser un subdominio
+  válido, no estar reservado (`www`, `admin`, `plataforma`…) ni usarlo otra tienda. **El link anterior sigue funcionando y redirige
+  al nuevo** (301 en las visitas, 308 en los envíos, con el mismo camino y las mismas búsquedas, sin caché), así que no se rompen
+  los links compartidos ni lo que Google guardó. Los anteriores quedan registrados en `tienda_enlaces_anteriores` (migración
+  `010`) y ninguna otra tienda los puede usar hasta que los sueltes con *Dejar de redirigir*. Cambiar el nombre de la tienda no
+  cambia el link, y el cliente no puede cambiarlo solo. Al cambiarlo, los carritos que los compradores tengan abiertos se vacían:
+  el navegador los guarda por dirección. Un dominio propio (`www.sutienda.com`) es otra cosa y no está soportado.
 - **Planes.** Nombre, precio por mes y topes: **productos**, **fotos por producto** (hasta 10) y **banners** (hasta 6).
   Un tope vacío es "sin límite". Al llegar a un tope, el cliente no puede cargar más y se le avisa que amplíe su plan;
   editar lo que ya tiene sigue andando, y vale también para la carga masiva por Excel. Las tiendas que ya existían quedaron

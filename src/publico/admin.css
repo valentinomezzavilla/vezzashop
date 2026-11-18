@@ -747,6 +747,24 @@ input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; }
 .campo-con-prefijo .sufijo { order: -1; border: 1px solid var(--borde-campo); border-right: 0; border-radius: var(--radio-control) 0 0 var(--radio-control); }
 .campo-con-prefijo input { border-radius: 0 var(--radio-control) var(--radio-control) 0 !important; }
 
+/* Link de una tienda: "https://" + campo + ".dominio". */
+.campo-enlace { display: flex; align-items: stretch; min-width: 0; }
+.campo-enlace input { flex: 1; min-width: 0; border-radius: 0; }
+.campo-enlace .sufijo { min-width: 0; }
+.campo-enlace .sufijo:first-child { border: 1px solid var(--borde-campo); border-right: 0; border-radius: var(--radio-control) 0 0 var(--radio-control); }
+.campo-enlace .sufijo:last-child { border: 1px solid var(--borde-campo); border-left: 0; border-radius: 0 var(--radio-control) var(--radio-control) 0; }
+/* En el celular no entra todo: se oculta el "https://" y el campo se queda con las esquinas redondeadas. */
+@media (max-width: 560px) {
+  .campo-enlace .sufijo:first-child { display: none; }
+  .campo-enlace input { border-top-left-radius: var(--radio-control); border-bottom-left-radius: var(--radio-control); }
+}
+.enlaces-anteriores { display: grid; gap: .35rem; padding-top: 1rem; border-top: 1px solid var(--borde); }
+.enlaces-anteriores h3 { margin: 0; font-size: .9375rem; }
+.enlaces-anteriores .ayuda { margin: 0; }
+.enlaces-anteriores ul { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .5rem; }
+.enlaces-anteriores li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.enlaces-anteriores code { overflow-wrap: anywhere; }
+
 .selector-color { display: flex; gap: .75rem; align-items: center; }
 .selector-color input {
   width: 48px; height: 38px;

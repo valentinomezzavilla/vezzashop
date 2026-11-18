@@ -236,7 +236,8 @@ export async function validarCliente(db, campos) {
   if (planId === null || !(await db.prepare('SELECT 1 FROM planes WHERE id = ?').get(planId))) errores.planId = 'Elegí un plan';
   const venceEn = texto(campos.venceEn) || null;
   if (venceEn !== null && !esDiaValido(venceEn)) errores.venceEn = 'Elegí una fecha válida';
-  return { datos: { nombre: texto(campos.nombre).replace(/\s+/g, ' '), email: texto(campos.email), planId, venceEn }, errores };
+  // `slug` es el link elegido a mano; vacío, sale del nombre.
+  return { datos: { nombre: texto(campos.nombre).replace(/\s+/g, ' '), email: texto(campos.email), planId, venceEn, slug: texto(campos.slug) }, errores };
 }
 
 // Alta de un cliente: su tienda, su usuario y una clave que se muestra una sola vez.

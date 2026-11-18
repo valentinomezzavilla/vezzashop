@@ -20,7 +20,12 @@
   <div class="campo">
     <label for="nombre">Nombre de la tienda</label>
     <input id="nombre" type="text" name="nombre" value="<%= valores.nombre ?? '' %>" maxlength="80" required autofocus aria-describedby="ayuda-nombre">
-    <span class="ayuda" id="ayuda-nombre">Define el link de la tienda, que después no cambia (por ejemplo "Ufo Ambos" → ufo-ambos).</span>
+    <span class="ayuda" id="ayuda-nombre">Con el nombre se arma el link de la tienda (por ejemplo "Ufo Ambos" → ufo-ambos), salvo que elijas otro acá abajo.</span>
+  </div>
+  <div class="campo">
+    <label for="slug">Link <span class="opcional">(opcional)</span></label>
+    <input id="slug" type="text" name="slug" value="<%= valores.slug ?? '' %>" maxlength="63" autocomplete="off" spellcheck="false" autocapitalize="none" placeholder="ufo-ambos" aria-describedby="ayuda-slug">
+    <span class="ayuda" id="ayuda-slug">Si lo dejás vacío, sale del nombre. Después lo podés cambiar desde la ficha del cliente: el anterior redirige al nuevo.</span>
   </div>
   <div class="campo">
     <label for="email">Email del dueño</label>

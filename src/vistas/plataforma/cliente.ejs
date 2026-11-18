@@ -66,6 +66,50 @@
   </div>
 </section>
 
+<section class="ajuste" id="enlace">
+  <div class="ajuste-intro">
+    <h2>Link de la tienda</h2>
+    <p class="texto-suave">La dirección donde los compradores entran a la tienda. Si la cambiás, la anterior sigue funcionando y redirige a la nueva.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/enlace" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="slug">Link</label>
+        <div class="campo-enlace">
+          <span class="sufijo" aria-hidden="true"><%= partesLink[0] %></span>
+          <input id="slug" type="text" name="slug" value="<%= valores.slug ?? cliente.slug %>" maxlength="63" required autocomplete="off" spellcheck="false" autocapitalize="none"
+                 aria-describedby="ayuda-slug<%= errores.enlace ? ' error-enlace' : '' %>"<%- errores.enlace ? ' aria-invalid="true"' : '' %>>
+          <span class="sufijo" aria-hidden="true"><%= partesLink[1] %></span>
+        </div>
+        <span class="ayuda" id="ayuda-slug">Letras, números y guiones: lo demás se arregla solo (tildes, espacios y mayúsculas). Hasta 63 caracteres.</span>
+        <%- error('enlace') %>
+      </div>
+      <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>Avisale al cliente para que actualice sus redes y su publicidad. Los carritos que los compradores tengan abiertos se vacían, porque el navegador los guarda por dirección.</span></p>
+      <div><button class="boton" type="submit">Cambiar el link</button></div>
+    </form>
+
+    <% if (enlacesAnteriores.length) { %>
+      <div class="enlaces-anteriores">
+        <h3>Links anteriores</h3>
+        <p class="ayuda">Redirigen a la tienda. Mientras estén acá, ninguna otra tienda puede usarlos.</p>
+        <ul>
+          <% for (const anterior of enlacesAnteriores) { %>
+            <li>
+              <span><code><%= partesLink[0] %><%= anterior.slug %><%= partesLink[1] %></code> <span class="ayuda">desde el <%= formatearFecha(anterior.cambiadoEn).split(',')[0] %></span></span>
+              <form method="post" action="/plataforma/clientes/<%= cliente.id %>/enlaces/soltar">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <input type="hidden" name="slug" value="<%= anterior.slug %>">
+                <button class="boton boton-fantasma boton-chico" type="submit" title="Deja de redirigir y lo libera para otra tienda">Dejar de redirigir</button>
+              </form>
+            </li>
+          <% } %>
+        </ul>
+      </div>
+    <% } %>
+  </div>
+</section>
+
 <section class="ajuste">
   <div class="ajuste-intro">
     <h2>Cobro</h2>
