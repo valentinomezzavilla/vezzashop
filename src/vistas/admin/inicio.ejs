@@ -17,8 +17,11 @@
   <% const vencido = limites.cobro.estado === 'vencido' %>
   <p class="aviso <%= vencido ? 'aviso-error' : 'aviso-info' %>">
     <%- icono(vencido ? 'alerta' : 'reloj', { tamano: 18 }) %>
-    <span><strong><%= vencido ? `Tu plan venció el ${formatearDia(limites.venceEn)}.` : (limites.cobro.dias === 0 ? 'Tu plan vence hoy.' : `Tu plan vence el ${formatearDia(limites.venceEn)}.`) %></strong>
-    <%= vencido ? 'Para que tu tienda siga abierta, regularizá el pago.' : 'Para que no se corte el servicio, acordate de abonarlo.' %><% if (locals.contactoPlataforma) { %> Contacto: <%= contactoPlataforma %>.<% } %></span>
+    <% const prueba = Boolean(limites.plan && limites.plan.diasPrueba) %>
+    <span><strong><%= prueba
+      ? (vencido ? `Tu período de prueba terminó el ${formatearDia(limites.venceEn)}.` : (limites.cobro.dias === 0 ? 'Tu prueba termina hoy.' : `Tu prueba termina el ${formatearDia(limites.venceEn)}.`))
+      : (vencido ? `Tu plan venció el ${formatearDia(limites.venceEn)}.` : (limites.cobro.dias === 0 ? 'Tu plan vence hoy.' : `Tu plan vence el ${formatearDia(limites.venceEn)}.`)) %></strong>
+    <%= vencido ? 'Para que tu tienda siga abierta, regularizá el pago.' : (prueba ? 'Para seguir usándola, elegí un plan antes de esa fecha.' : 'Para que no se corte el servicio, acordate de abonarlo.') %><% if (locals.contactoPlataforma) { %> Contacto: <%= contactoPlataforma %>.<% } %></span>
   </p>
 <% } %>
 

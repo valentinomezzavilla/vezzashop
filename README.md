@@ -202,13 +202,21 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
 - **Planes.** Nombre, precio por mes y topes: **productos**, **fotos por producto** (hasta 10) y **banners** (hasta 6).
   Un tope vacío es "sin límite". Al llegar a un tope, el cliente no puede cargar más y se le avisa que amplíe su plan;
   editar lo que ya tiene sigue andando, y vale también para la carga masiva por Excel. Las tiendas que ya existían quedaron
-  en el plan **Sin límites**, para que nada cambie para ellas. Un plan con clientes no se puede borrar: se desactiva.
+  en el plan **Sin límites**, para que nada cambie para ellas. Un plan con clientes no se puede borrar: se **pausa** (botón *Pausar* en la lista): deja de ofrecerse al dar de alta o cambiar de
+  plan, y los clientes que ya lo tienen no notan nada. *Reanudar* lo vuelve a ofrecer.
+- **Período de prueba.** Un plan puede tener **días de prueba** (el plan *Prueba* trae 7): a cada cliente que entra al plan, ya sea al darlo
+  de alta o al cambiarle el plan, le vence a los N días de ese momento. Si al dar de alta elegís una fecha, vale esa (para darle más o menos
+  días a un cliente puntual); cambiar a un plan sin prueba no toca el vencimiento.
+- **Cerrar la tienda sola al vencer.** Una opción de cada plan (activa en *Prueba*): cuando pasa la fecha de vencimiento, los compradores ven
+  que la tienda no está disponible y el panel del cliente queda en solo lectura. No se guarda como una suspensión ni hace falta ninguna
+  tarea programada: se calcula al atender cada pedido, así que registrar un pago (o extender la fecha) la reabre en el acto. El día del
+  vencimiento todavía está abierta. Sin la opción, el vencimiento solo avisa.
 - **Planes sugeridos.** `npm run cargar-planes` crea cuatro planes de arranque (Prueba, Esencial, Acompañado y A medida) si todavía no
   existen; no toca los que ya hay, así que se puede correr de nuevo. Los precios son un punto de partida: ajustalos en **Planes**.
 - **Cobro manual.** Cobrás por fuera (transferencia, Mercado Pago…). Cada pago que registrás extiende el vencimiento
   desde la fecha en que vence (si todavía no venció) o desde hoy, y queda en un historial. Un cliente figura *al día*,
-  *por vencer* (faltan 7 días o menos) o *vencido*, y él lo ve en su Inicio y en Cuenta. **Un vencimiento solo avisa**: no
-  suspende solo, lo decidís vos.
+  *por vencer* (faltan 7 días o menos) o *vencido*, y él lo ve en su Inicio y en Cuenta. **Un vencimiento solo avisa**, salvo que el plan tenga
+  activado *Cerrar la tienda sola cuando venza* (ver arriba).
 - **Suspender.** La tienda deja de estar disponible para los compradores (página de aviso, HTTP 503) y el panel del cliente
   queda **en solo lectura**: puede mirar sus datos y pedidos, pero cualquier cambio vuelve con un aviso. Ve el motivo que
   anotaste. Reactivar la vuelve a abrir. No hay un botón de borrar clientes: borrar una tienda arrastraría sus productos,
@@ -345,6 +353,7 @@ src/
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
   imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
+  estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
   limites.js             topes del plan de cada tienda, uso y estado de cobro
   migrar-imagenes.js     convierte al formato nuevo las imágenes subidas antes (lo usa scripts/migrar-imagenes.js)
   util/dominios.js       qué tienda corresponde a cada subdominio

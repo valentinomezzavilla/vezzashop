@@ -23,6 +23,7 @@
     <div><dt>Tienda</dt><dd><a href="<%= urlTienda %>" target="_blank" rel="noopener"><%= urlTienda.replace(/^https?:\/\//, '') %></a></dd></div>
     <div><dt>Panel</dt><dd><a href="<%= urlPanel %>" target="_blank" rel="noopener"><%= urlPanel.replace(/^https?:\/\//, '') %></a></dd></div>
     <div><dt>Usuario</dt><dd><%= email %></dd></div>
+    <% if (venceEn) { %><div><dt><%= diasPrueba ? 'Prueba hasta' : 'Vence el' %></dt><dd><%= formatearDia(venceEn) %></dd></div><% } %>
     <div><dt>Clave</dt><dd><code class="clave-generada"><%= clave %></code></dd></div>
   </dl>
   <div class="campo">

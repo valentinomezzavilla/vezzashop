@@ -6,7 +6,8 @@ import { estadoDeCobro, limitesDeTienda, usoDeTienda } from './limites.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
 import { parsearPrecio, ErrorDeValor } from './importacion/valores.js';
-import { esDiaValido, hoy, sumarMeses } from './util/fechas.js';
+import { esDiaValido, hoy, sumarDias, sumarMeses } from './util/fechas.js';
+import { estadoEfectivo } from './estado.js';
 
 const texto = (valor) => String(valor ?? '').trim();
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -63,6 +64,7 @@ export async function cambiarClaveSuperadmin(db, id, { actual, nueva, repetida }
 
 const COLUMNAS_PLAN = `id, nombre, precio_centavos AS "precioCentavos", max_productos AS "maxProductos",
   max_fotos AS "maxFotos", max_banners AS "maxBanners", (activo = 1) AS "activo",
+  dias_prueba AS "diasPrueba", (suspender_al_vencer = 1) AS "suspenderAlVencer",
   (SELECT count(*) FROM tiendas t WHERE t.plan_id = planes.id) AS clientes`;
 
 export function listarPlanes(db) {
@@ -110,23 +112,42 @@ export async function validarPlan(db, id, campos) {
     maxFotos: tope(campos.maxFotos, 1, MAX_FOTOS, 'Fotos por producto', errores, 'maxFotos'),
     maxBanners: tope(campos.maxBanners, 0, MAX_BANNERS, 'Banners', errores, 'maxBanners'),
     activo: campos.activo === '1' || campos.activo === 'on' || campos.activo === true,
+    diasPrueba: null,
+    suspenderAlVencer: campos.suspenderAlVencer === '1' || campos.suspenderAlVencer === 'on' || campos.suspenderAlVencer === true,
   };
+  // Días de prueba: vacío es "sin prueba". Al darle este plan a un cliente, vence a los N días.
+  const dias = texto(campos.diasPrueba);
+  if (dias !== '') {
+    if (!/^\d+$/.test(dias) || Number(dias) < 1 || Number(dias) > 365) errores.diasPrueba = 'Días de prueba: escribí un número entre 1 y 365, o dejalo vacío si el plan no tiene prueba';
+    else datos.diasPrueba = Number(dias);
+  }
   return { datos, errores };
 }
 
 export async function crearPlan(db, datos) {
   const { rows } = await db
-    .prepare('INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo) VALUES (?, ?, ?, ?, ?, ?) RETURNING id')
-    .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo));
+    .prepare(
+      `INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo, dias_prueba, suspender_al_vencer)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    )
+    .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)));
   return rows[0].id;
 }
 
 export async function editarPlan(db, id, datos) {
   return (
     (await db
-      .prepare('UPDATE planes SET nombre = ?, precio_centavos = ?, max_productos = ?, max_fotos = ?, max_banners = ?, activo = ? WHERE id = ?')
-      .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), id)).changes > 0
+      .prepare(
+        `UPDATE planes SET nombre = ?, precio_centavos = ?, max_productos = ?, max_fotos = ?, max_banners = ?, activo = ?,
+         dias_prueba = ?, suspender_al_vencer = ? WHERE id = ?`,
+      )
+      .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), id)).changes > 0
   );
+}
+
+// Pausar un plan: deja de ofrecerse a clientes nuevos, pero los que ya lo tienen lo conservan y siguen igual. Reanudar lo vuelve a ofrecer.
+export async function pausarPlan(db, id, pausado) {
+  return (await db.prepare('UPDATE planes SET activo = ? WHERE id = ?').run(pausado ? 0 : 1, id)).changes > 0;
 }
 
 // Devuelve null si se borró, o el motivo por el que no se puede.
@@ -151,14 +172,26 @@ export const esFiltroClientes = (valor) => typeof valor === 'string' && Object.h
 const SELECCION_CLIENTE = `
   SELECT t.id, t.nombre, t.slug, t.estado, t.motivo_suspension AS "motivoSuspension", t.vence_en AS "venceEn", t.notas,
          t.creada_en AS "creadaEn", t.plan_id AS "planId", p.nombre AS "planNombre", p.precio_centavos AS "precioCentavos",
-         p.max_productos AS "maxProductos",
+         p.max_productos AS "maxProductos", p.dias_prueba AS "diasPrueba", (p.suspender_al_vencer = 1) AS "suspenderAlVencer",
          (SELECT u.email FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS email,
          (SELECT count(*) FROM productos x WHERE x.tienda_id = t.id) AS productos,
          (SELECT count(*) FROM pedidos o WHERE o.tienda_id = t.id) AS pedidos
   FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id`;
 
+// `estado` es el que vale ahora (cerrada si la suspendieron o si su plan la cierra al vencer y ya venció);
+// `estadoReal` es el que se guardó, y `cerradaAlVencer` avisa que el cierre es automático.
 function conCobro(cliente, dia) {
-  return { ...cliente, productos: Number(cliente.productos), pedidos: Number(cliente.pedidos), cobro: estadoDeCobro(cliente.venceEn, dia) };
+  const efectivo = estadoEfectivo(cliente, dia);
+  return {
+    ...cliente,
+    productos: Number(cliente.productos),
+    pedidos: Number(cliente.pedidos),
+    cobro: estadoDeCobro(cliente.venceEn, dia),
+    estadoReal: cliente.estado,
+    estado: efectivo.estado,
+    cerradaAlVencer: efectivo.cerradaAlVencer,
+    motivoCierre: efectivo.motivo,
+  };
 }
 
 // Devuelve { clientes, cuentas }: la lista según el filtro y la búsqueda, y cuántos hay en cada filtro.
@@ -207,14 +240,26 @@ export async function validarCliente(db, campos) {
 }
 
 // Alta de un cliente: su tienda, su usuario y una clave que se muestra una sola vez.
-export function crearCliente(db, datos) {
-  return crearTienda(db, datos);
+// Si no se elige una fecha de vencimiento y el plan tiene prueba, vence a los N días de hoy; con una fecha elegida, vale esa.
+export async function crearCliente(db, datos, dia = hoy()) {
+  let { venceEn } = datos;
+  if (venceEn === null || venceEn === undefined) {
+    const plan = datos.planId == null ? null : await db.prepare('SELECT dias_prueba AS "diasPrueba" FROM planes WHERE id = ?').get(datos.planId);
+    venceEn = plan?.diasPrueba ? sumarDias(dia, plan.diasPrueba) : null;
+  }
+  return crearTienda(db, { ...datos, venceEn });
 }
 
-export async function cambiarPlanDeCliente(db, tiendaId, planId) {
-  if (!(await db.prepare('SELECT 1 FROM planes WHERE id = ?').get(planId))) return 'El plan no existe';
+// Devuelve { error } o { prueba }, donde prueba es { dias, venceEn } si el plan nuevo tiene período de prueba (empieza hoy) o null.
+// Cambiar a un plan sin prueba no toca el vencimiento: eso se maneja registrando pagos o fijando la fecha.
+export async function cambiarPlanDeCliente(db, tiendaId, planId, dia = hoy()) {
+  const plan = await db.prepare('SELECT dias_prueba AS "diasPrueba" FROM planes WHERE id = ?').get(planId);
+  if (!plan) return { error: 'El plan no existe' };
   await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(planId, tiendaId);
-  return null;
+  if (!plan.diasPrueba) return { prueba: null };
+  const venceEn = sumarDias(dia, plan.diasPrueba);
+  await db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceEn, tiendaId);
+  return { prueba: { dias: plan.diasPrueba, venceEn } };
 }
 
 export async function suspenderCliente(db, tiendaId, motivo) {
@@ -299,7 +344,8 @@ export async function usoDeCliente(db, tiendaId) {
 // momento y conviene revisarlos). Un tope en null es "sin límite". Las horas de trabajo y el soporte de cada plan no los
 // aplica el sistema: se cumplen a mano.
 export const PLANES_SUGERIDOS = [
-  { nombre: 'Prueba', precioCentavos: 0, maxProductos: 20, maxFotos: 3, maxBanners: 1 }, // 14 días: se le pone vencimiento al dar de alta
+  // 7 días de prueba desde que el cliente entra al plan; al terminar, la tienda se cierra hasta que se le registre un pago.
+  { nombre: 'Prueba', precioCentavos: 0, maxProductos: 20, maxFotos: 3, maxBanners: 1, diasPrueba: 7, suspenderAlVencer: true },
   { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2 },
   { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4 },
   { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null },

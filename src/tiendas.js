@@ -2,6 +2,7 @@ import { enTransaccion } from './db.js';
 import { generarClave, hashClave, verificarClave } from './claves.js';
 import { slugificar } from './util/slug.js';
 import { SUBDOMINIOS_RESERVADOS } from './util/dominios.js';
+import { estadoEfectivo } from './estado.js';
 
 const LARGO_MAXIMO_SUBDOMINIO = 63;
 
@@ -36,16 +37,24 @@ export async function crearTienda(db, { nombre, email, planId = null, venceEn = 
   });
 }
 
+const SELECCION_TIENDA = `
+  SELECT t.id, t.nombre, t.slug, t.estado, t.motivo_suspension AS "motivoSuspension", t.vence_en AS "venceEn",
+         (p.suspender_al_vencer = 1) AS "suspenderAlVencer", p.dias_prueba AS "diasPrueba"
+  FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id`;
+
+// `estado` es el que vale ahora: 'suspendida' si la suspendieron o si su plan la cierra al vencer y ya venció.
+function conEstado(fila) {
+  if (!fila) return null;
+  const { estado, motivo } = estadoEfectivo(fila);
+  return { id: fila.id, nombre: fila.nombre, slug: fila.slug, estado, motivoSuspension: motivo };
+}
+
 export async function buscarTiendaPorSlug(db, slug) {
-  return (await db.prepare('SELECT id, nombre, slug, estado FROM tiendas WHERE slug = ?').get(slug)) ?? null;
+  return conEstado(await db.prepare(`${SELECCION_TIENDA} WHERE t.slug = ?`).get(slug));
 }
 
 export async function buscarTienda(db, id) {
-  return (
-    (await db
-      .prepare('SELECT id, nombre, slug, estado, motivo_suspension AS "motivoSuspension" FROM tiendas WHERE id = ?')
-      .get(id)) ?? null
-  );
+  return conEstado(await db.prepare(`${SELECCION_TIENDA} WHERE t.id = ?`).get(id));
 }
 
 export function listarTiendas(db) {

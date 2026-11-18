@@ -19,12 +19,12 @@ export async function limitesDeTienda(db, tiendaId) {
   const fila = await db
     .prepare(
       `SELECT t.vence_en AS "venceEn", p.id AS "planId", p.nombre, p.precio_centavos AS "precioCentavos",
-              p.max_productos AS "maxProductos", p.max_fotos AS "maxFotos", p.max_banners AS "maxBanners"
+              p.max_productos AS "maxProductos", p.max_fotos AS "maxFotos", p.max_banners AS "maxBanners", p.dias_prueba AS "diasPrueba"
        FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id WHERE t.id = ?`,
     )
     .get(tiendaId);
   return {
-    plan: fila?.planId ? { id: fila.planId, nombre: fila.nombre, precioCentavos: fila.precioCentavos } : null,
+    plan: fila?.planId ? { id: fila.planId, nombre: fila.nombre, precioCentavos: fila.precioCentavos, diasPrueba: fila.diasPrueba ?? null } : null,
     maxProductos: fila?.maxProductos ?? null,
     maxFotos: Math.min(MAX_FOTOS, fila?.maxFotos ?? MAX_FOTOS),
     maxBanners: Math.min(MAX_BANNERS, fila?.maxBanners ?? MAX_BANNERS),

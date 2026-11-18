@@ -18,7 +18,7 @@ try {
     }
     const hecho = 'creado     ';
     const precio = plan.precioCentavos ? `${formatearPrecio(plan.precioCentavos)}/mes` : 'gratis';
-    console.log(`${hecho}  ${plan.nombre.padEnd(11)} ${precio.padEnd(22)} productos: ${String(tope(plan.maxProductos)).padEnd(8)} fotos: ${String(tope(plan.maxFotos)).padEnd(8)} banners: ${tope(plan.maxBanners)}`);
+    console.log(`${hecho}  ${plan.nombre.padEnd(11)} ${precio.padEnd(22)} productos: ${String(tope(plan.maxProductos)).padEnd(8)} fotos: ${String(tope(plan.maxFotos)).padEnd(8)} banners: ${String(tope(plan.maxBanners)).padEnd(8)} ${plan.diasPrueba ? `prueba: ${plan.diasPrueba} días${plan.suspenderAlVencer ? ', cierra al vencer' : ''}` : ''}`.trimEnd());
   }
   console.log(`\n${creados.length} creados, ${existentes.length} ya existían. Los ves y los editás en /plataforma/planes.`);
   await db.cerrar();

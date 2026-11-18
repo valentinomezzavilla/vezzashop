@@ -87,7 +87,7 @@
               </a>
             </td>
             <td data-etiqueta="Plan"><%= c.planNombre ?? 'Sin plan' %></td>
-            <td data-etiqueta="Estado"><span class="pastilla <%= c.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= c.estado === 'activa' ? 'Activa' : 'Suspendida' %></span></td>
+            <td data-etiqueta="Estado"><span class="pastilla <%= c.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= c.estado === 'activa' ? 'Activa' : (c.cerradaAlVencer ? 'Cerrada' : 'Suspendida') %></span><% if (c.cerradaAlVencer) { %><span class="celda-nota ayuda">terminó el plazo</span><% } %></td>
             <td data-etiqueta="Cobro"><span class="pastilla <%= claseCobro %>"><%= cobro %></span></td>
             <td data-etiqueta="Productos" class="numero"><%= c.productos %><% if (c.maxProductos) { %><span class="ayuda"> / <%= c.maxProductos %></span><% } %></td>
             <td data-etiqueta="Pedidos" class="numero"><%= c.pedidos %></td>

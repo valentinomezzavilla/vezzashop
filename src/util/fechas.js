@@ -19,6 +19,9 @@ export function sumarMeses(dia, meses) {
   return destino.toISOString().slice(0, 10);
 }
 
+// Suma días de calendario: sumarDias('2026-11-28', 7) -> '2026-12-05'.
+export const sumarDias = (dia, dias) => new Date(Date.parse(`${dia}T00:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
+
 // Cantidad de días de `desde` a `hasta` (negativa si `hasta` es anterior).
 export const diasEntre = (desde, hasta) => Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000);
 

@@ -10,7 +10,8 @@ import { crearTienda, buscarTienda } from '../src/tiendas.js';
 import { interpretarHoja } from '../src/importacion/interpretar.js';
 import { previsualizar, aplicarImportacion, ErrorDeImportacion } from '../src/importacion/aplicar.js';
 import { estadoDeCobro, limitesDeTienda } from '../src/limites.js';
-import { diasEntre, esDiaValido, hoy, sumarMeses } from '../src/util/fechas.js';
+import { diasEntre, esDiaValido, hoy, sumarDias, sumarMeses } from '../src/util/fechas.js';
+import { estadoEfectivo } from '../src/estado.js';
 import {
   crearSuperadmin,
   resetearClaveSuperadmin,
@@ -210,7 +211,7 @@ test('un plan desactivado no se ofrece para clientes nuevos, pero lo conserva qu
   assert.match(await rechazado.text(), /Elegí un plan/);
   await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = (SELECT max(id) FROM tiendas)').run(apagado);
   const { id } = await db.prepare('SELECT max(id) AS id FROM tiendas').get();
-  assert.match(await (await nav.pedir(`/plataforma/clientes/${id}`)).text(), new RegExp(`${nombrePlan}[^<]*\\(ya no se ofrece\\)`));
+  assert.match(await (await nav.pedir(`/plataforma/clientes/${id}`)).text(), new RegExp(`${nombrePlan}[^<]*\\(pausado\\)`));
 });
 
 // ---------- Clientes ----------
@@ -562,4 +563,186 @@ test('una tienda sin plan, o con el plan "Sin límites", no tiene topes', async 
   assert.ok(sinLimites, 'la migración deja un plan sin topes para las tiendas que ya existían');
   assert.deepEqual({ p: sinLimites.maxProductos, f: sinLimites.maxFotos, b: sinLimites.maxBanners }, { p: null, f: null, b: null });
   await assert.rejects(crearTienda(db, { nombre: unico('Plan'), email: `${unico('p')}@c.com`, planId: 999999 }), /plan elegido no existe/);
+});
+
+// ---------- Período de prueba, cierre al vencer y pausa de planes ----------
+
+const planConPrueba = (datos = {}) => nuevoPlan({ nombre: unico('Prueba'), precioCentavos: 0, diasPrueba: 7, suspenderAlVencer: true, ...datos });
+const vencimientoDe = async (id) => (await db.prepare('SELECT vence_en AS v FROM tiendas WHERE id = ?').get(id)).v;
+
+test('días de prueba de un plan: se validan, se guardan y se ven en la lista', async () => {
+  const { nav } = await superadmin();
+  const campos = (extra) => ({ nombre: unico('P'), precio: '0', ...extra });
+  const html = async (extra) => (await nav.enviar('/plataforma/planes/nuevo', campos(extra))).text();
+  for (const malo of ['0', '366', '-3', '7.5', 'una semana', '1e1']) assert.match(await html({ diasPrueba: malo }), /Días de prueba: escribí un número entre 1 y 365/, malo);
+
+  const nombre = unico('Prueba');
+  assert.equal((await nav.enviar('/plataforma/planes/nuevo', { nombre, precio: '0', diasPrueba: '7', suspenderAlVencer: '1', activo: '1' })).status, 302);
+  const plan = (await listarPlanes(db)).find((p) => p.nombre === nombre);
+  assert.deepEqual({ dias: plan.diasPrueba, cierra: plan.suspenderAlVencer, activo: plan.activo }, { dias: 7, cierra: true, activo: true });
+  assert.match(await (await nav.pedir('/plataforma/planes')).text(), /7 días<span class="celda-nota ayuda">cierra al vencer/);
+  assert.match(await (await nav.pedir(`/plataforma/planes/${plan.id}`)).text(), /name="diasPrueba" value="7"/);
+
+  // Vaciarlo quita la prueba; sin marcar el cierre, queda en falso
+  await nav.enviar(`/plataforma/planes/${plan.id}`, { nombre, precio: '0', diasPrueba: '', activo: '1' }, { desde: `/plataforma/planes/${plan.id}` });
+  const despues = (await listarPlanes(db)).find((p) => p.id === plan.id);
+  assert.deepEqual({ dias: despues.diasPrueba, cierra: despues.suspenderAlVencer }, { dias: null, cierra: false });
+});
+
+test('al dar de alta un cliente en un plan con prueba vence a los N días; una fecha elegida manda; sin prueba no vence', async () => {
+  const { nav } = await superadmin();
+  const conPrueba = await planConPrueba({ diasPrueba: 7 });
+  const otraPrueba = await planConPrueba({ diasPrueba: 30 });
+  const sinPrueba = await nuevoPlan();
+
+  const a = await altaDeCliente(nav, { planId: conPrueba });
+  assert.equal(await vencimientoDe(a.id), sumarDias(hoy(), 7));
+  assert.match(a.html, new RegExp(`Prueba hasta[\\s\\S]*${sumarDias(hoy(), 7).split('-')[2].replace(/^0/, '')}/`), 'la pantalla de alta muestra hasta cuándo');
+  assert.equal(await vencimientoDe((await altaDeCliente(nav, { planId: otraPrueba })).id), sumarDias(hoy(), 30), 'cada plan con sus días');
+  // Para un cliente puntual se elige otra fecha
+  const fecha = sumarDias(hoy(), 3);
+  assert.equal(await vencimientoDe((await altaDeCliente(nav, { planId: conPrueba, venceEn: fecha })).id), fecha);
+  assert.equal(await vencimientoDe((await altaDeCliente(nav, { planId: sinPrueba })).id), null);
+  assert.match(await (await nav.pedir('/plataforma/clientes/nuevo')).text(), /prueba de 7 días/);
+});
+
+test('cambiar a un plan con prueba empieza la prueba hoy; cambiar a uno sin prueba no toca el vencimiento', async () => {
+  const { nav } = await superadmin();
+  const conPrueba = await planConPrueba({ diasPrueba: 10 });
+  const pago = await nuevoPlan();
+  const cliente = await altaDeCliente(nav, { planId: pago, venceEn: sumarMeses(hoy(), 2) });
+  const original = await vencimientoDe(cliente.id);
+  const cambiar = (planId) => nav.enviar(`/plataforma/clientes/${cliente.id}/plan`, { planId: String(planId) }, { desde: `/plataforma/clientes/${cliente.id}` });
+
+  assert.equal((await cambiar(conPrueba)).status, 302);
+  assert.equal(await vencimientoDe(cliente.id), sumarDias(hoy(), 10));
+  assert.match(await (await nav.pedir(`/plataforma/clientes/${cliente.id}`)).text(), /empezó una prueba de 10 días/);
+  await db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(original, cliente.id);
+  await cambiar(pago);
+  assert.equal(await vencimientoDe(cliente.id), original, 'sin prueba, el vencimiento queda como estaba');
+});
+
+test('un plan que cierra al vencer cierra la tienda cuando pasa la fecha, y se reabre al registrar un pago o extender la fecha', async () => {
+  const { nav } = await superadmin();
+  const cliente = await altaDeCliente(nav, { planId: await planConPrueba({ diasPrueba: 7 }) });
+  const fecha = (dias) => sumarDias(hoy(), dias);
+  const fijar = (dia) => db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(dia, cliente.id);
+
+  // Durante la prueba y el último día (vence hoy) está abierta
+  assert.equal((await vidriera(cliente.slug)).status, 200);
+  await fijar(fecha(0));
+  assert.equal((await vidriera(cliente.slug)).status, 200, 'el día del vencimiento todavía no está cerrada');
+
+  // Pasada la fecha, se cierra sola
+  await fijar(fecha(-1));
+  const cerrada = await vidriera(cliente.slug);
+  assert.equal(cerrada.status, 503);
+  assert.match(cerrada.cuerpo, /no está disponible por el momento/);
+  assert.equal((await buscarTienda(db, cliente.id)).estado, 'suspendida');
+  assert.equal((await db.prepare('SELECT estado FROM tiendas WHERE id = ?').get(cliente.id)).estado, 'activa', 'no se guardó ninguna suspensión: se calcula');
+
+  // El dueño mira su panel (con el motivo) pero no cambia nada
+  const panel = await (await cliente.panel.pedir('/admin/productos')).text();
+  assert.match(panel, /Tu tienda está suspendida/);
+  assert.match(panel, /Motivo: Terminó el período de prueba/);
+  const intento = await cliente.panel.enviar('/admin/productos/nuevo', PRODUCTO(1), { desde: '/admin/productos' });
+  assert.equal(intento.headers.get('location'), '/admin/inicio');
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM productos WHERE tienda_id = ?').get(cliente.id)).n, 0);
+  const inicio = await (await cliente.panel.pedir('/admin/inicio')).text();
+  assert.match(inicio, /Tu período de prueba terminó el/);
+
+  // El administrador la ve cerrada por vencimiento, sin botón de reactivar, y cuenta como suspendida
+  const ficha = await (await nav.pedir(`/plataforma/clientes/${cliente.id}`)).text();
+  assert.match(ficha, /La tienda se cerró sola: terminó el período de prueba/);
+  assert.match(ficha, /Cerrada: venció/);
+  assert.doesNotMatch(ficha, /Reactivar la tienda/);
+  assert.match(ficha, /está cerrada por el vencimiento, no suspendida a mano/);
+  const lista = await listarClientes(db, { filtro: 'suspendidos' });
+  assert.ok(lista.clientes.some((c) => c.id === cliente.id && c.cerradaAlVencer));
+  assert.ok(!(await listarClientes(db, { filtro: 'activos' })).clientes.some((c) => c.id === cliente.id));
+  assert.match(await (await nav.pedir('/plataforma/clientes?filtro=suspendidos')).text(), /Cerrada[\s\S]*terminó el plazo/);
+
+  // Registrar un pago la reabre en el acto
+  assert.equal((await nav.enviar(`/plataforma/clientes/${cliente.id}/pago`, { meses: '1', monto: '', nota: '' }, { desde: `/plataforma/clientes/${cliente.id}` })).status, 302);
+  assert.equal((await vidriera(cliente.slug)).status, 200);
+  const reabierta = crearNavegador(base());
+  await reabierta.enviar('/admin/ingresar', { email: cliente.email, clave: cliente.clave });
+  assert.equal((await reabierta.enviar('/admin/productos/nuevo', PRODUCTO(1), { desde: '/admin/productos/nuevo' })).status, 302);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM productos WHERE tienda_id = ?').get(cliente.id)).n, 1);
+
+  // Extender la fecha también la reabre
+  await fijar(fecha(-5));
+  assert.equal((await vidriera(cliente.slug)).status, 503);
+  await nav.enviar(`/plataforma/clientes/${cliente.id}/vencimiento`, { venceEn: fecha(7) }, { desde: `/plataforma/clientes/${cliente.id}` });
+  assert.equal((await vidriera(cliente.slug)).status, 200);
+});
+
+test('sin la opción "cerrar al vencer" el vencimiento solo avisa; y una suspensión a mano manda sobre el cierre automático', async () => {
+  const { nav } = await superadmin();
+  const soloAviso = await altaDeCliente(nav, { planId: await nuevoPlan() });
+  await db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(sumarDias(hoy(), -30), soloAviso.id);
+  assert.equal((await vidriera(soloAviso.slug)).status, 200, 'vencido hace un mes y sigue abierta');
+  assert.equal((await buscarTienda(db, soloAviso.id)).estado, 'activa');
+
+  const cierra = await altaDeCliente(nav, { planId: await planConPrueba() });
+  await db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(sumarDias(hoy(), -1), cierra.id);
+  await nav.enviar(`/plataforma/clientes/${cierra.id}/suspender`, { motivo: 'Pidió pausar' }, { desde: `/plataforma/clientes/${cierra.id}` });
+  const tienda = await buscarTienda(db, cierra.id);
+  assert.equal(tienda.motivoSuspension, 'Pidió pausar', 'se muestra el motivo manual, no el automático');
+  const ficha = await (await nav.pedir(`/plataforma/clientes/${cierra.id}`)).text();
+  assert.match(ficha, /Reactivar la tienda/, 'suspendida a mano: sí se reactiva');
+  assert.doesNotMatch(ficha, /La tienda se cerró sola/);
+  // Reactivar a mano no reabre una tienda que además está vencida: hay que extender la fecha
+  await nav.enviar(`/plataforma/clientes/${cierra.id}/reactivar`, {}, { desde: `/plataforma/clientes/${cierra.id}` });
+  assert.equal((await vidriera(cierra.slug)).status, 503);
+});
+
+test('un plan que cierra al vencer pero sin vencimiento no cierra nada', async () => {
+  const { nav } = await superadmin();
+  const cliente = await altaDeCliente(nav, { planId: await planConPrueba({ diasPrueba: null }) });
+  assert.equal(await vencimientoDe(cliente.id), null);
+  assert.equal((await vidriera(cliente.slug)).status, 200);
+});
+
+test('estadoEfectivo: abierta, cerrada a mano y cerrada por vencimiento con el motivo que corresponde', () => {
+  const dia = '2026-11-17';
+  const base = { estado: 'activa', venceEn: '2026-11-16', suspenderAlVencer: true, diasPrueba: 7, motivoSuspension: '' };
+  assert.deepEqual(estadoEfectivo(base, dia), { estado: 'suspendida', cerradaAlVencer: true, motivo: 'Terminó el período de prueba' });
+  assert.deepEqual(estadoEfectivo({ ...base, diasPrueba: null }, dia), { estado: 'suspendida', cerradaAlVencer: true, motivo: 'Venció el plazo de pago' });
+  assert.equal(estadoEfectivo({ ...base, venceEn: '2026-11-17' }, dia).estado, 'activa', 'vence hoy: abierta');
+  assert.equal(estadoEfectivo({ ...base, suspenderAlVencer: false }, dia).estado, 'activa', 'el plan no cierra al vencer');
+  assert.equal(estadoEfectivo({ ...base, venceEn: null }, dia).estado, 'activa', 'sin vencimiento');
+  assert.deepEqual(estadoEfectivo({ ...base, estado: 'suspendida', motivoSuspension: 'Falta de pago', venceEn: '2099-01-01' }, dia), { estado: 'suspendida', cerradaAlVencer: false, motivo: 'Falta de pago' });
+  assert.equal(sumarDias('2026-11-28', 7), '2026-12-05');
+  assert.equal(sumarDias('2026-12-30', 3), '2027-01-02');
+  assert.equal(sumarDias('2028-02-27', 2), '2028-02-29');
+});
+
+test('pausar un plan: deja de ofrecerse a clientes nuevos, no toca a los que ya lo tienen, y se reanuda', async () => {
+  const { nav } = await superadmin();
+  const nombre = unico('Pausable');
+  const planId = await nuevoPlan({ nombre, maxProductos: 3 });
+  const cliente = await altaDeCliente(nav, { planId });
+
+  const lista = async () => (await nav.pedir('/plataforma/planes')).text();
+  assert.match(await lista(), new RegExp(`${nombre}[\\s\\S]*?>Pausar<`));
+  assert.equal((await nav.enviar(`/plataforma/planes/${planId}/pausar`, {}, { desde: '/plataforma/planes' })).status, 302);
+  assert.equal((await listarPlanes(db)).find((p) => p.id === planId).activo, false);
+  const pausada = await lista();
+  assert.match(pausada, /Pausado/);
+  assert.match(pausada, /Pausamos|>Reanudar</);
+  assert.doesNotMatch(await (await nav.pedir('/plataforma/clientes/nuevo')).text(), new RegExp(nombre), 'no se ofrece para clientes nuevos');
+  const rechazado = await nav.enviar('/plataforma/clientes/nuevo', { nombre: unico('N'), email: `${unico('e')}@c.com`, planId: String(planId) });
+  assert.equal(rechazado.status, 200, 'un plan pausado no se puede elegir');
+  // El cliente que ya lo tiene sigue igual: mismos topes, tienda abierta
+  assert.equal((await limitesDeTienda(db, cliente.id)).maxProductos, 3);
+  assert.equal((await vidriera(cliente.slug)).status, 200);
+  assert.match(await (await nav.pedir(`/plataforma/clientes/${cliente.id}`)).text(), new RegExp(`${nombre}[^<]*\\(pausado\\)`));
+
+  await nav.enviar(`/plataforma/planes/${planId}/pausar`, {}, { desde: '/plataforma/planes' });
+  assert.equal((await listarPlanes(db)).find((p) => p.id === planId).activo, true, 'reanudado');
+  assert.match(await (await nav.pedir('/plataforma/clientes/nuevo')).text(), new RegExp(nombre));
+  assert.equal((await nav.pedir(`/plataforma/planes/${planId}/pausar`, { method: 'POST', body: new URLSearchParams() })).status, 403, 'sin token no pasa');
+  assert.equal((await listarPlanes(db)).find((p) => p.id === planId).activo, true, 'y no cambió nada');
+  assert.equal((await nav.pedir('/plataforma/planes/999999/pausar', { method: 'POST', body: new URLSearchParams() })).status, 404);
 });

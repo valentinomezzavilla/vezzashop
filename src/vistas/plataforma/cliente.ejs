@@ -14,7 +14,7 @@
 <header class="encabezado">
   <div>
     <a class="volver" href="/plataforma/clientes"><%- icono('izquierda', { tamano: 16 }) %> Clientes</a>
-    <h1><%= cliente.nombre %> <span class="pastilla <%= cliente.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= cliente.estado === 'activa' ? 'Activa' : 'Suspendida' %></span></h1>
+    <h1><%= cliente.nombre %> <span class="pastilla <%= cliente.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= cliente.estado === 'activa' ? 'Activa' : (cliente.cerradaAlVencer ? 'Cerrada: venció' : 'Suspendida') %></span></h1>
     <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
   </div>
   <div class="acciones">
@@ -22,7 +22,9 @@
   </div>
 </header>
 
-<% if (cliente.estado === 'suspendida') { %>
+<% if (cliente.cerradaAlVencer) { %>
+  <p class="aviso aviso-error"><%- icono('reloj', { tamano: 18 }) %><span><strong>La tienda se cerró sola: <%= cliente.motivoCierre.toLowerCase() %>.</strong> Venció el <%= formatearDia(cliente.venceEn) %> y su plan cierra la tienda al vencer. Para reabrirla, registrale un pago o extendé la fecha de vencimiento (más abajo, en Cobro).</span></p>
+<% } else if (cliente.estado === 'suspendida') { %>
   <p class="aviso aviso-error"><%- icono('alerta', { tamano: 18 }) %><span><strong>Esta tienda está suspendida.</strong> Los compradores ven un aviso y el dueño puede mirar su panel, pero no cambiar nada.<% if (cliente.motivoSuspension) { %> Motivo: <%= cliente.motivoSuspension %>.<% } %></span></p>
 <% } %>
 
@@ -37,13 +39,14 @@
       <label class="visualmente-oculto" for="planId">Plan</label>
       <select id="planId" name="planId"<%- invalido('planId') %>>
         <% for (const plan of planes) { %>
-          <option value="<%= plan.id %>"<%= plan.id === cliente.planId ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %><%= plan.activo ? '' : ' (ya no se ofrece)' %></option>
+          <option value="<%= plan.id %>"<%= plan.id === cliente.planId ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %><%= plan.diasPrueba ? ` · prueba de ${plan.diasPrueba} días` : '' %><%= plan.activo ? '' : ' (pausado)' %></option>
         <% } %>
         <% if (cliente.planId === null) { %><option value="" selected disabled>Sin plan</option><% } %>
       </select>
       <button class="boton boton-secundario" type="submit">Cambiar plan</button>
     </form>
     <%- error('planId') %>
+    <span class="ayuda">Si el plan nuevo tiene prueba, empieza una prueba de esos días desde hoy y cambia el vencimiento. Si no, el vencimiento queda como está.</span>
     <div class="uso-plan">
       <div>
         <div class="uso-plan-fila"><span>Productos</span><strong><%= uso.productos %><%= limites.maxProductos === null ? '' : ` de ${limites.maxProductos}` %></strong></div>
@@ -136,7 +139,9 @@
     <p class="texto-suave">Suspender cierra la tienda para los compradores y deja el panel del cliente en solo lectura. Reactivar la vuelve a abrir.</p>
   </div>
   <div class="tarjeta ajuste-campos">
-    <% if (cliente.estado === 'activa') { %>
+    <% if (cliente.cerradaAlVencer) { %>
+      <p class="ayuda">La tienda está cerrada por el vencimiento, no suspendida a mano: se reabre sola al registrarle un pago o extender la fecha.</p>
+    <% } else if (cliente.estadoReal === 'activa') { %>
       <details class="confirmar">
         <summary class="boton boton-peligro-suave"><%- icono('candado', { tamano: 16 }) %> Suspender la tienda</summary>
         <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suspender" class="confirmar-cuerpo">

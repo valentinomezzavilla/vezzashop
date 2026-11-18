@@ -17,6 +17,7 @@ import {
   crearPlan,
   editarPlan,
   borrarPlan,
+  pausarPlan,
   listarClientes,
   leerCliente,
   resumenPlataforma,
@@ -127,7 +128,10 @@ export function rutasPlataforma({ db, config }) {
       return mostrarNuevoCliente(req, res, { valores: req.body, errores: { general: error.message }, status: 400 });
     }
     // La clave se muestra en esta respuesta y no se guarda en la sesión: no se puede volver a ver.
+    const { venceEn, diasPrueba } = await leerCliente(db, alta.tienda.id);
     res.render('plataforma/cliente-creado', {
+      venceEn,
+      diasPrueba,
       tienda: alta.tienda,
       email: alta.email,
       clave: alta.clave,
@@ -164,9 +168,11 @@ export function rutasPlataforma({ db, config }) {
 
   router.post('/clientes/:clienteId/plan', cargarCliente, verificarCsrf, async (req, res) => {
     const planId = id(req.body.planId);
-    const error = planId === null ? 'Elegí un plan' : await cambiarPlanDeCliente(db, req.cliente.id, planId);
+    const { error, prueba } = planId === null ? { error: 'Elegí un plan' } : await cambiarPlanDeCliente(db, req.cliente.id, planId);
     if (error) return mostrarCliente(req, res, { errores: { planId: error }, status: 400 });
-    avisar(req, 'ok', 'Cambiamos el plan. Los topes nuevos valen desde ya.');
+    avisar(req, 'ok', prueba
+      ? `Cambiamos el plan y empezó una prueba de ${plural(prueba.dias, 'día', 'días')}: vence el ${formatearDia(prueba.venceEn)}. Los topes nuevos valen desde ya.`
+      : 'Cambiamos el plan. Los topes nuevos valen desde ya.');
     volverAlCliente(req, res);
   });
 
@@ -235,6 +241,8 @@ export function rutasPlataforma({ db, config }) {
     maxFotos: plan?.maxFotos ?? '',
     maxBanners: plan?.maxBanners ?? '',
     activo: plan?.activo ?? true,
+    diasPrueba: plan?.diasPrueba ?? '',
+    suspenderAlVencer: plan?.suspenderAlVencer ?? false,
   });
 
   const mostrarPlan = (req, res, { plan = null, valores, errores = {}, status = 200 }) =>
@@ -244,7 +252,7 @@ export function rutasPlataforma({ db, config }) {
 
   router.post('/planes/nuevo', verificarCsrf, async (req, res) => {
     const { datos, errores } = await validarPlan(db, null, req.body);
-    if (Object.keys(errores).length > 0) return mostrarPlan(req, res, { valores: { ...req.body, activo: datos.activo }, errores, status: 400 });
+    if (Object.keys(errores).length > 0) return mostrarPlan(req, res, { valores: { ...req.body, activo: datos.activo, suspenderAlVencer: datos.suspenderAlVencer }, errores, status: 400 });
     await crearPlan(db, datos);
     avisar(req, 'ok', `Creamos el plan "${datos.nombre}".`);
     res.redirect('/plataforma/planes');
@@ -261,10 +269,20 @@ export function rutasPlataforma({ db, config }) {
   router.post('/planes/:planId', cargarPlan, verificarCsrf, async (req, res) => {
     const { datos, errores } = await validarPlan(db, req.plan.id, req.body);
     if (Object.keys(errores).length > 0) {
-      return mostrarPlan(req, res, { plan: req.plan, valores: { ...req.body, activo: datos.activo }, errores, status: 400 });
+      return mostrarPlan(req, res, { plan: req.plan, valores: { ...req.body, activo: datos.activo, suspenderAlVencer: datos.suspenderAlVencer }, errores, status: 400 });
     }
     await editarPlan(db, req.plan.id, datos);
     avisar(req, 'ok', `Guardamos el plan "${datos.nombre}". Los topes nuevos valen para todos sus clientes desde ya.`);
+    res.redirect('/plataforma/planes');
+  });
+
+  // Pausar / reanudar desde la lista: deja de ofrecerse a clientes nuevos (los que ya lo tienen no cambian).
+  router.post('/planes/:planId/pausar', cargarPlan, verificarCsrf, async (req, res) => {
+    const pausar = req.plan.activo; // si estaba ofrecido, se pausa; si estaba pausado, se reanuda
+    await pausarPlan(db, req.plan.id, pausar);
+    avisar(req, 'ok', pausar
+      ? `Pausamos "${req.plan.nombre}": ya no se ofrece a clientes nuevos. Los que lo tienen siguen igual.`
+      : `Reanudamos "${req.plan.nombre}": vuelve a ofrecerse a clientes nuevos.`);
     res.redirect('/plataforma/planes');
   });
 

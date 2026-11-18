@@ -44,10 +44,21 @@
       <%- error('maxBanners') %>
     </div>
   </div>
+  <div class="campo">
+    <label for="diasPrueba">Días de prueba <span class="opcional">(opcional)</span></label>
+    <input id="diasPrueba" type="text" name="diasPrueba" value="<%= valores.diasPrueba %>" inputmode="numeric" placeholder="Sin prueba" aria-describedby="ayuda-diasPrueba"<%- invalido('diasPrueba') %>>
+    <span class="ayuda" id="ayuda-diasPrueba">Si lo completás, cada cliente que entra a este plan vence a los N días de entrar, contados desde ese día. Al darlo de alta o cambiarle el plan podés poner otra fecha para un cliente puntual.</span>
+    <%- error('diasPrueba') %>
+  </div>
+  <label class="interruptor">
+    <input type="checkbox" name="suspenderAlVencer" value="1"<%= valores.suspenderAlVencer === true || valores.suspenderAlVencer === '1' || valores.suspenderAlVencer === 'on' ? ' checked' : '' %>>
+    <span class="interruptor-pista" aria-hidden="true"></span>
+    <span class="interruptor-texto"><strong>Cerrar la tienda sola cuando venza</strong><span class="ayuda">Al pasar la fecha de vencimiento, los compradores ven que la tienda no está disponible y el panel del cliente queda en solo lectura. Se reabre sola apenas le registrás un pago o extendés la fecha. Sin esto, el vencimiento solo avisa.</span></span>
+  </label>
   <label class="interruptor">
     <input type="checkbox" name="activo" value="1"<%= valores.activo === true || valores.activo === '1' || valores.activo === 'on' ? ' checked' : '' %>>
     <span class="interruptor-pista" aria-hidden="true"></span>
-    <span class="interruptor-texto"><strong>Se ofrece a clientes nuevos</strong><span class="ayuda">Si lo apagás, los clientes que ya lo tienen lo conservan, pero no se puede elegir para otros.</span></span>
+    <span class="interruptor-texto"><strong>Disponible para clientes nuevos</strong><span class="ayuda">Si lo pausás, deja de ofrecerse al dar de alta o cambiar de plan, pero los clientes que ya lo tienen lo conservan y no cambia nada para ellos.</span></span>
   </label>
   <div class="acciones">
     <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar plan</button>

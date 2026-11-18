@@ -1,6 +1,6 @@
 <%- include('parciales/cabecera', { titulo: 'Planes' }) %>
 <%
-  const tope = (valor, unidad) => (valor === null ? 'Sin tope' : `${valor} ${unidad}`);
+  const tope = (valor) => (valor === null ? 'Sin tope' : valor);
 %>
 <header class="encabezado">
   <div>
@@ -17,11 +17,13 @@
     <thead>
       <tr>
         <th scope="col">Plan</th>
-        <th scope="col" class="numero">Precio por mes</th>
+        <th scope="col" class="numero">Por mes</th>
         <th scope="col">Productos</th>
-        <th scope="col">Fotos por producto</th>
+        <th scope="col">Fotos</th>
         <th scope="col">Banners</th>
+        <th scope="col">Prueba</th>
         <th scope="col" class="numero">Clientes</th>
+        <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
       </tr>
     </thead>
     <tbody>
@@ -31,15 +33,22 @@
             <a class="celda-producto" href="/plataforma/planes/<%= p.id %>">
               <span class="celda-producto-textos">
                 <span class="celda-producto-nombre"><%= p.nombre %></span>
-                <% if (!p.activo) { %><span class="ayuda">Ya no se ofrece</span><% } %>
+                <% if (!p.activo) { %><span class="pastilla pastilla-ambar">Pausado</span><% } %>
               </span>
             </a>
           </td>
-          <td data-etiqueta="Precio por mes" class="numero"><%= p.precioCentavos ? formatearPrecio(p.precioCentavos) : 'Gratis' %></td>
-          <td data-etiqueta="Productos"><%= tope(p.maxProductos, 'productos') %></td>
-          <td data-etiqueta="Fotos por producto"><%= tope(p.maxFotos, 'fotos') %></td>
-          <td data-etiqueta="Banners"><%= tope(p.maxBanners, 'banners') %></td>
+          <td data-etiqueta="Por mes" class="numero"><%= p.precioCentavos ? formatearPrecio(p.precioCentavos) : 'Gratis' %></td>
+          <td data-etiqueta="Productos"><%= tope(p.maxProductos) %></td>
+          <td data-etiqueta="Fotos por producto"><%= tope(p.maxFotos) %></td>
+          <td data-etiqueta="Banners"><%= tope(p.maxBanners) %></td>
+          <td data-etiqueta="Prueba"><%= p.diasPrueba ? plural(p.diasPrueba, 'día', 'días') : '—' %><% if (p.suspenderAlVencer) { %><span class="celda-nota ayuda">cierra al vencer</span><% } %></td>
           <td data-etiqueta="Clientes" class="numero"><%= Number(p.clientes) %></td>
+          <td class="celda-acciones">
+            <form method="post" action="/plataforma/planes/<%= p.id %>/pausar">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="boton boton-secundario boton-chico" type="submit" title="<%= p.activo ? 'Deja de ofrecerse a clientes nuevos; los que ya lo tienen no cambian' : 'Vuelve a ofrecerse a clientes nuevos' %>"><%= p.activo ? 'Pausar' : 'Reanudar' %></button>
+            </form>
+          </td>
         </tr>
       <% } %>
     </tbody>

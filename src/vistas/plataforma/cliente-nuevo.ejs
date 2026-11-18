@@ -32,7 +32,7 @@
     <select id="planId" name="planId" required<%- invalido('planId') %>>
       <option value="">Elegí un plan</option>
       <% for (const plan of planes) { %>
-        <option value="<%= plan.id %>"<%= String(valores.planId) === String(plan.id) ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %></option>
+        <option value="<%= plan.id %>"<%= String(valores.planId) === String(plan.id) ? ' selected' : '' %>><%= plan.nombre %><%= plan.precioCentavos ? ` · ${formatearPrecio(plan.precioCentavos)}/mes` : '' %><%= plan.diasPrueba ? ` · prueba de ${plan.diasPrueba} días` : '' %></option>
       <% } %>
     </select>
     <%- error('planId') %>
@@ -40,7 +40,7 @@
   <div class="campo">
     <label for="venceEn">Vence el <span class="opcional">(opcional)</span></label>
     <input id="venceEn" type="date" name="venceEn" value="<%= valores.venceEn ?? '' %>"<%- invalido('venceEn') %> aria-describedby="ayuda-venceEn">
-    <span class="ayuda" id="ayuda-venceEn">Hasta cuándo tiene pago el servicio. Si lo dejás vacío, no vence. Después lo extendés registrando pagos.</span>
+    <span class="ayuda" id="ayuda-venceEn">Hasta cuándo tiene pago el servicio. Si lo dejás vacío, vale la prueba del plan (si tiene: vence a los N días de hoy) o, si no, no vence. Con una fecha elegida, vale esa: así le das más o menos días a un cliente puntual. Después lo extendés registrando pagos.</span>
     <%- error('venceEn') %>
   </div>
   <div><button class="boton boton-grande" type="submit"><%- icono('mas', { tamano: 18 }) %> Crear cliente</button></div>
