@@ -68,6 +68,6 @@ export function icono(nombre, { tamano = 20, clase = 'icono' } = {}) {
   if (!trazo) throw new Error(`No existe el ícono "${nombre}"`);
   return (
     `<svg class="${clase}" width="${tamano}" height="${tamano}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
-    `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${trazo}</svg>`
+    `stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${trazo}</svg>`
   );
 }

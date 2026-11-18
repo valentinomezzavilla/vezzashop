@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="light dark">
   <%# Aplica la apariencia elegida antes de pintar, para que no parpadee entre claro y oscuro al cambiar de página. %>
   <script>try{var t=localStorage.getItem("tema");if(t==="claro"||t==="oscuro")document.documentElement.dataset.tema=t}catch(e){}</script>
-  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">
   <title><%= titulo %> · Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +18,7 @@
 <body>
 <a class="saltar" href="#contenido">Ir al contenido</a>
 <% if (usuario) { %>
-  <%# [sección, texto, ícono, texto corto para el menú del celular] %>
+  <%# [sección, texto, ícono, texto corto para la barra del celular] %>
   <% const secciones = [
        ['inicio', 'Inicio', 'inicio'],
        ['pedidos', 'Pedidos', 'recibo'],
@@ -29,22 +29,37 @@
        ['pagos', 'Envíos y pagos', 'camion', 'Envíos'],
        ['cuenta', 'Cuenta', 'usuario'],
      ] %>
+  <%# En el celular, las secciones de todos los días quedan en la barra de abajo; el resto, en "Más". %>
+  <% const accesosRapidos = ['inicio', 'pedidos', 'productos', 'diseno'] %>
+  <% const contador = pedidosNuevos > 99 ? '99+' : pedidosNuevos %>
   <div class="app">
-    <aside class="lateral">
+    <header class="barra-superior">
+      <a class="barra-superior-marca" href="/admin/inicio">
+        <span class="lateral-logo" aria-hidden="true"><%- icono('tienda', { tamano: 16 }) %></span>
+        <span class="barra-superior-nombre"><%= nombreTienda ?? 'Tu tienda' %></span>
+      </a>
+      <% if (urlMiTienda) { %>
+        <a class="boton-icono" href="<%= urlMiTienda %>" target="_blank" rel="noopener" aria-label="Ver mi tienda" title="Ver mi tienda"><%- icono('externo', { tamano: 18 }) %></a>
+      <% } %>
+    </header>
+
+    <%# En la computadora es el menú de la izquierda; en el celular se abre desde "Más" como un panel lateral
+        (sin JavaScript, con el ancla #menu-panel; admin.js lo abre y lo cierra sin tocar el historial). %>
+    <aside class="lateral" id="menu-panel" aria-label="Menú del panel">
       <div class="lateral-marca">
         <span class="lateral-logo" aria-hidden="true"><%- icono('tienda', { tamano: 18 }) %></span>
         <span class="lateral-textos">
           <span class="lateral-tienda"><%= nombreTienda ?? 'Tu tienda' %></span>
           <span class="lateral-sub">Panel de administración</span>
         </span>
+        <a class="boton-icono lateral-cerrar" href="#contenido" data-cerrar-menu aria-label="Cerrar el menú"><%- icono('cerrar', { tamano: 18 }) %></a>
       </div>
       <nav class="lateral-menu" aria-label="Secciones del panel">
-        <% for (const [seccion, texto, nombreIcono, corto] of secciones) { %>
+        <% for (const [seccion, texto, nombreIcono] of secciones) { %>
           <a href="/admin/<%= seccion %>" class="menu-<%= seccion %><%= seccion === seccionActual ? ' activo' : '' %>"<%- seccion === seccionActual ? ' aria-current="page"' : '' %>>
-            <%- icono(nombreIcono) %>
-            <% if (corto) { %><span class="texto-largo"><%= texto %></span><span class="texto-corto"><%= corto %></span>
-            <% } else { %><span><%= texto %></span><% } %>
-            <% if (seccion === 'pedidos' && pedidosNuevos) { %><span class="menu-contador" aria-label="<%= pedidosNuevos %> nuevo<%= pedidosNuevos === 1 ? '' : 's' %>"><%= pedidosNuevos > 99 ? '99+' : pedidosNuevos %></span><% } %>
+            <%- icono(nombreIcono, { tamano: 18 }) %>
+            <span><%= texto %></span>
+            <% if (seccion === 'pedidos' && pedidosNuevos) { %><span class="menu-contador" aria-label="<%= pedidosNuevos %> nuevo<%= pedidosNuevos === 1 ? '' : 's' %>"><%= contador %></span><% } %>
           </a>
         <% } %>
       </nav>
@@ -61,6 +76,20 @@
         </form>
       </div>
     </aside>
+
+    <nav class="barra-inferior" aria-label="Accesos rápidos">
+      <% for (const [seccion, texto, nombreIcono, corto] of secciones.filter(([s]) => accesosRapidos.includes(s))) { %>
+        <a href="/admin/<%= seccion %>"<%- seccion === seccionActual ? ' class="activa" aria-current="page"' : '' %>>
+          <span class="barra-inferior-icono"><%- icono(nombreIcono, { tamano: 22 }) %><% if (seccion === 'pedidos' && pedidosNuevos) { %><span class="barra-inferior-contador" aria-hidden="true"><%= contador %></span><% } %></span>
+          <span><%= corto ?? texto %><% if (seccion === 'pedidos' && pedidosNuevos) { %><span class="visualmente-oculto"> (<%= pedidosNuevos %> nuevo<%= pedidosNuevos === 1 ? '' : 's' %>)</span><% } %></span>
+        </a>
+      <% } %>
+      <% const enMas = secciones.some(([s]) => s === seccionActual && !accesosRapidos.includes(s)) %>
+      <a href="#menu-panel"<%- enMas ? ' class="activa"' : '' %> data-abrir-menu aria-controls="menu-panel" aria-label="Más secciones">
+        <span class="barra-inferior-icono"><%- icono('menu', { tamano: 22 }) %></span>
+        <span aria-hidden="true">Más</span>
+      </a>
+    </nav>
     <main class="contenido" id="contenido">
 <% } else { %>
   <%- include('tema', { flotante: true }) %>

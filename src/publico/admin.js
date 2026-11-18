@@ -259,14 +259,56 @@ if (aCoordinar) {
   actualizar();
 }
 
-// ---------- Menú del celular: la sección activa a la vista ----------
-// En pantallas chicas el menú se desliza de costado; si la sección actual quedó afuera, se la muestra.
+// ---------- Menú del celular ----------
+// En pantallas chicas el menú lateral se abre desde "Más". Sin JavaScript funciona con el ancla #menu-panel (:target);
+// acá se abre con una clase, sin sumar pasos al historial: se cierra con Escape, con la X o tocando afuera, y mientras
+// está abierto el resto de la página no recibe el foco (inert).
 
-const activa = document.querySelector('.lateral-menu a.activo');
-const menu = activa?.closest('.lateral-menu');
-if (menu && menu.scrollWidth > menu.clientWidth) {
-  const desde = activa.getBoundingClientRect().left - menu.getBoundingClientRect().left + menu.scrollLeft;
-  menu.scrollLeft = desde - (menu.clientWidth - activa.offsetWidth) / 2;
+const menuPanel = document.getElementById('menu-panel');
+if (menuPanel) {
+  const abridores = [...document.querySelectorAll('[data-abrir-menu]')];
+  const detras = [...document.querySelectorAll('.barra-superior, .barra-inferior, .contenido')];
+  let ultimoAbridor = null;
+  const abierto = () => menuPanel.classList.contains('abierto');
+  const marcar = (valor) => {
+    menuPanel.classList.toggle('abierto', valor);
+    for (const abridor of abridores) abridor.setAttribute('aria-expanded', String(valor));
+    for (const parte of detras) parte.inert = valor;
+  };
+  const cerrar = ({ devolverFoco = true } = {}) => {
+    if (!abierto()) return;
+    marcar(false);
+    if (devolverFoco) ultimoAbridor?.focus();
+  };
+  // Si se llegó con el ancla en la dirección, se la saca (así deja de valer :target) y se abre con la clase.
+  if (location.hash === '#menu-panel') {
+    location.replace('#');
+    history.replaceState(null, '', location.pathname + location.search);
+    marcar(true);
+  }
+  for (const abridor of abridores) {
+    abridor.setAttribute('aria-expanded', String(abierto()));
+    abridor.addEventListener('click', (evento) => {
+      evento.preventDefault();
+      ultimoAbridor = abridor;
+      marcar(true);
+      menuPanel.querySelector('.lateral-menu a.activo, .lateral-menu a')?.focus({ preventScroll: true });
+    });
+  }
+  menuPanel.querySelector('[data-cerrar-menu]')?.addEventListener('click', (evento) => {
+    evento.preventDefault();
+    cerrar();
+  });
+  document.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Escape') cerrar();
+  });
+  document.addEventListener('click', (evento) => {
+    if (abierto() && !menuPanel.contains(evento.target) && !evento.target.closest('[data-abrir-menu]')) cerrar({ devolverFoco: false });
+  });
+  // Si la ventana se agranda hasta mostrar el menú fijo, deja de ser un panel.
+  matchMedia('(min-width: 861px)').addEventListener('change', (evento) => {
+    if (evento.matches) cerrar({ devolverFoco: false });
+  });
 }
 
 // ---------- Productos: seleccionar varios para borrar ----------
@@ -325,21 +367,6 @@ if (!menosMovimiento) {
   }
 }
 
-// Brillo que sigue al puntero en las tarjetas de números (ver .numero-tarjeta::after en admin.css).
-if (!menosMovimiento) {
-  document.addEventListener(
-    'pointermove',
-    (evento) => {
-      const tarjeta = evento.target.closest?.('.numero-tarjeta, .dato');
-      if (!tarjeta) return;
-      const caja = tarjeta.getBoundingClientRect();
-      tarjeta.style.setProperty('--x', `${evento.clientX - caja.left}px`);
-      tarjeta.style.setProperty('--y', `${evento.clientY - caja.top}px`);
-    },
-    { passive: true },
-  );
-}
-
 // ---------- Apariencia: Automático / Claro / Oscuro ----------
 // El atributo data-tema de <html> lo pone antes de pintar un script del <head> (ver cabecera.ejs); acá se cambia al
 // elegir una opción y se guarda en este navegador. Automático = sin atributo: manda la preferencia del sistema.
@@ -347,7 +374,7 @@ if (!menosMovimiento) {
 {
   const raiz = document.documentElement;
   const botones = [...document.querySelectorAll('[data-tema-elegir]')];
-  const colorBarra = { claro: '#f2f2f7', oscuro: '#000000' };
+  const colorBarra = { claro: '#f7f7f8', oscuro: '#0b0b0d' };
   const barras = [...document.querySelectorAll('meta[name="theme-color"]')];
   const originales = barras.map((meta) => meta.content);
   const marcar = () => {
