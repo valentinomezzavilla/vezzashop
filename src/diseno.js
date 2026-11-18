@@ -16,21 +16,58 @@ export const TAMANOS_LOGO = {
   grande: { titulo: 'Grande', alto: 56 },
 };
 
+// Tipografía de la vidriera. 'sistema' es la de siempre (San Francisco en Apple, Inter en el resto) y no descarga nada;
+// las otras se piden a Google Fonts solo cuando la tienda las elige. `titulos` y `texto` son los valores de --fuente-titulos y
+// --fuente-texto (texto: null deja la del sistema).
+const SIN_SERIFA = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FUENTES = {
+  sistema: { titulo: 'Del sistema', ayuda: 'La letra de cada dispositivo. Carga al instante.', google: null },
+  moderna: { titulo: 'Moderna', ayuda: 'Poppins: redonda y amable.', google: 'Poppins:wght@400;500;600;700', titulos: `"Poppins", ${SIN_SERIFA}`, texto: `"Poppins", ${SIN_SERIFA}` },
+  elegante: { titulo: 'Elegante', ayuda: 'Títulos con serifa (Playfair Display) y texto limpio.', google: 'Playfair+Display:wght@600;700', titulos: '"Playfair Display", Georgia, "Times New Roman", serif', texto: null },
+  geometrica: { titulo: 'Geométrica', ayuda: 'Montserrat: firme y de líneas rectas.', google: 'Montserrat:wght@400;500;600;700', titulos: `"Montserrat", ${SIN_SERIFA}`, texto: `"Montserrat", ${SIN_SERIFA}` },
+  suave: { titulo: 'Suave', ayuda: 'Nunito: terminaciones redondeadas, cercana.', google: 'Nunito:wght@400;500;600;700', titulos: `"Nunito", ${SIN_SERIFA}`, texto: `"Nunito", ${SIN_SERIFA}` },
+};
+
+// Redondeo de botones, tarjetas y fotos (en px). 'redondeadas' son los valores de tienda.css.
+export const ESQUINAS = {
+  redondeadas: { titulo: 'Redondeadas', ayuda: 'Botones en forma de píldora y tarjetas bien redondeadas.', radios: null },
+  suaves: { titulo: 'Suaves', ayuda: 'Esquinas apenas redondeadas.', radios: { chico: 6, medio: 8, grande: 12, foto: 8, boton: 10 } },
+  rectas: { titulo: 'Rectas', ayuda: 'Todo con esquinas en ángulo recto.', radios: { chico: 0, medio: 0, grande: 0, foto: 0, boton: 0 } },
+};
+
+// Tamaño de las tarjetas de producto: cuántas entran por fila en la tableta y en la computadora. En el celular son siempre 2.
+export const TARJETAS = {
+  chicas: { titulo: 'Chicas', ayuda: 'Más productos a la vista: 5 por fila en la computadora.', columnas: { media: 4, ancha: 5 } },
+  normales: { titulo: 'Normales', ayuda: '4 por fila en la computadora.', columnas: null },
+  grandes: { titulo: 'Grandes', ayuda: 'Fotos más grandes: 3 por fila en la computadora.', columnas: { media: 2, ancha: 3 } },
+};
+
 const AJUSTES_POR_DEFECTO = {
   logo: null,
   menuEstilo: 'barra',
   logoTamano: 'mediano',
   colorPrincipal: '#1a1a1a',
   franjaTexto: '',
+  colorFranja: '', // '' = el color principal
+  franjaEnlace: '',
+  fuente: 'sistema',
+  esquinas: 'redondeadas',
+  tarjetas: 'normales',
+  tituloDestacados: 'Destacados',
+  tituloCatalogo: 'Todos los productos',
   descuentoTransferencia: 0,
   cuotasSinInteres: 0,
   ordenCatalogo: 'nombre',
+  descripcion: '',
   whatsapp: '',
   instagram: '',
   facebook: '',
   tiktok: '',
   emailContacto: '',
   direccion: '',
+  direccionMapa: '',
+  horarios: '',
+  notaPie: '',
   // Formas de pago (sección Envíos y pagos del panel).
   pagoTransferencia: false,
   transferenciaAlias: '',
@@ -53,6 +90,17 @@ const COLUMNAS = {
   logoTamano: 'logo_tamano',
   colorPrincipal: 'color_principal',
   franjaTexto: 'franja_texto',
+  colorFranja: 'color_franja',
+  franjaEnlace: 'franja_enlace',
+  fuente: 'fuente',
+  esquinas: 'esquinas',
+  tarjetas: 'tarjetas',
+  tituloDestacados: 'titulo_destacados',
+  tituloCatalogo: 'titulo_catalogo',
+  descripcion: 'descripcion',
+  direccionMapa: 'direccion_mapa',
+  horarios: 'horarios',
+  notaPie: 'nota_pie',
   descuentoTransferencia: 'descuento_transferencia',
   cuotasSinInteres: 'cuotas_sin_interes',
   ordenCatalogo: 'orden_catalogo',
@@ -158,6 +206,47 @@ export function validarAjustes(campos) {
   ajustes.direccion = texto(campos.direccion);
   if (ajustes.direccion.length > 300) errores.direccion = 'Máximo 300 caracteres';
 
+  // Lo nuevo de Diseño: si un campo no viene, el ajuste queda como estaba (otro formulario, o uno anterior a estas opciones).
+  const opcion = (campo, opciones, mensaje = 'Elegí una de las opciones') => {
+    if (campos[campo] === undefined) return;
+    if (Object.hasOwn(opciones, texto(campos[campo]))) ajustes[campo] = texto(campos[campo]);
+    else errores[campo] = mensaje;
+  };
+  opcion('fuente', FUENTES);
+  opcion('esquinas', ESQUINAS);
+  opcion('tarjetas', TARJETAS);
+
+  // Un texto de una línea (se juntan los espacios y los saltos). Vacío es válido; con `porDefecto`, vacío vuelve al texto de siempre.
+  const linea = (campo, maximo, { porDefecto } = {}) => {
+    if (campos[campo] === undefined) return;
+    const valor = texto(campos[campo]).replace(/\s+/g, ' ');
+    if (valor.length > maximo) errores[campo] = `Máximo ${maximo} caracteres`;
+    else ajustes[campo] = valor === '' && porDefecto !== undefined ? porDefecto : valor;
+  };
+  linea('tituloDestacados', 60, { porDefecto: AJUSTES_POR_DEFECTO.tituloDestacados });
+  linea('tituloCatalogo', 60, { porDefecto: AJUSTES_POR_DEFECTO.tituloCatalogo });
+  linea('horarios', 150);
+  linea('notaPie', 300);
+  if (campos.descripcion !== undefined) {
+    ajustes.descripcion = texto(campos.descripcion).replace(/\s+/g, ' ');
+    if (ajustes.descripcion.length > 300) errores.descripcion = 'Máximo 300 caracteres';
+  }
+
+  // Los links son opcionales: una página de la tienda o una dirección completa.
+  for (const [campo, etiqueta] of [['franjaEnlace', 'Link de la franja'], ['direccionMapa', 'Link del mapa']]) {
+    if (campos[campo] === undefined) continue;
+    const enlace = validarEnlace(campos[campo]);
+    if (enlace.error) errores[campo] = `${etiqueta}: ${enlace.error}`;
+    else ajustes[campo] = enlace.valor;
+  }
+
+  // Color de la franja: solo vale si se marcó "usar otro color"; si no, la franja usa el color principal.
+  if (campos.colorFranja !== undefined || campos.franjaColorPropio !== undefined) {
+    if (!campos.franjaColorPropio) ajustes.colorFranja = '';
+    else if (/^#[0-9a-f]{6}$/.test(texto(campos.colorFranja).toLowerCase())) ajustes.colorFranja = texto(campos.colorFranja).toLowerCase();
+    else errores.colorFranja = 'Elegí un color';
+  }
+
   // Cabecera: si el campo no viene, el ajuste queda como estaba (otro formulario, o uno anterior a estas opciones).
   if (campos.menuEstilo !== undefined) {
     if (Object.hasOwn(ESTILOS_MENU, texto(campos.menuEstilo))) ajustes.menuEstilo = texto(campos.menuEstilo);
@@ -190,6 +279,31 @@ export function validarEnlace(valor) {
   if (enlace.startsWith('/') && !enlace.startsWith('//')) return { valor: enlace };
   if (/^https?:\/\//i.test(enlace) && URL.canParse(enlace)) return { valor: enlace };
   return { error: 'Tiene que ser una página de tu tienda (por ejemplo /categoria/ofertas) o un link que empiece con https://' };
+}
+
+// Lo que la vidriera pone en el <head> a partir de los ajustes: las variables CSS que pisan las de tienda.css y la hoja de
+// Google Fonts (solo si la tienda eligió una tipografía que no es la del sistema). Con los valores por defecto no agrega nada.
+// Todo sale de las constantes de arriba o de colores ya validados (#rrggbb), así que se puede imprimir tal cual.
+export function estiloDeTienda(ajustes) {
+  const variables = [];
+  const fuente = FUENTES[ajustes.fuente] ?? FUENTES.sistema;
+  if (fuente.titulos) variables.push(`--fuente-titulos: ${fuente.titulos}`);
+  if (fuente.texto) variables.push(`--fuente-texto: ${fuente.texto}`);
+  const radios = (ESQUINAS[ajustes.esquinas] ?? ESQUINAS.redondeadas).radios;
+  if (radios) {
+    variables.push(`--radio-chico: ${radios.chico}px`, `--radio: ${radios.medio}px`, `--radio-grande: ${radios.grande}px`, `--radio-foto: ${radios.foto}px`);
+  }
+  // El botón va aparte: por defecto es una píldora (999px), no un valor de la escala.
+  if (radios) variables.push(`--radio-boton: ${radios.boton}px`);
+  const columnas = (TARJETAS[ajustes.tarjetas] ?? TARJETAS.normales).columnas;
+  if (columnas) variables.push(`--columnas-media: ${columnas.media}`, `--columnas: ${columnas.ancha}`);
+  if (/^#[0-9a-f]{6}$/.test(ajustes.colorFranja)) {
+    variables.push(`--franja: ${ajustes.colorFranja}`, `--franja-texto: ${colorDeTextoSobre(ajustes.colorFranja)}`);
+  }
+  return {
+    variables: variables.join('; '),
+    hojaDeFuente: fuente.google ? `https://fonts.googleapis.com/css2?family=${fuente.google}&display=swap` : null,
+  };
 }
 
 // Texto que se lee bien sobre el color principal.

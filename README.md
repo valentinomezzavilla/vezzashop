@@ -139,18 +139,29 @@ es el del panel; si un cliente entra a `/admin` desde su subdominio, lo manda al
 
 ## Diseño de la tienda
 
-En el panel, **Diseño**: cada cliente configura cómo se ve su vidriera.
+En el panel, **Diseño**: cada cliente configura cómo se ve su vidriera. Todo lo nuevo viene con el valor de siempre
+(la migración `009` no cambia ninguna tienda existente) y se guarda en `ajustes_tienda`. La vidriera lo aplica con
+variables CSS que pone `estiloDeTienda` en el `<head>`, así que no hay estilos sueltos por tienda.
 
-- **Identidad:** logo y color principal (franja de anuncios y botones; el color del texto se elige solo
+- **Identidad:** logo y color principal (botones y, si no se elige otro, la franja; el color del texto se elige solo
   para que se lea bien).
-- **Franja de anuncios:** el texto de arriba de todo (envío gratis, descuentos, etc.).
+- **Franja de anuncios:** el texto de arriba de todo (envío gratis, descuentos, etc.), con un **link** opcional
+  (una página de la tienda o un `https://`) y un **color propio** opcional.
+- **Estilo:** la **tipografía** (la del sistema, Moderna/Poppins, Elegante/Playfair Display, Geométrica/Montserrat o
+  Suave/Nunito; las que no son la del sistema se piden a Google Fonts solo si la tienda las elige) y las **esquinas**
+  de botones, tarjetas y fotos (redondeadas, suaves o rectas). Ver `FUENTES` y `ESQUINAS` en `src/diseno.js`.
 - **Cabecera y menú:** con vista previa en vivo. El **estilo del menú** puede ser una *barra de categorías* (las
   que no entran en la pantalla pasan solas a un botón "Más", con sus subcategorías) o un *menú desplegable* (un botón
   abre la lista, también en la computadora). Se elige el **tamaño del logo** (32, 40 o 56 px de alto; en el celular no
   pasa de 44) y **qué categorías de primer nivel aparecen en el menú de arriba** (el pie de página las muestra todas).
   Una categoría sin productos visibles no se muestra, la elijan o no.
-- **Orden del catálogo** por defecto: nombre, más nuevos o precio. El visitante lo puede cambiar.
-- **Contacto y redes:** WhatsApp (botón flotante), Instagram, Facebook, TikTok, email y dirección.
+- **Catálogo:** orden por defecto (nombre, más nuevos o precio; el visitante lo puede cambiar), **tamaño de las
+  tarjetas** (chicas, normales o grandes: 5, 4 o 3 por fila en la computadora; en el celular siempre 2) y los
+  **títulos** de la portada ("Todos los productos" y "Destacados" se pueden cambiar).
+- **Sobre la tienda:** una **descripción** corta (sale en el pie y como descripción para buscadores y para el link
+  que se comparte) y una **nota al pie** (condiciones de compra, aclaraciones).
+- **Contacto y redes:** WhatsApp (botón flotante), Instagram, Facebook, TikTok, email, dirección (con un link al
+  mapa que agrega "Cómo llegar") y horario de atención.
 - **Banners de bienvenida:** hasta 6 imágenes para el carrusel de la portada, con imagen opcional
   para celular, link y orden. Al elegir la imagen aparece el **recortador**: un marco con la proporción
   exacta del banner en la tienda (3:1 en la computadora, cuadrado en el celular, ver `PROPORCION_BANNER`

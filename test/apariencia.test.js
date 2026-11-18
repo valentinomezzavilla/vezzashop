@@ -56,7 +56,7 @@ test('el CSS del panel: los dos temas oscuros iguales, Claro forzable, y las lis
   assert.match(panel, /:root\[data-tema="claro"\] \{ color-scheme: light; \}/);
   // Sin esto, en tema oscuro la lista nativa quedaba con texto claro sobre fondo claro.
   assert.match(panel, /select option, select optgroup \{ background-color: var\(--campo-solido\); color: var\(--texto\); \}/);
-  assert.match(panel, /--campo-solido: #2c2c2e/);
+  assert.match(panel, /--campo-solido: #[0-9a-f]{6};/, 'las listas de los desplegables usan un color sólido en el tema oscuro');
 });
 
 test('la vidriera usa la tipografía del sistema con Inter de respaldo, queda siempre clara y respeta "reducir movimiento"', async () => {

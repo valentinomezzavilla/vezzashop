@@ -126,7 +126,7 @@ p { margin: 0; }
   min-height: 48px;
   padding: 0 1.5rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radio-boton, 999px); /* Diseño > Esquinas lo cambia */
   background: var(--acento);
   color: var(--acento-texto);
   font: 600 .9375rem/1.2 var(--fuente-texto);
@@ -172,8 +172,10 @@ p { margin: 0; }
 
 /* ---------- Franja y cabecera ---------- */
 
-.franja { background: var(--acento); color: var(--acento-texto); text-align: center; font-size: .8125rem; font-weight: 500; letter-spacing: .005em; }
+.franja { background: var(--franja, var(--acento)); color: var(--franja-texto, var(--acento-texto)); text-align: center; font-size: .8125rem; font-weight: 500; letter-spacing: .005em; }
 .franja p { max-width: var(--ancho); margin: 0 auto; padding: .55rem var(--margen); }
+.franja a { color: inherit; text-decoration: underline; text-underline-offset: .2em; }
+.franja a:hover { text-decoration-thickness: 2px; }
 
 /* Cabecera de vidrio: se ve lo que pasa por debajo al hacer scroll. */
 .cabecera {
@@ -402,8 +404,9 @@ p { margin: 0; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem .875rem;
 }
-@media (min-width: 700px) { .grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 1.25rem; } }
-@media (min-width: 1040px) { .grilla { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Cuántas tarjetas entran por fila lo elige cada tienda en Diseño (--columnas-media y --columnas). */
+@media (min-width: 700px) { .grilla { grid-template-columns: repeat(var(--columnas-media, 3), minmax(0, 1fr)); gap: 2.5rem 1.25rem; } }
+@media (min-width: 1040px) { .grilla { grid-template-columns: repeat(var(--columnas, 4), minmax(0, 1fr)); } }
 
 .tarjeta-producto { position: relative; display: grid; gap: .8rem; align-content: start; color: var(--texto); text-decoration: none; border-radius: var(--radio-foto); -webkit-tap-highlight-color: transparent; }
 .foto {
@@ -613,7 +616,12 @@ p { margin: 0; }
 .pie-contacto { flex: 1.4 1 220px; min-width: 0; }
 .pie-titulo { margin: 0 0 .65rem; color: var(--texto); font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
 .pie-dato { display: flex; gap: .5rem; align-items: flex-start; margin: 0; color: var(--texto-suave); }
-.pie-dato .icono { margin-top: .1rem; color: var(--texto-tenue); }
+.pie-dato .icono { margin-top: .1rem; flex-shrink: 0; color: var(--texto-tenue); }
+.pie-dato a { color: var(--texto); text-underline-offset: .2em; }
+.pie-enlaces + .pie-horarios { margin-top: .75rem; }
+.pie-descripcion { margin: 0; max-width: 36ch; color: var(--texto-suave); font-size: .875rem; line-height: 1.5; }
+/* Texto libre al pie (por ejemplo, "Precios con IVA incluido"): va con el mismo ancho que el copyright. */
+.pie-nota { width: calc(100% - 2 * var(--margen)); max-width: calc(var(--ancho) - 2 * var(--margen)); margin: 0 auto; padding: 0 0 1rem; color: var(--texto-tenue); font-size: .8125rem; line-height: 1.5; }
 
 /* Categorías y contacto: botones en fila. Diez categorías ocupan dos o tres renglones en vez de una columna larga. */
 .pie-enlaces { display: flex; flex-wrap: wrap; gap: .45rem; }
@@ -621,7 +629,7 @@ p { margin: 0; }
   display: inline-flex; align-items: center; gap: .45rem;
   min-height: 32px; max-width: 100%;
   padding: 0 .85rem;
-  border-radius: 999px;
+  border-radius: min(var(--radio-boton, 999px), 999px);
   background: var(--fondo);
   color: var(--texto-suave);
   font-size: .8125rem;

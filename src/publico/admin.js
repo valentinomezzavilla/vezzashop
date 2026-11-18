@@ -231,14 +231,29 @@ if (vistaPrevia && color) {
   const hex = document.querySelector('[data-color-hex]');
   const franja = document.querySelector('[data-franja]');
   const textoFranja = vistaPrevia.querySelector('[data-vista-franja]');
+  // La franja puede tener un color propio: si no, usa el principal.
+  const franjaPropia = document.querySelector('[data-franja-propio]');
+  const colorFranja = document.querySelector('[data-color-franja]');
+  const hexFranja = document.querySelector('[data-color-franja-hex]');
   const pintar = () => {
     vistaPrevia.style.setProperty('--muestra', color.value);
     vistaPrevia.style.setProperty('--muestra-texto', colorDeTextoSobre(color.value));
     hex.textContent = color.value;
     textoFranja.textContent = franja.value.trim() || 'Tu anuncio va acá';
+    if (franjaPropia && colorFranja) {
+      const propio = franjaPropia.checked;
+      vistaPrevia.style.setProperty('--franja-muestra', propio ? colorFranja.value : color.value);
+      vistaPrevia.style.setProperty('--franja-muestra-texto', colorDeTextoSobre(propio ? colorFranja.value : color.value));
+      hexFranja.textContent = colorFranja.value;
+    }
   };
   color.addEventListener('input', pintar);
   franja.addEventListener('input', pintar);
+  franjaPropia?.addEventListener('change', pintar);
+  colorFranja?.addEventListener('input', () => {
+    if (franjaPropia) franjaPropia.checked = true; // elegir un color es querer usarlo
+    pintar();
+  });
   pintar();
 
   // El logo elegido se ve en la cabecera de la vista previa con el tamaño que va a tener en la tienda.

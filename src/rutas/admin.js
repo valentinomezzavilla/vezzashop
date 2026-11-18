@@ -29,6 +29,9 @@ import {
   ESTILOS_MENU,
   TAMANOS_LOGO,
   MAX_BANNERS,
+  FUENTES,
+  ESQUINAS,
+  TARJETAS,
 } from '../diseno.js';
 import { arbolCategoriasAdmin } from '../categorias.js';
 import { limitesDeTienda, ampliarPlan } from '../limites.js';
@@ -97,6 +100,9 @@ export function rutasAdmin({ db, config }) {
       ordenes: ORDENES,
       estilosMenu: ESTILOS_MENU,
       tamanosLogo: TAMANOS_LOGO,
+      opcionesFuente: FUENTES,
+      opcionesEsquinas: ESQUINAS,
+      opcionesTarjetas: TARJETAS,
       // Categorías de primer nivel, para elegir cuáles van en el menú de arriba de la tienda.
       categoriasMenu: await arbolCategoriasAdmin(db, tiendaId),
       banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),

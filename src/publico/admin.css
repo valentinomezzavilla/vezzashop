@@ -1,6 +1,6 @@
 /* Panel de administración y de la plataforma.
-   Sistema de diseño sobrio, de producto profesional: superficies neutras, un solo color de marca (azul),
-   tipografía Inter, bordes finos, sombras mínimas y movimientos cortos. Modo claro y oscuro con los mismos tokens.
+   Sistema de diseño sobrio, de producto profesional: superficies neutras con un matiz índigo, un solo color de marca
+   (el índigo del logo de Vezza, #3b2ee4, con la tinta #13121a como texto), tipografía Inter, bordes finos, sombras mínimas y movimientos cortos. Modo claro y oscuro con los mismos tokens.
    Todos los colores salen de las variables de :root; los componentes no usan colores sueltos. */
 
 :root {
@@ -11,34 +11,34 @@
   --lateral: #ffffff;
   --superficie: #ffffff;
   --superficie-solida: #ffffff;
-  --superficie-suave: #f4f4f5;
-  --superficie-hover: #ededef;
+  --superficie-suave: #f4f3f6;
+  --superficie-hover: #edecf0;
   --campo: #ffffff;
   --campo-solido: #ffffff; /* para las listas de los desplegables: las pinta el navegador y no admiten transparencias */
   --cabecera-tabla: #fafafb;
   --fila-hover: #fafafb;
   --vidrio: rgb(255 255 255 / .88);
-  --velo: rgb(9 9 11 / .38);
+  --velo: rgb(10 9 18 / .38);
 
   /* Texto (todos con contraste AA sobre las superficies) */
-  --texto: #18181b;
-  --texto-suave: #45454d;
-  --texto-tenue: #6b6b74;
-  --texto-placeholder: #8e8e96;
+  --texto: #13121a; /* la tinta del logo */
+  --texto-suave: #45444e;
+  --texto-tenue: #6a6877;
+  --texto-placeholder: #8c8a9a;
 
   /* Bordes. --borde-campo cumple 3:1 con el fondo: es lo único que marca dónde está un campo. */
-  --borde: #e6e6e9;
-  --borde-fuerte: #d6d6db;
-  --borde-campo: #8f8f99;
-  --borde-hover: #6b6b74;
-  --borde-tarjeta: #e6e6e9;
+  --borde: #e6e5ea;
+  --borde-fuerte: #d7d6db;
+  --borde-campo: #8f8d9b;
+  --borde-hover: #6a6877;
+  --borde-tarjeta: #e6e5ea;
 
   /* Marca */
-  --primario: #2563eb;
-  --primario-hover: #1d4ed8;
-  --primario-texto: #1d4ed8;
-  --primario-suave: rgb(37 99 235 / .08);
-  --primario-borde: rgb(37 99 235 / .32);
+  --primario: #3b2ee4; /* el índigo del logo */
+  --primario-hover: #2d22c0;
+  --primario-texto: #3b2ee4;
+  --primario-suave: rgb(59 46 228 / .08);
+  --primario-borde: rgb(59 46 228 / .32);
 
   /* Logo de Vezza */
   --vezza-tinta: #13121a;
@@ -59,16 +59,16 @@
   --ambar-solido: #f59e0b;
   --ambar-fondo: rgb(245 158 11 / .13);
   --ambar-borde: rgb(245 158 11 / .4);
-  --violeta: #6d28d9;
-  --violeta-fondo: rgb(124 58 237 / .09);
-  --info-texto: #1e40af;
+  --violeta: #a21caf; /* fucsia: se distingue del índigo de la marca */
+  --violeta-fondo: rgb(192 38 211 / .09);
+  --info-texto: #2a20b4;
 
   /* Controles */
-  --segmento: #ededef;
+  --segmento: #edecf0;
   --segmento-activo: #ffffff;
-  --interruptor-apagado: #d4d4d8;
-  --foco: 0 0 0 3px rgb(37 99 235 / .22);
-  --anillo: #2563eb;
+  --interruptor-apagado: #d4d3d9;
+  --foco: 0 0 0 3px rgb(59 46 228 / .22);
+  --anillo: #3b2ee4;
 
   /* Elevación */
   --sombra: 0 1px 2px rgb(16 16 24 / .04);
@@ -81,32 +81,32 @@
    en <html>. Los valores del tema oscuro están dos veces porque CSS no deja compartirlos entre una media query y un atributo. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="claro"]) {
-    --fondo: #0b0b0d;
-    --lateral: #0f0f12;
-    --superficie: #141417;
-    --superficie-solida: #18181b;
-    --superficie-suave: #1c1c20;
-    --superficie-hover: #27272b;
-    --campo: #18181b;
-    --campo-solido: #2c2c2e;
-    --cabecera-tabla: #17171a;
-    --fila-hover: #18181c;
-    --vidrio: rgb(15 15 18 / .88);
-    --velo: rgb(0 0 0 / .6);
-    --texto: #f4f4f5;
-    --texto-suave: #d4d4d8;
-    --texto-tenue: #a1a1aa;
-    --texto-placeholder: #71717a;
-    --borde: #26262b;
-    --borde-fuerte: #34343a;
-    --borde-campo: #6a6a75;
-    --borde-hover: #8f8f99;
-    --borde-tarjeta: #232328;
-    --primario: #2563eb;
-    --primario-hover: #3b82f6;
-    --primario-texto: #6ea8fe;
-    --primario-suave: rgb(59 130 246 / .14);
-    --primario-borde: rgb(59 130 246 / .42);
+    --fondo: #0b0a0e;
+    --lateral: #0f0e13;
+    --superficie: #131219;
+    --superficie-solida: #17161d;
+    --superficie-suave: #1b1a22;
+    --superficie-hover: #25232f;
+    --campo: #17161d;
+    --campo-solido: #282733;
+    --cabecera-tabla: #16151c;
+    --fila-hover: #17161e;
+    --vidrio: rgb(15 14 19 / .88);
+    --velo: rgb(3 2 8 / .6);
+    --texto: #f5f5f7; /* el blanco del logo en fondo oscuro */
+    --texto-suave: #d3d2da;
+    --texto-tenue: #9f9dae;
+    --texto-placeholder: #6d6a81;
+    --borde: #24232e;
+    --borde-fuerte: #33323d;
+    --borde-campo: #67647b;
+    --borde-hover: #8c899f;
+    --borde-tarjeta: #22202b;
+    --primario: #4b40ec;
+    --primario-hover: #6258f5;
+    --primario-texto: #8f89ff;
+    --primario-suave: rgb(122 114 255 / .16);
+    --primario-borde: rgb(122 114 255 / .45);
     --vezza-tinta: #f5f5f7;
     --vezza-acento: #7a72ff;
     --ok: #4ade80;
@@ -123,14 +123,14 @@
     --ambar-solido: #f59e0b;
     --ambar-fondo: rgb(245 158 11 / .14);
     --ambar-borde: rgb(245 158 11 / .38);
-    --violeta: #c4b5fd;
-    --violeta-fondo: rgb(139 92 246 / .16);
-    --info-texto: #93c5fd;
-    --segmento: #1c1c20;
-    --segmento-activo: #303036;
-    --interruptor-apagado: #3f3f46;
-    --foco: 0 0 0 3px rgb(59 130 246 / .4);
-    --anillo: #6ea8fe;
+    --violeta: #f0abfc;
+    --violeta-fondo: rgb(217 70 239 / .16);
+    --info-texto: #aaa5ff;
+    --segmento: #1b1a22;
+    --segmento-activo: #2f2e38;
+    --interruptor-apagado: #3e3c49;
+    --foco: 0 0 0 3px rgb(122 114 255 / .45);
+    --anillo: #8f89ff;
     --sombra: 0 1px 2px rgb(0 0 0 / .4);
     --sombra-alta: 0 1px 2px rgb(0 0 0 / .4), 0 10px 24px -10px rgb(0 0 0 / .7);
     --sombra-flotante: 0 0 0 1px rgb(255 255 255 / .07), 0 22px 54px -14px rgb(0 0 0 / .75);
@@ -138,32 +138,32 @@
   }
 }
 :root[data-tema="oscuro"] {
-    --fondo: #0b0b0d;
-    --lateral: #0f0f12;
-    --superficie: #141417;
-    --superficie-solida: #18181b;
-    --superficie-suave: #1c1c20;
-    --superficie-hover: #27272b;
-    --campo: #18181b;
-    --campo-solido: #2c2c2e;
-    --cabecera-tabla: #17171a;
-    --fila-hover: #18181c;
-    --vidrio: rgb(15 15 18 / .88);
-    --velo: rgb(0 0 0 / .6);
-    --texto: #f4f4f5;
-    --texto-suave: #d4d4d8;
-    --texto-tenue: #a1a1aa;
-    --texto-placeholder: #71717a;
-    --borde: #26262b;
-    --borde-fuerte: #34343a;
-    --borde-campo: #6a6a75;
-    --borde-hover: #8f8f99;
-    --borde-tarjeta: #232328;
-    --primario: #2563eb;
-    --primario-hover: #3b82f6;
-    --primario-texto: #6ea8fe;
-    --primario-suave: rgb(59 130 246 / .14);
-    --primario-borde: rgb(59 130 246 / .42);
+    --fondo: #0b0a0e;
+    --lateral: #0f0e13;
+    --superficie: #131219;
+    --superficie-solida: #17161d;
+    --superficie-suave: #1b1a22;
+    --superficie-hover: #25232f;
+    --campo: #17161d;
+    --campo-solido: #282733;
+    --cabecera-tabla: #16151c;
+    --fila-hover: #17161e;
+    --vidrio: rgb(15 14 19 / .88);
+    --velo: rgb(3 2 8 / .6);
+    --texto: #f5f5f7; /* el blanco del logo en fondo oscuro */
+    --texto-suave: #d3d2da;
+    --texto-tenue: #9f9dae;
+    --texto-placeholder: #6d6a81;
+    --borde: #24232e;
+    --borde-fuerte: #33323d;
+    --borde-campo: #67647b;
+    --borde-hover: #8c899f;
+    --borde-tarjeta: #22202b;
+    --primario: #4b40ec;
+    --primario-hover: #6258f5;
+    --primario-texto: #8f89ff;
+    --primario-suave: rgb(122 114 255 / .16);
+    --primario-borde: rgb(122 114 255 / .45);
     --vezza-tinta: #f5f5f7;
     --vezza-acento: #7a72ff;
     --ok: #4ade80;
@@ -180,14 +180,14 @@
     --ambar-solido: #f59e0b;
     --ambar-fondo: rgb(245 158 11 / .14);
     --ambar-borde: rgb(245 158 11 / .38);
-    --violeta: #c4b5fd;
-    --violeta-fondo: rgb(139 92 246 / .16);
-    --info-texto: #93c5fd;
-    --segmento: #1c1c20;
-    --segmento-activo: #303036;
-    --interruptor-apagado: #3f3f46;
-    --foco: 0 0 0 3px rgb(59 130 246 / .4);
-    --anillo: #6ea8fe;
+    --violeta: #f0abfc;
+    --violeta-fondo: rgb(217 70 239 / .16);
+    --info-texto: #aaa5ff;
+    --segmento: #1b1a22;
+    --segmento-activo: #2f2e38;
+    --interruptor-apagado: #3e3c49;
+    --foco: 0 0 0 3px rgb(122 114 255 / .45);
+    --anillo: #8f89ff;
     --sombra: 0 1px 2px rgb(0 0 0 / .4);
     --sombra-alta: 0 1px 2px rgb(0 0 0 / .4), 0 10px 24px -10px rgb(0 0 0 / .7);
     --sombra-flotante: 0 0 0 1px rgb(255 255 255 / .07), 0 22px 54px -14px rgb(0 0 0 / .75);
@@ -238,7 +238,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-::selection { background: rgb(37 99 235 / .2); }
+::selection { background: rgb(59 46 228 / .2); }
 
 a { color: var(--primario-texto); text-underline-offset: .2em; text-decoration-thickness: 1px; }
 h1, h2, h3 { margin: 0; color: var(--texto); line-height: 1.25; letter-spacing: -.018em; text-wrap: balance; }
@@ -877,7 +877,7 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
   border-radius: 12px;
   background: var(--primario);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 6px 16px -6px rgb(37 99 235 / .55);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 6px 16px -6px rgb(59 46 228 / .55);
 }
 
 /* ---------- Carga masiva ---------- */
@@ -939,7 +939,7 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
 /* La vista previa muestra la tienda tal como se ve (siempre clara), también con el panel en modo oscuro. */
 .vista-previa { border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; --muestra: #1a1a1a; --muestra-texto: #fff; }
 .vista-previa-titulo { display: block; padding: .4rem .75rem; font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-tenue); background: var(--superficie-suave); border-bottom: 1px solid var(--borde); }
-.vista-previa-franja { padding: .45rem .75rem; background: var(--muestra); color: var(--muestra-texto); font-size: .78rem; font-weight: 500; text-align: center; transition: background-color 300ms var(--suave), color 300ms var(--suave); }
+.vista-previa-franja { padding: .45rem .75rem; background: var(--franja-muestra, var(--muestra)); color: var(--franja-muestra-texto, var(--muestra-texto)); font-size: .78rem; font-weight: 500; text-align: center; transition: background-color 300ms var(--suave), color 300ms var(--suave); }
 .vista-previa-cabecera { display: flex; align-items: center; min-height: 60px; padding: .7rem 1rem; border-bottom: 1px solid #e8e8eb; background: #fff; color: #18181b; }
 .vista-previa-logo { display: block; height: 40px; width: auto; max-width: 180px; object-fit: contain; object-position: left center; }
 .vista-previa-nombre { font-weight: 650; font-size: 1.05rem; letter-spacing: -.02em; }
@@ -1419,7 +1419,14 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
 .opcion-tipo:has(input:checked) { border-color: var(--primario); background: var(--primario-suave); box-shadow: inset 0 0 0 1px var(--primario); }
 .opcion-tipo:has(input:checked) > span:first-of-type .icono { color: var(--primario-texto); }
 .opcion-tipo:has(input:focus-visible) { box-shadow: inset 0 0 0 1px var(--primario), var(--foco); }
-.tipos-entrega .error-campo { grid-column: 1 / -1; }
+.tipos-entrega .error-campo, .tipos-entrega > .campo-ancho { grid-column: 1 / -1; }
+/* Tipografías: tantas columnas como entren. */
+.tipos-varios { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.muestra-fuente strong { font-size: 1.0625rem; font-weight: 600; }
+/* Esquinas: una tarjetita y un botón con el redondeo de cada opción. */
+.muestra-esquinas { display: inline-flex; align-items: center; gap: .35rem; }
+.muestra-esquinas i { width: 22px; height: 16px; border: 1.5px solid var(--borde-hover); }
+.muestra-esquinas b { width: 26px; height: 12px; background: var(--primario); }
 .editor-entrega, .editor-pedido { grid-template-areas: "principal lateral"; }
 @media (max-width: 1080px) { .editor-entrega, .editor-pedido { grid-template-areas: "principal" "lateral"; } }
 

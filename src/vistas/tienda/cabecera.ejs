@@ -30,8 +30,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <%# La tipografía que la tienda eligió en Diseño (si no es la del sistema) se pide a Google Fonts. %>
+  <% if (estilo.hojaDeFuente) { %><link rel="stylesheet" href="<%= estilo.hojaDeFuente %>"><% } %>
   <link rel="stylesheet" href="/tienda.css">
-  <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; --logo-alto: <%= locals.logoAlto ?? 40 %>px; }</style>
+  <style>:root { --acento: <%= ajustes.colorPrincipal %>; --acento-texto: <%= colorTexto %>; --logo-alto: <%= locals.logoAlto ?? 40 %>px;<%- estilo.variables ? ` ${estilo.variables};` : '' %> }</style>
   <%# Sin JavaScript no se puede juntar lo que no entra en "Más": las categorías pasan a una segunda línea en vez de quedar tapadas. %>
   <noscript><style>.navegacion { overflow: visible; } .navegacion-lista { flex-wrap: wrap; }</style></noscript>
   <script src="/tienda.js" defer></script>
@@ -39,7 +41,7 @@
 <body>
 <a class="saltar" href="#contenido">Ir al contenido</a>
 <% if (ajustes.franjaTexto) { %>
-  <div class="franja"><p><%= ajustes.franjaTexto %></p></div>
+  <div class="franja"><p><% if (ajustes.franjaEnlace) { %><a href="<%= ajustes.franjaEnlace %>"><%= ajustes.franjaTexto %></a><% } else { %><%= ajustes.franjaTexto %><% } %></p></div>
 <% } %>
 <%# Las categorías del menú de arriba son las que la tienda eligió en Diseño; el pie las muestra todas. %>
 <% const enMenu = categorias.filter((c) => c.enMenu) %>

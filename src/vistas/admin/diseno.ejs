@@ -6,7 +6,19 @@
     return (errores[campo] ? ' aria-invalid="true"' : '') + (describe ? ` aria-describedby="${describe}"` : '');
   };
   const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  // Si el formulario volvió con errores, `valores` es lo que se envió (puede faltar algún campo); si no, lo guardado.
+  const volvio = valores._csrf !== undefined;
+  const valor = (campo, porDefecto = '') => valores[campo] ?? porDefecto;
+  const esColor = (texto) => /^#[0-9a-f]{6}$/i.test(texto ?? '');
+  const franjaPropia = volvio ? Boolean(valores.franjaColorPropio) : esColor(valores.colorFranja);
+  const colorFranja = esColor(valores.colorFranja) ? valores.colorFranja : valores.colorPrincipal;
+  const fuenteActual = Object.hasOwn(opcionesFuente, valor('fuente')) ? valor('fuente') : 'sistema';
+  const esquinasActual = Object.hasOwn(opcionesEsquinas, valor('esquinas')) ? valor('esquinas') : 'redondeadas';
+  const tarjetasActual = Object.hasOwn(opcionesTarjetas, valor('tarjetas')) ? valor('tarjetas') : 'normales';
+  // Para mostrar cada tipografía con su propia letra en las tarjetas de arriba (se piden juntas, en un solo pedido).
+  const hojaFuentes = 'https://fonts.googleapis.com/css2?' + Object.values(opcionesFuente).filter((f) => f.google).map((f) => `family=${f.google.split(':')[0]}:wght@600`).join('&') + '&display=swap';
 %>
+<link rel="stylesheet" href="<%= hojaFuentes %>">
 <header class="encabezado">
   <div>
     <h1>Diseño de tu tienda</h1>
@@ -57,7 +69,7 @@
           <input id="colorPrincipal" type="color" name="colorPrincipal" value="<%= valores.colorPrincipal %>" data-color<%- accesibilidad('colorPrincipal') %>>
           <code data-color-hex><%= valores.colorPrincipal %></code>
         </div>
-        <span class="ayuda" id="ayuda-colorPrincipal">Se usa en la franja de anuncios y en los botones. El color del texto se ajusta solo para que se lea bien.</span>
+        <span class="ayuda" id="ayuda-colorPrincipal">Se usa en los botones y, si no elegís otro, en la franja de anuncios. El color del texto se ajusta solo para que se lea bien.</span>
         <%- error('colorPrincipal') %>
       </div>
 
@@ -67,6 +79,24 @@
                placeholder="Envío gratis desde $100.000 / 15% off con transferencia"<%- accesibilidad('franjaTexto') %>>
         <span class="ayuda" id="ayuda-franjaTexto">Aparece arriba de todo, en todas las páginas. Dejala vacía para no mostrarla.</span>
         <%- error('franjaTexto') %>
+      </div>
+
+      <div class="campo">
+        <label for="franjaEnlace">Link de la franja <span class="opcional">(opcional)</span></label>
+        <input id="franjaEnlace" type="text" name="franjaEnlace" value="<%= valor('franjaEnlace') %>" placeholder="/categoria/ofertas"<%- accesibilidad('franjaEnlace') %>>
+        <span class="ayuda" id="ayuda-franjaEnlace">Si lo completás, el anuncio se puede tocar y lleva a una página de tu tienda o a un link completo.</span>
+        <%- error('franjaEnlace') %>
+      </div>
+
+      <div class="campo">
+        <span class="etiqueta">Color de la franja</span>
+        <label class="casilla"><input type="checkbox" name="franjaColorPropio" value="1" data-franja-propio<%= franjaPropia ? ' checked' : '' %>> Usar otro color en la franja</label>
+        <div class="selector-color">
+          <input id="colorFranja" type="color" name="colorFranja" value="<%= colorFranja %>" data-color-franja aria-label="Color de la franja"<%- accesibilidad('colorFranja', false) %>>
+          <code data-color-franja-hex><%= colorFranja %></code>
+        </div>
+        <span class="ayuda">Si no lo marcás, la franja usa el color principal.</span>
+        <%- error('colorFranja') %>
       </div>
 
       <div class="vista-previa" data-vista-previa aria-hidden="true">
@@ -80,6 +110,39 @@
           <span class="vista-previa-boton">Botón de ejemplo</span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section class="ajuste" id="estilo">
+    <div class="ajuste-intro">
+      <h2>Estilo</h2>
+      <p class="texto-suave">La letra y las esquinas de los botones y las tarjetas. Combinadas con tu color, le dan personalidad a la tienda.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <fieldset class="tipos-entrega tipos-varios">
+        <legend class="etiqueta">Tipografía</legend>
+        <% for (const [clave, fuente] of Object.entries(opcionesFuente)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="fuente" value="<%= clave %>"<%= fuenteActual === clave ? ' checked' : '' %>>
+            <span class="muestra-fuente" style="font-family: <%= fuente.titulos ?? 'inherit' %>"><strong><%= fuente.titulo %></strong></span>
+            <span class="ayuda"><%= fuente.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('fuente') %>
+      </fieldset>
+
+      <fieldset class="tipos-entrega tipos-tres">
+        <legend class="etiqueta">Esquinas</legend>
+        <% for (const [clave, forma] of Object.entries(opcionesEsquinas)) { %>
+          <% const r = forma.radios ?? { grande: 20, boton: 999 } %>
+          <label class="opcion-tipo">
+            <input type="radio" name="esquinas" value="<%= clave %>"<%= esquinasActual === clave ? ' checked' : '' %>>
+            <span><span class="muestra-esquinas" aria-hidden="true"><i style="border-radius: <%= r.grande %>px"></i><b style="border-radius: <%= r.boton %>px"></b></span> <strong><%= forma.titulo %></strong></span>
+            <span class="ayuda"><%= forma.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('esquinas') %>
+      </fieldset>
     </div>
   </section>
 
@@ -168,6 +231,55 @@
         <span class="ayuda" id="ayuda-ordenCatalogo">Tus clientes lo pueden cambiar desde la tienda.</span>
         <%- error('ordenCatalogo') %>
       </div>
+
+      <fieldset class="tipos-entrega tipos-tres">
+        <legend class="etiqueta">Tamaño de las tarjetas de producto</legend>
+        <% for (const [clave, tarjeta] of Object.entries(opcionesTarjetas)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="tarjetas" value="<%= clave %>"<%= tarjetasActual === clave ? ' checked' : '' %>>
+            <span><strong><%= tarjeta.titulo %></strong></span>
+            <span class="ayuda"><%= tarjeta.ayuda %></span>
+          </label>
+        <% } %>
+        <span class="ayuda campo-ancho">En el celular se ven siempre de a dos.</span>
+        <%- error('tarjetas') %>
+      </fieldset>
+
+      <div class="ajuste-campos-dos">
+        <div class="campo">
+          <label for="tituloCatalogo">Título del catálogo</label>
+          <input id="tituloCatalogo" type="text" name="tituloCatalogo" value="<%= valor('tituloCatalogo', 'Todos los productos') %>" maxlength="60" placeholder="Todos los productos"<%- accesibilidad('tituloCatalogo') %>>
+          <span class="ayuda" id="ayuda-tituloCatalogo">Arriba de la lista de productos de la portada.</span>
+          <%- error('tituloCatalogo') %>
+        </div>
+        <div class="campo">
+          <label for="tituloDestacados">Título de los destacados</label>
+          <input id="tituloDestacados" type="text" name="tituloDestacados" value="<%= valor('tituloDestacados', 'Destacados') %>" maxlength="60" placeholder="Destacados"<%- accesibilidad('tituloDestacados') %>>
+          <span class="ayuda" id="ayuda-tituloDestacados">Por ejemplo "Lo más vendido" o "Nuestra selección".</span>
+          <%- error('tituloDestacados') %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste" id="sobre">
+    <div class="ajuste-intro">
+      <h2>Sobre la tienda</h2>
+      <p class="texto-suave">Un par de líneas para presentarte. Salen en el pie y como descripción cuando compartís el link o te busca Google.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="campo">
+        <label for="descripcion">Descripción</label>
+        <textarea id="descripcion" name="descripcion" rows="3" maxlength="300" placeholder="Somos una tienda familiar de Córdoba. Envíos a todo el país y atención por WhatsApp."<%- accesibilidad('descripcion') %>><%= valor('descripcion') %></textarea>
+        <span class="ayuda" id="ayuda-descripcion">Hasta 300 caracteres. Dejala vacía para no mostrarla.</span>
+        <%- error('descripcion') %>
+      </div>
+      <div class="campo">
+        <label for="notaPie">Nota al pie <span class="opcional">(opcional)</span></label>
+        <input id="notaPie" type="text" name="notaPie" value="<%= valor('notaPie') %>" maxlength="300" placeholder="Precios con IVA incluido. Cambios dentro de los 30 días."<%- accesibilidad('notaPie') %>>
+        <span class="ayuda" id="ayuda-notaPie">Va abajo de todo, antes de los derechos reservados: condiciones de compra, cambios, aclaraciones.</span>
+        <%- error('notaPie') %>
+      </div>
     </div>
   </section>
 
@@ -211,6 +323,17 @@
                placeholder="Av. Siempre Viva 742, Córdoba"<%- accesibilidad('direccion') %>>
         <span class="ayuda" id="ayuda-direccion">Si tenés varios locales, separalos con "/".</span>
         <%- error('direccion') %>
+      </div>
+      <div class="campo">
+        <label for="direccionMapa">Link del mapa <span class="opcional">(opcional)</span></label>
+        <input id="direccionMapa" type="text" name="direccionMapa" value="<%= valor('direccionMapa') %>" placeholder="https://maps.app.goo.gl/..."<%- accesibilidad('direccionMapa') %>>
+        <span class="ayuda" id="ayuda-direccionMapa">Agrega "Cómo llegar" junto a la dirección. Copiá el link desde Google Maps, en Compartir.</span>
+        <%- error('direccionMapa') %>
+      </div>
+      <div class="campo">
+        <label for="horarios">Horario de atención <span class="opcional">(opcional)</span></label>
+        <input id="horarios" type="text" name="horarios" value="<%= valor('horarios') %>" maxlength="150" placeholder="Lunes a viernes de 9 a 18 hs"<%- accesibilidad('horarios') %>>
+        <%- error('horarios') %>
       </div>
     </div>
   </section>

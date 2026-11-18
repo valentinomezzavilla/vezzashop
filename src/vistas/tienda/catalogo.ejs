@@ -39,7 +39,7 @@
 <% if (destacados.length) { %>
   <section class="seccion-destacados" aria-labelledby="titulo-destacados">
     <div class="encabezado-catalogo">
-      <h2 id="titulo-destacados" class="titulo-seccion">Destacados</h2>
+      <h2 id="titulo-destacados" class="titulo-seccion"><%= ajustes.tituloDestacados %></h2>
     </div>
     <ul class="grilla">
       <% for (const p of destacados) { %><%- include('tarjeta-producto', { p }) %><% } %>
@@ -59,7 +59,7 @@
 
 <div class="encabezado-catalogo">
   <div>
-    <h1><%= migas.length || busquedaPagina ? titulo : 'Todos los productos' %></h1>
+    <h1><%= migas.length || busquedaPagina ? titulo : ajustes.tituloCatalogo %></h1>
     <% if (!busquedaPagina || busqueda) { %>
       <p class="cantidad" data-cantidad><%= total %> producto<%= total === 1 ? '' : 's' %></p>
     <% } %>

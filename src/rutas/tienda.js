@@ -11,7 +11,7 @@ import {
   ORDENES,
   esOrden,
 } from '../vidriera.js';
-import { leerAjustes, listarBanners, colorDeTextoSobre, precioConDescuento, valorCuota, TAMANOS_LOGO } from '../diseno.js';
+import { leerAjustes, listarBanners, colorDeTextoSobre, estiloDeTienda, precioConDescuento, valorCuota, TAMANOS_LOGO } from '../diseno.js';
 import { dimensionesDe, urlImagen, urlMiniatura } from '../imagenes.js';
 import { formatearPrecio } from '../util/formato.js';
 import { urlPanel } from '../util/dominios.js';
@@ -148,11 +148,13 @@ export function rutasTienda({ db, config }) {
       medidasLogo: await dimensionesDe(config.dirSubidas, req.tienda.id, ajustes.logo),
       logoAlto: TAMANOS_LOGO[ajustes.logoTamano]?.alto ?? TAMANOS_LOGO.mediano.alto,
       colorTexto: colorDeTextoSobre(ajustes.colorPrincipal),
+      // Tipografía, esquinas, tarjetas y color de la franja que eligió la tienda (ver estiloDeTienda en diseno.js).
+      estilo: estiloDeTienda(ajustes),
       urlCategoria,
       estadoStock,
       porcentajeOff,
       preciosExtra: (centavos) => preciosExtra(centavos, ajustes),
-      meta: { descripcion: `Comprá online en ${req.tienda.nombre}.`, imagen: null, tipo: 'website' },
+      meta: { descripcion: ajustes.descripcion.slice(0, 160) || `Comprá online en ${req.tienda.nombre}.`, imagen: null, tipo: 'website' },
       busqueda: '',
       // Con checkout el carrito termina en /checkout; si no, el pedido se manda por WhatsApp.
       checkoutActivo: checkout.activo,

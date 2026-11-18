@@ -4,6 +4,7 @@
   <div class="pie-interior">
     <div class="pie-marca">
       <a class="marca" href="/"><% if (urlLogo) { %><img class="logo" src="<%= urlLogo %>" alt="<%= tienda.nombre %>"<%- medidasLogo ? ` width="${medidasLogo.ancho}" height="${medidasLogo.alto}"` : '' %> loading="lazy" decoding="async"><% } else { %><%= tienda.nombre %><% } %></a>
+      <% if (ajustes.descripcion) { %><p class="pie-descripcion"><%= ajustes.descripcion %></p><% } %>
       <% if (redes.length) { %>
         <div class="redes">
           <% for (const [red, nombreIcono, url] of redes) { %>
@@ -12,7 +13,7 @@
         </div>
       <% } %>
       <% if (ajustes.direccion) { %>
-        <p class="pie-dato"><%- icono('ubicacion', { tamano: 16 }) %><span><%= ajustes.direccion %></span></p>
+        <p class="pie-dato"><%- icono('ubicacion', { tamano: 16 }) %><span><%= ajustes.direccion %><% if (ajustes.direccionMapa) { %> · <a href="<%= ajustes.direccionMapa %>" target="_blank" rel="noopener">Cómo llegar</a><% } %></span></p>
       <% } %>
     </div>
 
@@ -26,7 +27,7 @@
       </nav>
     <% } %>
 
-    <% if (ajustes.emailContacto || ajustes.whatsapp) { %>
+    <% if (ajustes.emailContacto || ajustes.whatsapp || ajustes.horarios) { %>
       <div class="pie-bloque pie-contacto">
         <p class="pie-titulo">Contacto</p>
         <div class="pie-enlaces">
@@ -37,9 +38,11 @@
             <a href="mailto:<%= ajustes.emailContacto %>"><%- icono('mail', { tamano: 16 }) %><span><%= ajustes.emailContacto %></span></a>
           <% } %>
         </div>
+        <% if (ajustes.horarios) { %><p class="pie-dato pie-horarios"><%- icono('reloj', { tamano: 16 }) %><span><%= ajustes.horarios %></span></p><% } %>
       </div>
     <% } %>
   </div>
+  <% if (ajustes.notaPie) { %><p class="pie-nota"><%= ajustes.notaPie %></p><% } %>
   <p class="pie-copyright">
     <span>© <%= new Date().getFullYear() %> <%= tienda.nombre %>. Todos los derechos reservados.</span>
     <%- vezza({ etiqueta: true }) %>

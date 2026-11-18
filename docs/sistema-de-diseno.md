@@ -8,9 +8,13 @@ no usan colores ni medidas sueltas.
 Estilo de producto profesional: superficies neutras, un solo color de marca, bordes finos y movimientos cortos.
 
 - **Tipografía:** Inter (con la del sistema de respaldo). Cuerpo de 15 px; títulos de página de 26 px (24 px en el celular).
-- **Color de marca:** azul `--primario` (`#2563eb`). Se usa en botones principales, la sección activa del menú, foco,
-  interruptores y links. Nada más es azul.
-- **Estados:** `--ok` (verde), `--error` (rojo), `--ambar`, `--violeta` (enviado), cada uno con su `-fondo` y `-borde`.
+- **Colores del logo de Vezza:** la marca es el índigo `--primario` (`#3b2ee4`, `#4b40ec` en oscuro) y el texto es la
+  tinta del logo (`--texto: #13121a`; en oscuro, el blanco `#f5f5f7`). Los grises llevan un matiz índigo (248°) para que
+  las superficies combinen con el logo, con la misma luminosidad de antes. `--primario` se usa en botones principales,
+  la sección activa del menú, foco, interruptores y links; `--primario-texto` es la versión para texto (en oscuro,
+  `#8f89ff`). Todos los pares de texto cumplen contraste AA; si cambiás un valor, revisalo. Nada más es índigo.
+- **Estados:** `--ok` (verde), `--error` (rojo), `--ambar`, `--violeta` (enviado, en fucsia para que no se confunda con
+  el índigo de la marca), cada uno con su `-fondo` y `-borde`.
   Las pastillas (`.pastilla-*`) y los avisos (`.aviso-*`) ya los combinan.
 - **Claro y oscuro:** los dos temas tienen los mismos tokens. Los valores oscuros están dos veces (media query y
   `data-tema="oscuro"`) y tienen que ser iguales: lo controla `test/apariencia.test.js`.
