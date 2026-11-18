@@ -86,7 +86,7 @@ export function rutasPlataforma({ db, config }) {
   router.post('/salir', verificarCsrf, (req, res, next) => {
     req.session.destroy((error) => {
       if (error) return next(error);
-      res.clearCookie('sesion').redirect('/plataforma/ingresar');
+      res.clearCookie('sesion-plataforma', { path: '/plataforma' }).redirect('/plataforma/ingresar');
     });
   });
 

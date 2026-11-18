@@ -233,6 +233,11 @@ Para que los avisos a los clientes digan cómo contactarte, definí `CONTACTO_PL
 Los datos viven en las tablas `planes`, `superadmins`, `pagos_plataforma` y en columnas nuevas de `tiendas`; la migración
 `007` se aplica sola al arrancar.
 
+**Sesiones.** La plataforma y el panel de cada tienda tienen cada uno su propia cookie (`sesion-plataforma` y `sesion`),
+así que ingresar o salir de una tienda, aunque sea en el mismo navegador, no cierra la sesión del superadmin ni al revés.
+La de la plataforma dura 15 días y se renueva cada vez que se usa; la de una tienda, 8 horas desde que ingresa. Para que no
+se cierre al reiniciar o redesplegar, `SECRETO_SESION` tiene que ser siempre el mismo.
+
 ## Logo de Vezza
 
 La firma "Desarrollado por VEZZA" aparece en la pantalla de ingreso y en el menú de la plataforma (donde además es el

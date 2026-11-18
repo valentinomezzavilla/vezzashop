@@ -15,6 +15,7 @@ import { vezza } from './util/vezza.js';
 import { dominioDeTiendas, slugDeHost, urlPanel } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
+const QUINCE_DIAS_MS = 15 * 24 * 60 * 60 * 1000;
 
 export function crearApp({ db, config }) {
   const app = express();
@@ -87,19 +88,26 @@ export function crearApp({ db, config }) {
 
   // Más campos que los 1000 de fábrica: al borrar varios productos, cada uno marcado es un campo "ids".
   app.use(express.urlencoded({ extended: false, parameterLimit: 10_000, limit: '200kb' }));
-  app.use(
+
+  // El panel de cada tienda y el de la plataforma tienen cada uno su propia cookie de sesión. Con una sola, quien ingresaba
+  // o salía de una tienda en el mismo navegador (por ejemplo, el superadmin probando el panel de un cliente) cerraba la
+  // sesión del otro panel. Las dos guardan sus datos en la misma tabla, pero cada una con su propio almacén: express-session
+  // le asigna al almacén cómo armar la cookie, así que compartirlo haría que la última configuración pisara a la otra.
+  const sesion = ({ name, path, maxAge, rolling = false }) =>
     session({
-      name: 'sesion',
+      name,
       store: new AlmacenSesiones(db),
       secret: config.secretoSesion,
       resave: false,
       saveUninitialized: false,
-      cookie: { httpOnly: true, sameSite: 'lax', secure: config.produccion, maxAge: OCHO_HORAS_MS },
-    }),
-  );
+      rolling,
+      cookie: { httpOnly: true, sameSite: 'lax', secure: config.produccion, path, maxAge },
+    });
 
-  app.use('/admin', rutasAdmin({ db, config }));
-  app.use('/plataforma', rutasPlataforma({ db, config }));
+  // Tiendas: 8 horas desde que ingresan.
+  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config }));
+  // Plataforma: 15 días, y cada uso los renueva: mientras se use, no hay que volver a ingresar.
+  app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config }));
   app.get('/', (req, res) => res.redirect('/admin'));
 
   app.use((req, res) => {
