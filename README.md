@@ -20,7 +20,10 @@ es manual (link de pago de Mercado Pago que manda la tienda; ver [Qué falta](#q
 | **Carga masiva** | Ver más abajo. |
 | **Diseño** | Ver más abajo. |
 | **Envíos y pagos** | Ver más abajo. |
-| **Cuenta** | Cambia el nombre de la tienda (el link no cambia) y su clave (mínimo 10 caracteres). |
+| **Cuenta** | Cambia el nombre de la tienda (el link no cambia; lo cambia quien administra la plataforma) y su clave (mínimo 10 caracteres). |
+
+Todos los campos de clave (ingreso y cambio de clave, en el panel y en la plataforma) tienen un **ojo** al costado para ver lo
+que se escribe; `admin.js` lo agrega solo y la clave vuelve a ocultarse al enviar el formulario.
 
 Los productos **destacados** aparecen en una sección propia arriba de la portada (hasta 8).
 

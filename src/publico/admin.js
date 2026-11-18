@@ -207,6 +207,41 @@ if (recortador && 'ResizeObserver' in window) {
   });
 }
 
+// ---------- Claves: botón para mostrarlas u ocultarlas ----------
+
+// A cada campo de clave se le agrega un ojo al costado (la plantilla con los íconos viene del servidor). Sin JavaScript el
+// campo queda como siempre, siempre oculto.
+const plantillaVerClave = document.querySelector('#plantilla-ver-clave');
+if (plantillaVerClave) {
+  for (const entrada of document.querySelectorAll('input[type="password"]')) {
+    const teniaFoco = document.activeElement === entrada;
+    const envoltorio = document.createElement('span');
+    envoltorio.className = 'clave-campo';
+    entrada.replaceWith(envoltorio);
+    const boton = plantillaVerClave.content.firstElementChild.cloneNode(true);
+    envoltorio.append(entrada, boton);
+    if (teniaFoco) entrada.focus();
+    // Al mostrarla, que el teclado del celular no la corrija ni le ponga mayúsculas.
+    entrada.setAttribute('autocapitalize', 'none');
+    entrada.setAttribute('autocorrect', 'off');
+    entrada.spellcheck = false;
+
+    const mostrar = (visible) => {
+      entrada.type = visible ? 'text' : 'password';
+      const texto = visible ? 'Ocultar la clave' : 'Mostrar la clave';
+      boton.setAttribute('aria-pressed', String(visible));
+      boton.setAttribute('aria-label', texto);
+      boton.title = texto;
+      boton.querySelector('[data-icono-oculta]').hidden = visible;
+      boton.querySelector('[data-icono-visible]').hidden = !visible;
+    };
+    boton.addEventListener('click', () => mostrar(entrada.type === 'password'));
+    // Que no quede a la vista al enviar el formulario ni al volver a la página con el botón "atrás".
+    entrada.form?.addEventListener('submit', () => mostrar(false));
+    addEventListener('pagehide', () => mostrar(false));
+  }
+}
+
 // ---------- Copiar al portapapeles ----------
 
 for (const boton of document.querySelectorAll('[data-copiar]')) {

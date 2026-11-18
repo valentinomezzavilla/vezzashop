@@ -1,0 +1,7 @@
+<%# Botón para mostrar u ocultar una clave: admin.js lo copia al lado de cada campo de clave. Los íconos salen del servidor. %>
+<template id="plantilla-ver-clave">
+  <button class="clave-ver" type="button" aria-pressed="false" aria-label="Mostrar la clave" title="Mostrar la clave">
+    <span data-icono-oculta><%- icono('ojo', { tamano: 18 }) %></span>
+    <span data-icono-visible hidden><%- icono('ojo-tachado', { tamano: 18 }) %></span>
+  </button>
+</template>
