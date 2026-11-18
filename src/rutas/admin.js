@@ -32,7 +32,7 @@ import {
 } from '../diseno.js';
 import { arbolCategoriasAdmin } from '../categorias.js';
 import { limitesDeTienda, ampliarPlan } from '../limites.js';
-import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
+import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN, PROPORCION_BANNER, leerRecorte } from '../imagenes.js';
 import { ORDENES } from '../vidriera.js';
 
 // El Excel puede traer fotos pegadas: por eso el límite es mucho más alto que el de una foto sola.
@@ -101,6 +101,7 @@ export function rutasAdmin({ db, config }) {
       categoriasMenu: await arbolCategoriasAdmin(db, tiendaId),
       banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
       maxBanners: (await limitesDeTienda(db, tiendaId)).maxBanners,
+      proporcionBanner: PROPORCION_BANNER,
       megasImagen: MEGAS_IMAGEN,
     });
   }
@@ -345,10 +346,16 @@ export function rutasAdmin({ db, config }) {
       if (enlace.error) return volverConError(`Link del banner: ${enlace.error}`);
       const textoAlternativo = String(req.body.textoAlternativo ?? '').trim().slice(0, 150);
 
+      // El recortador del panel manda qué parte de cada imagen se ve en la tienda. Sin JavaScript no hay recortes y la imagen
+      // se guarda entera. Si hay recorte para el celular pero no se subió otra imagen, sale de la misma de la computadora.
+      const recorteComputadora = leerRecorte(req.body.recorteComputadora);
+      const recorteCelular = leerRecorte(req.body.recorteCelular);
+      const archivoCelular = imagenMovil ?? (recorteCelular ? imagen : null);
+
       const guardadas = [];
       try {
-        for (const [archivo, perfil] of [[imagen, 'banner'], [imagenMovil, 'bannerMovil']]) {
-          if (archivo) guardadas.push(await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer, { perfil }));
+        for (const [archivo, perfil, recorte] of [[imagen, 'banner', recorteComputadora], [archivoCelular, 'bannerMovil', recorteCelular]]) {
+          if (archivo) guardadas.push(await guardarImagen(config.dirSubidas, tiendaId, archivo.buffer, { perfil, recorte }));
         }
       } catch (error) {
         if (!(error instanceof ErrorDeImagen)) throw error;

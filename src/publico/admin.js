@@ -46,6 +46,167 @@ for (const input of document.querySelectorAll('input[type="file"]')) {
   });
 }
 
+// ---------- Banners: recorte con vista previa ----------
+
+// Cada marco tiene la proporción exacta del banner en la tienda. La imagen se mueve y se acerca por debajo y, al enviar el
+// formulario, un campo oculto lleva qué parte quedó a la vista: "x,y,ancho,alto", todo entre 0 y 1. El servidor recorta
+// con esos mismos números (leerRecorte en src/imagenes.js), así que la tienda muestra lo que se ve acá.
+
+const limitar = (valor, minimo, maximo) => Math.min(maximo, Math.max(minimo, valor));
+
+function crearMarcoDeRecorte(figura) {
+  const marco = figura.querySelector('[data-marco]');
+  const imagen = marco.querySelector('img');
+  const zoomEntrada = figura.querySelector('[data-zoom]');
+  const aviso = figura.querySelector('[data-aviso]');
+  const salida = figura.querySelector('[data-valor]');
+  const origen = figura.querySelector('[data-origen]');
+  const ideal = Number(figura.dataset.ideal);
+  let natural = null; // medidas de la imagen tal como se ve (el navegador ya aplica la rotación de la cámara)
+  let url = null;
+  let zoom = 1; // 1 = la imagen justo cubre el marco; hasta 3
+  let cx = 0.5; // centro de lo que se ve, como fracción de la imagen
+  let cy = 0.5;
+  let arrastre = null;
+
+  const medidas = () => {
+    const ancho = marco.clientWidth;
+    const alto = marco.clientHeight;
+    const escala = Math.max(ancho / natural.ancho, alto / natural.alto) * zoom;
+    return { ancho, alto, anchoImagen: natural.ancho * escala, altoImagen: natural.alto * escala };
+  };
+
+  function dibujar() {
+    if (!natural || !marco.clientWidth) return;
+    const { ancho, alto, anchoImagen, altoImagen } = medidas();
+    const visibleAncho = ancho / anchoImagen; // fracción de la imagen que entra en el marco
+    const visibleAlto = alto / altoImagen;
+    cx = limitar(cx, visibleAncho / 2, 1 - visibleAncho / 2);
+    cy = limitar(cy, visibleAlto / 2, 1 - visibleAlto / 2);
+    const x = cx - visibleAncho / 2;
+    const y = cy - visibleAlto / 2;
+    imagen.style.width = `${anchoImagen}px`;
+    imagen.style.height = `${altoImagen}px`;
+    imagen.style.transform = `translate(${-x * anchoImagen}px, ${-y * altoImagen}px)`;
+    salida.value = [x, y, visibleAncho, visibleAlto].map((n) => n.toFixed(5)).join(',');
+    zoomEntrada.value = Math.round(zoom * 100);
+
+    // Cuántos píxeles de la imagen original ocupan el ancho del banner: si son pocos, se ve borroso.
+    const pixeles = visibleAncho * natural.ancho;
+    const nivel = pixeles >= ideal * 0.9 ? 'bien' : pixeles >= ideal * 0.6 ? 'justo' : 'mal';
+    aviso.dataset.nivel = nivel;
+    aviso.textContent = {
+      bien: 'Se ve nítida.',
+      justo: 'Se ve bien, aunque la imagen es algo chica para esta medida.',
+      mal: 'Se va a ver borrosa: la parte elegida es muy chica. Probá con una imagen más grande o alejá el zoom.',
+    }[nivel];
+  }
+
+  const cambiarZoom = (nuevo) => {
+    zoom = limitar(nuevo, 1, 3);
+    dibujar();
+  };
+
+  marco.addEventListener('pointerdown', (evento) => {
+    if (!natural || evento.button > 0) return;
+    arrastre = { x: evento.clientX, y: evento.clientY, cx, cy };
+    marco.setPointerCapture(evento.pointerId);
+    marco.classList.add('arrastrando');
+  });
+  marco.addEventListener('pointermove', (evento) => {
+    if (!arrastre) return;
+    const { anchoImagen, altoImagen } = medidas();
+    cx = arrastre.cx - (evento.clientX - arrastre.x) / anchoImagen;
+    cy = arrastre.cy - (evento.clientY - arrastre.y) / altoImagen;
+    dibujar();
+  });
+  const soltar = () => {
+    arrastre = null;
+    marco.classList.remove('arrastrando');
+  };
+  marco.addEventListener('pointerup', soltar);
+  marco.addEventListener('pointercancel', soltar);
+  marco.addEventListener('keydown', (evento) => {
+    if (!natural) return;
+    const { ancho, anchoImagen, alto, altoImagen } = medidas();
+    const paso = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[evento.key];
+    if (paso) {
+      cx += (paso[0] * 0.04 * ancho) / anchoImagen;
+      cy += (paso[1] * 0.04 * alto) / altoImagen;
+      dibujar();
+    } else if (evento.key === '+' || evento.key === '=') cambiarZoom(zoom + 0.1);
+    else if (evento.key === '-') cambiarZoom(zoom - 0.1);
+    else return;
+    evento.preventDefault();
+  });
+  zoomEntrada.addEventListener('input', () => cambiarZoom(Number(zoomEntrada.value) / 100));
+  figura.querySelector('[data-acercar]').addEventListener('click', () => cambiarZoom(zoom + 0.1));
+  figura.querySelector('[data-alejar]').addEventListener('click', () => cambiarZoom(zoom - 0.1));
+  figura.querySelector('[data-centrar]').addEventListener('click', () => {
+    cx = cy = 0.5;
+    cambiarZoom(1);
+  });
+  new ResizeObserver(dibujar).observe(marco);
+
+  return {
+    // Devuelve false si el navegador no pudo mostrar la imagen.
+    cargar(archivo, texto) {
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(archivo);
+      if (origen && texto) origen.textContent = texto;
+      return new Promise((resolver) => {
+        imagen.onload = () => {
+          natural = { ancho: imagen.naturalWidth, alto: imagen.naturalHeight };
+          zoom = 1;
+          cx = cy = 0.5;
+          dibujar();
+          resolver(true);
+        };
+        imagen.onerror = () => {
+          this.limpiar();
+          resolver(false);
+        };
+        imagen.src = url;
+      });
+    },
+    limpiar() {
+      natural = null;
+      salida.value = '';
+      imagen.removeAttribute('src');
+    },
+  };
+}
+
+const recortador = document.querySelector('[data-recortador]');
+if (recortador && 'ResizeObserver' in window) {
+  const formulario = recortador.closest('form');
+  const entradaPrincipal = formulario.querySelector('input[name="imagen"]');
+  const entradaCelular = formulario.querySelector('input[name="imagenMovil"]');
+  const marcos = Object.fromEntries([...recortador.querySelectorAll('[data-recorte]')].map((figura) => [figura.dataset.recorte, crearMarcoDeRecorte(figura)]));
+
+  const ocultar = () => {
+    recortador.hidden = true;
+    for (const marco of Object.values(marcos)) marco.limpiar();
+  };
+  // El celular usa su propia imagen si se subió una; si no, la misma de la computadora con su propio recorte.
+  const cargarCelular = async () => {
+    const propia = entradaCelular.files[0];
+    const archivo = propia ?? entradaPrincipal.files[0];
+    if (archivo) await marcos.celular.cargar(archivo, propia ? propia.name : 'Con la misma imagen');
+  };
+
+  entradaPrincipal.addEventListener('change', async () => {
+    const archivo = entradaPrincipal.files[0];
+    if (!archivo) return ocultar();
+    recortador.hidden = false; // el marco tiene que estar a la vista para medirse
+    if (!(await marcos.computadora.cargar(archivo))) return ocultar(); // sin vista previa se envía entera, como siempre
+    await cargarCelular();
+  });
+  entradaCelular.addEventListener('change', async () => {
+    if (!recortador.hidden) await cargarCelular();
+  });
+}
+
 // ---------- Copiar al portapapeles ----------
 
 for (const boton of document.querySelectorAll('[data-copiar]')) {

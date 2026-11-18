@@ -991,6 +991,54 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
 .banner-acciones { display: flex; gap: .15rem; }
 .agregar-banner { display: grid; gap: 1rem; padding-top: 1.25rem; border-top: 1px solid var(--borde); }
 
+/* Recortador de banners: cada marco tiene la proporción del banner en la tienda y la imagen se mueve y se acerca por debajo.
+   Los puntitos y las flechas del carrusel se dibujan a escala (--u es 1 px de la tienda, en el ancho del marco), así se ve qué tapan. */
+.recortador { display: grid; gap: 1rem; padding: 1rem; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--superficie-suave); }
+.recortador-cabecera h4 { margin: 0 0 .2rem; font-size: .9375rem; }
+.recortador-cabecera .ayuda { margin: 0; }
+.recortador-marcos { display: flex; flex-wrap: wrap; gap: 1.25rem 1.5rem; align-items: flex-start; }
+.recorte { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; min-width: 0; }
+.recorte-ancho { flex: 2 1 360px; }
+.recorte-cuadrado { flex: 1 1 250px; max-width: 300px; }
+.recorte figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; font-size: .875rem; }
+.recorte figcaption .ayuda { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recorte-marco {
+  position: relative; container-type: inline-size;
+  aspect-ratio: var(--proporcion);
+  overflow: hidden;
+  border-radius: var(--radio-grande);
+  background: var(--superficie);
+  box-shadow: inset 0 0 0 1px var(--borde-fuerte);
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.recorte-cuadrado .recorte-marco { border-radius: 0; } /* en el celular el banner va de borde a borde */
+.recorte-marco.arrastrando { cursor: grabbing; }
+.recorte-marco:focus-visible { outline: none; box-shadow: var(--foco), inset 0 0 0 1px var(--primario); }
+.recorte-marco img { position: absolute; left: 0; top: 0; display: block; max-width: none; transform-origin: 0 0; pointer-events: none; }
+.recorte-puntos, .recorte-flecha { --u: calc(100cqw / var(--ancho-real)); position: absolute; pointer-events: none; }
+.recorte-puntos {
+  left: 50%; bottom: calc(14.4 * var(--u)); transform: translateX(-50%);
+  display: flex; align-items: center; gap: calc(1.6 * var(--u)); padding: calc(3.2 * var(--u)) calc(6.4 * var(--u));
+  border-radius: 99px; background: rgb(0 0 0 / .28);
+}
+.recorte-puntos i { display: grid; place-items: center; width: calc(24 * var(--u)); height: calc(24 * var(--u)); }
+.recorte-puntos i::after { content: ""; width: calc(6 * var(--u)); height: calc(6 * var(--u)); border-radius: 99px; background: rgb(255 255 255 / .6); }
+.recorte-puntos i.activo::after { width: calc(18 * var(--u)); background: #fff; }
+.recorte-flecha {
+  top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: calc(44 * var(--u)); height: calc(44 * var(--u));
+  border-radius: 50%; background: rgb(255 255 255 / .92); color: #18181b;
+  box-shadow: 0 calc(4 * var(--u)) calc(14 * var(--u)) calc(-4 * var(--u)) rgb(0 0 0 / .3);
+}
+.recorte-flecha .icono { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
+.recorte-flecha-izq { left: calc(16 * var(--u)); }
+.recorte-flecha-der { right: calc(16 * var(--u)); }
+.recorte-controles { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.recorte-controles input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--primario); }
+.recorte-aviso { margin: 0; min-height: 1.25em; font-size: .8125rem; color: var(--texto-tenue); }
+.recorte-aviso[data-nivel="bien"] { color: var(--ok); }
+.recorte-aviso[data-nivel="justo"], .recorte-aviso[data-nivel="mal"] { color: var(--ambar); }
+
 /* ---------- Componentes compartidos ---------- */
 
 .enlace-chico { font-size: .8125rem; font-weight: 500; text-decoration: none; }

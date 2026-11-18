@@ -152,7 +152,14 @@ En el panel, **Diseño**: cada cliente configura cómo se ve su vidriera.
 - **Orden del catálogo** por defecto: nombre, más nuevos o precio. El visitante lo puede cambiar.
 - **Contacto y redes:** WhatsApp (botón flotante), Instagram, Facebook, TikTok, email y dirección.
 - **Banners de bienvenida:** hasta 6 imágenes para el carrusel de la portada, con imagen opcional
-  para celular, link y orden.
+  para celular, link y orden. Al elegir la imagen aparece el **recortador**: un marco con la proporción
+  exacta del banner en la tienda (3:1 en la computadora, cuadrado en el celular, ver `PROPORCION_BANNER`
+  en `src/imagenes.js`) donde se arrastra y se acerca la imagen, con los puntitos y las flechas del carrusel
+  dibujados encima y un aviso si la parte elegida es chica y se va a ver borrosa. El celular usa la misma
+  imagen con su propio recorte, o una aparte si se sube. Lo que se ve en el marco es lo que muestra la tienda:
+  el navegador manda qué parte quedó a la vista (`recorteComputadora` y `recorteCelular`, como
+  `x,y,ancho,alto` entre 0 y 1) y el servidor recorta con sharp antes de achicar. Sin JavaScript la imagen se
+  guarda entera, como siempre.
 
 Las imágenes (JPG, PNG o WEBP, hasta 5 MB) se guardan en `data/subidas/<id de tienda>/`. El tipo se
 reconoce por el contenido del archivo; los SVG no se aceptan porque pueden traer scripts. En
@@ -248,7 +255,7 @@ según la orientación de la cámara (EXIF) y se descartan los metadatos, como l
 | Imagen | Archivos | Medidas |
 |---|---|---|
 | Foto de producto | `<uuid>.webp` · `<uuid>-m.webp` · `<uuid>-s.webp` | 1600 px de ancho (la que se abre al ampliar) · 540 px (grilla y ficha) · 128 px (carrito, buscador, tira de fotos) |
-| Banner | `<uuid>.webp` | 1200 px de ancho (800 px el de celular) |
+| Banner | `<uuid>.webp` | recortado a la proporción de la tienda: hasta 1200 px de ancho (800 px el de celular) |
 | Logo | `<uuid>.webp` | hasta 504 × 112 px: el doble del tamaño más grande que se puede elegir en Diseño (56 px de alto) |
 
 La base de datos sigue guardando un solo nombre (el de la versión grande, `archivo` / `logo` / `imagen`); las miniaturas

@@ -7,7 +7,7 @@
 //   foto    <uuid>.webp      versión grande, de hasta 1600 px de ancho (la que se abre al ampliar)
 //           <uuid>-m.webp    miniatura de 540 px (grillas de productos y portada de la ficha)
 //           <uuid>-s.webp    miniatura de 128 px (carrito, buscador, tira de fotos, listados del panel)
-//   banner  <uuid>.webp      hasta 1200 px de ancho (800 px la versión para celular)
+//   banner  <uuid>.webp      hasta 1200 px de ancho (800 px la versión para celular), ya recortado a la proporción del carrusel
 //   logo    <uuid>.webp      hasta 504 × 112 px: el doble del tamaño más grande que se puede elegir (56 px de alto)
 //
 // La base de datos guarda solo el nombre de la versión grande (<uuid>.webp); las miniaturas se encuentran por nombre
@@ -34,6 +34,24 @@ export const PERFILES = {
   logo: { ancho: 504, alto: 112, calidad: 88, miniaturas: [] },
 };
 
+// Proporción (ancho : alto) de los banners en la vidriera y medida ideal. Es la misma que usa el recortador del panel:
+// lo que se ve en el recorte es lo que se ve en la tienda.
+export const PROPORCION_BANNER = {
+  computadora: { ancho: 3, alto: 1, pixelesIdeales: [1200, 400] },
+  celular: { ancho: 1, alto: 1, pixelesIdeales: [800, 800] },
+};
+
+// El recorte llega como "x,y,ancho,alto", todo entre 0 y 1 y relativo a la imagen ya enderezada (la que se ve en pantalla),
+// así no depende de cuántos píxeles tenga. Devuelve null si falta o no es válido: la imagen se guarda entera.
+export function leerRecorte(valor) {
+  if (typeof valor !== 'string' || !/^[\d.]+(,[\d.]+){3}$/.test(valor.trim())) return null;
+  const [x, y, ancho, alto] = valor.trim().split(',').map(Number);
+  if (![x, y, ancho, alto].every(Number.isFinite)) return null;
+  const margen = 0.001; // el redondeo de los decimales puede pasarse un poco
+  if (ancho <= 0 || alto <= 0 || ancho > 1 + margen || alto > 1 + margen || x + ancho > 1 + margen || y + alto > 1 + margen) return null;
+  return { x, y, ancho: Math.min(ancho, 1 - x), alto: Math.min(alto, 1 - y) };
+}
+
 // El tipo se decide por el contenido, no por el nombre del archivo. No se aceptan SVG: pueden traer scripts.
 export function tipoDeImagen(buffer) {
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
@@ -50,11 +68,26 @@ export function tipoDeImagen(buffer) {
 export const nombreMiniatura = (archivo, sufijo = 'm') => `${path.basename(archivo).replace(/\.[^.]+$/, '')}-${sufijo}.webp`;
 
 // Redimensiona y codifica a WebP. Con `.rotate()` sin argumentos se aplica la orientación EXIF y se quita la etiqueta.
-// Nunca agranda: una foto chica queda como está.
-export async function convertirAWebp(entrada, { ancho, alto, calidad = 78 }) {
+// Nunca agranda: una foto chica queda como está. `recorte` (ver leerRecorte) se aplica antes de achicar, sobre la imagen
+// ya enderezada.
+export async function convertirAWebp(entrada, { ancho, alto, calidad = 78, recorte = null }) {
   try {
-    return await sharp(entrada, { limitInputPixels: MAXIMO_PIXELES, failOn: 'error' })
-      .rotate()
+    const opciones = { limitInputPixels: MAXIMO_PIXELES, failOn: 'error' };
+    let imagen = sharp(entrada, opciones).rotate();
+    if (recorte) {
+      const { width, height, orientation = 1 } = await sharp(entrada, opciones).metadata();
+      // Con la orientación 5 a 8 la cámara guardó la foto de costado: lo que se ve tiene el ancho y el alto cambiados.
+      const [ancho0, alto0] = orientation >= 5 ? [height, width] : [width, height];
+      const izquierda = Math.min(Math.round(recorte.x * ancho0), ancho0 - 1);
+      const arriba = Math.min(Math.round(recorte.y * alto0), alto0 - 1);
+      imagen = imagen.extract({
+        left: izquierda,
+        top: arriba,
+        width: Math.max(1, Math.min(Math.round(recorte.ancho * ancho0), ancho0 - izquierda)),
+        height: Math.max(1, Math.min(Math.round(recorte.alto * alto0), alto0 - arriba)),
+      });
+    }
+    return await imagen
       .resize({ width: ancho, height: alto, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: calidad, alphaQuality: 100, effort: 4 })
       .toBuffer();
@@ -67,16 +100,16 @@ export async function convertirAWebp(entrada, { ancho, alto, calidad = 78 }) {
 // Genera y escribe todas las versiones de `entrada` (un buffer o la ruta de un archivo) en `dir`.
 // El nombre de la versión grande es `nombre`; las miniaturas se derivan de él. Devuelve los archivos escritos.
 // Si algo falla, no queda ninguno.
-export async function escribirVersiones(entrada, dir, nombre, perfil) {
+export async function escribirVersiones(entrada, dir, nombre, perfil, recorte = null) {
   const { miniaturas, ...medidas } = PERFILES[perfil];
   const escritos = [];
   try {
     await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, nombre), await convertirAWebp(entrada, medidas));
+    await writeFile(path.join(dir, nombre), await convertirAWebp(entrada, { ...medidas, recorte }));
     escritos.push(nombre);
     for (const [sufijo, ancho] of miniaturas) {
       const archivo = nombreMiniatura(nombre, sufijo);
-      await writeFile(path.join(dir, archivo), await convertirAWebp(entrada, { ancho, calidad: medidas.calidad - 2 }));
+      await writeFile(path.join(dir, archivo), await convertirAWebp(entrada, { ancho, calidad: medidas.calidad - 2, recorte }));
       escritos.push(archivo);
     }
   } catch (error) {
@@ -87,12 +120,12 @@ export async function escribirVersiones(entrada, dir, nombre, perfil) {
 }
 
 // Guarda la imagen subida y devuelve el nombre del archivo guardado (la versión grande).
-// perfil: 'foto' (por defecto), 'banner', 'bannerMovil' o 'logo'.
-export async function guardarImagen(dirSubidas, tiendaId, buffer, { perfil = 'foto' } = {}) {
+// perfil: 'foto' (por defecto), 'banner', 'bannerMovil' o 'logo'. recorte: ver leerRecorte.
+export async function guardarImagen(dirSubidas, tiendaId, buffer, { perfil = 'foto', recorte = null } = {}) {
   const tipo = tipoDeImagen(buffer);
   if (!tipo) throw new ErrorDeImagen('La imagen tiene que ser JPG, PNG o WEBP.');
   const archivo = `${randomUUID()}.webp`;
-  await escribirVersiones(buffer, path.join(dirSubidas, String(tiendaId)), archivo, perfil);
+  await escribirVersiones(buffer, path.join(dirSubidas, String(tiendaId)), archivo, perfil, recorte);
   return archivo;
 }
 

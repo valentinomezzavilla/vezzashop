@@ -264,27 +264,70 @@
     <% } %>
 
     <% if (banners.length < maxBanners) { %>
+      <%# Con JavaScript, al elegir la imagen aparece el recortador (ver admin.js): se acomoda cada recorte y se ve cómo queda en la
+          tienda. Sin JavaScript el formulario sigue andando: la imagen se guarda entera. %>
+      <% const { computadora, celular } = proporcionBanner %>
       <form method="post" action="/admin/diseno/banners" enctype="multipart/form-data" class="agregar-banner">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <h3>Agregar un banner</h3>
+        <p class="ayuda">En tu tienda el banner se ve <strong>panorámico en la computadora</strong> y <strong>cuadrado en el celular</strong>. Al elegir la imagen vas a poder acomodar cada recorte y ver cómo queda antes de agregarlo.</p>
         <div class="ajuste-campos-dos">
           <div class="campo">
-            <span class="etiqueta">Imagen para computadora</span>
+            <span class="etiqueta">Imagen del banner</span>
             <label class="zona-archivo zona-archivo-chica" data-vista="banner">
               <%- icono('imagen', { tamano: 24 }) %>
               <span class="zona-archivo-texto" data-nombre-archivo>Elegir imagen</span>
               <input class="visualmente-oculto" type="file" name="imagen" accept="image/png,image/jpeg,image/webp" required data-previsualizar="banner">
             </label>
+            <span class="ayuda">Idealmente de <%= computadora.pixelesIdeales[0] %> × <%= computadora.pixelesIdeales[1] %> px. JPG, PNG o WEBP.</span>
           </div>
           <div class="campo">
-            <span class="etiqueta">Imagen para celular <span class="opcional">(opcional)</span></span>
+            <span class="etiqueta">Otra imagen para celular <span class="opcional">(opcional)</span></span>
             <label class="zona-archivo zona-archivo-chica" data-vista="banner-movil">
               <%- icono('imagen', { tamano: 24 }) %>
               <span class="zona-archivo-texto" data-nombre-archivo>Elegir imagen</span>
               <input class="visualmente-oculto" type="file" name="imagenMovil" accept="image/png,image/jpeg,image/webp" data-previsualizar="banner-movil">
             </label>
-            <span class="ayuda">Si no la subís, en el celular se usa la misma.</span>
+            <span class="ayuda">Si no la subís, el celular usa la misma imagen con su propio recorte.</span>
           </div>
+        </div>
+
+        <div class="recortador" data-recortador hidden>
+          <div class="recortador-cabecera">
+            <h4>Así se va a ver en tu tienda</h4>
+            <p class="ayuda" id="ayuda-recorte">Arrastrá la imagen para moverla y usá el zoom para acercarla. Con el teclado, las flechas la mueven y + / − cambian el zoom.
+              Los puntitos de abajo y las flechas de los costados se muestran sobre el banner: evitá poner textos ahí.</p>
+          </div>
+          <div class="recortador-marcos">
+            <% for (const [clave, titulo, p, tipo] of [['computadora', 'En computadora', computadora, 'ancho'], ['celular', 'En celular', celular, 'cuadrado']]) { %>
+              <figure class="recorte recorte-<%= tipo %>" data-recorte="<%= clave %>" data-proporcion="<%= p.ancho %>:<%= p.alto %>" data-ideal="<%= p.pixelesIdeales[0] %>"
+                      style="--proporcion: <%= p.ancho %> / <%= p.alto %>; --ancho-real: <%= clave === 'celular' ? 390 : 1240 %>">
+                <figcaption>
+                  <strong><%= titulo %></strong>
+                  <span class="ayuda" data-origen><%= clave === 'celular' ? 'Con la misma imagen' : '' %></span>
+                </figcaption>
+                <div class="recorte-marco" data-marco tabindex="0" role="group" aria-label="Recorte para <%= clave === 'celular' ? 'celular' : 'computadora' %>" aria-describedby="ayuda-recorte">
+                  <img alt="" draggable="false">
+                  <span class="recorte-puntos" aria-hidden="true"><i class="activo"></i><i></i><i></i></span>
+                  <% if (clave === 'computadora') { %>
+                    <span class="recorte-flecha recorte-flecha-izq" aria-hidden="true"><%- icono('izquierda', { tamano: 18 }) %></span>
+                    <span class="recorte-flecha recorte-flecha-der" aria-hidden="true"><%- icono('derecha', { tamano: 18 }) %></span>
+                  <% } %>
+                </div>
+                <div class="recorte-controles">
+                  <button class="boton-icono" type="button" data-alejar aria-label="Alejar"><%- icono('menos', { tamano: 18 }) %></button>
+                  <input type="range" min="100" max="300" step="1" value="100" data-zoom aria-label="Zoom del recorte para <%= clave === 'celular' ? 'celular' : 'computadora' %>">
+                  <button class="boton-icono" type="button" data-acercar aria-label="Acercar"><%- icono('mas', { tamano: 18 }) %></button>
+                  <button class="boton boton-fantasma boton-chico" type="button" data-centrar>Restablecer</button>
+                </div>
+                <p class="recorte-aviso" data-aviso aria-live="polite"></p>
+                <input type="hidden" name="recorte<%= clave === 'celular' ? 'Celular' : 'Computadora' %>" data-valor>
+              </figure>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="ajuste-campos-dos">
           <div class="campo">
             <label for="enlace">Link <span class="opcional">(opcional)</span></label>
             <input id="enlace" type="text" name="enlace" placeholder="/categoria/ofertas" aria-describedby="ayuda-enlace">
