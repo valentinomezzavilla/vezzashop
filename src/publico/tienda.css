@@ -597,26 +597,47 @@ p { margin: 0; }
 /* ---------- Pie ---------- */
 
 .pie { margin-top: 2rem; background: var(--superficie); border-top: 1px solid var(--borde); color: var(--texto-suave); font-size: .875rem; }
+/* Tres bloques en fila (marca, categorías y contacto) que se acomodan solos y siguen bien si falta alguno. */
 .pie-interior {
   max-width: var(--ancho);
   margin: 0 auto;
-  padding: 3rem var(--margen) 2.25rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 2rem 2.5rem;
+  padding: 1.75rem var(--margen) 1.5rem;
+  display: flex; flex-wrap: wrap;
+  gap: 1.5rem 3rem;
 }
-.pie-columna { display: grid; gap: .6rem; align-content: start; }
-.pie-columna > a { width: fit-content; color: var(--texto-suave); text-decoration: none; transition: color var(--rapido); }
-.pie-columna > a:hover { color: var(--texto); text-decoration: underline; }
-.pie-marca { gap: 1rem; }
+.pie-marca { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .85rem; }
 .pie-marca .marca { color: var(--texto); }
-.pie-titulo { margin-bottom: .2rem; color: var(--texto); font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
-.pie-dato { display: flex; gap: .55rem; align-items: flex-start; }
+.pie-marca .logo { height: min(var(--logo-alto, 40px), 40px); }
+/* min-width: 0 para que un email largo se corte con puntos suspensivos en vez de ensanchar la página. */
+.pie-categorias { flex: 3 1 340px; min-width: 0; }
+.pie-contacto { flex: 1.4 1 220px; min-width: 0; }
+.pie-titulo { margin: 0 0 .65rem; color: var(--texto); font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.pie-dato { display: flex; gap: .5rem; align-items: flex-start; margin: 0; color: var(--texto-suave); }
 .pie-dato .icono { margin-top: .1rem; color: var(--texto-tenue); }
-.redes { display: flex; gap: .5rem; }
+
+/* Categorías y contacto: botones en fila. Diez categorías ocupan dos o tres renglones en vez de una columna larga. */
+.pie-enlaces { display: flex; flex-wrap: wrap; gap: .45rem; }
+.pie-enlaces a {
+  display: inline-flex; align-items: center; gap: .45rem;
+  min-height: 32px; max-width: 100%;
+  padding: 0 .85rem;
+  border-radius: 999px;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  font-size: .8125rem;
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px var(--borde-fuerte);
+  transition: background-color var(--rapido), color var(--rapido), box-shadow var(--rapido);
+}
+.pie-enlaces a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pie-enlaces a .icono { flex-shrink: 0; color: var(--texto-tenue); transition: color var(--rapido); }
+.pie-enlaces a:hover { background: var(--acento); color: var(--acento-texto); box-shadow: inset 0 0 0 1px var(--acento); }
+.pie-enlaces a:hover .icono { color: inherit; }
+
+.redes { display: flex; gap: .45rem; }
 .red {
   display: grid; place-items: center;
-  width: 42px; height: 42px;
+  width: 36px; height: 36px;
   border-radius: 50%;
   color: var(--texto);
   background: var(--fondo);
@@ -624,15 +645,38 @@ p { margin: 0; }
   transition: background-color var(--rapido), color var(--rapido), box-shadow var(--rapido);
 }
 .red:hover { background: var(--acento); color: var(--acento-texto); box-shadow: inset 0 0 0 1px var(--acento); }
-.pie-copyright { width: calc(100% - 2 * var(--margen)); max-width: calc(var(--ancho) - 2 * var(--margen)); margin: 0 auto; padding: 1.25rem 0 calc(1.5rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--borde); font-size: .8125rem; color: var(--texto-tenue); }
+
+/* Franja de abajo: el copyright a la izquierda y la firma de Vezza a la derecha, en una sola línea. */
+.pie-copyright {
+  width: calc(100% - 2 * var(--margen)); max-width: calc(var(--ancho) - 2 * var(--margen));
+  margin: 0 auto;
+  padding: .85rem 0 calc(1rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--borde);
+  font-size: .75rem; color: var(--texto-tenue);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1.5rem;
+}
 
 /* Firma de Vezza: conserva los colores de la marca, sean cuales sean los de la tienda (ver src/util/vezza.js). */
-.pie-copyright { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .9rem 1.5rem; }
 .vezza-firma { --vezza-tinta: #13121a; --vezza-acento: #3b2ee4; display: inline-grid; justify-items: center; gap: .5rem; }
 .vezza-etiqueta { font-size: .6875rem; line-height: 1; letter-spacing: .01em; color: var(--texto-tenue); }
 .vezza-logo { display: block; width: 50px; height: auto; color: var(--vezza-tinta); overflow: visible; }
 polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
 line.vz-a { stroke: var(--vezza-acento); }
+.pie-copyright .vezza-firma { display: inline-flex; align-items: center; gap: .6rem; }
+.pie-copyright .vezza-logo { width: 40px; }
+
+@media (min-width: 720px) {
+  .pie-marca { min-width: 200px; }
+}
+@media (max-width: 719px) {
+  .pie-interior { gap: 1.25rem; }
+  /* En el celular la marca va en una fila: logo a la izquierda y redes a la derecha. */
+  .pie-marca { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; }
+  .pie-marca .pie-dato { flex-basis: 100%; }
+}
+@media (max-width: 479px) {
+  .pie-copyright { flex-direction: column; align-items: flex-start; }
+}
 
 /* Que el botón flotante no tape el texto del final de la página. */
 .pie:has(~ .boton-whatsapp) .pie-copyright { padding-right: 4.5rem; }
