@@ -7,8 +7,8 @@
   <meta name="robots" content="noindex, nofollow">
   <%# Aplica la apariencia elegida antes de pintar, para que no parpadee. %>
   <script>try{var t=localStorage.getItem("tema");if(t==="claro"||t==="oscuro")document.documentElement.dataset.tema=t}catch(e){}</script>
-  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)">
   <title><%= titulo %> · Plataforma</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,18 +22,26 @@
   <%# [sección, texto, ícono] %>
   <% const secciones = [['clientes', 'Clientes', 'tienda'], ['planes', 'Planes', 'etiqueta'], ['cuenta', 'Mi cuenta', 'usuario']] %>
   <div class="app">
-    <aside class="lateral">
+    <header class="barra-superior">
+      <a class="barra-superior-marca" href="/plataforma/clientes">
+        <span class="lateral-logo" aria-hidden="true"><%- icono('candado', { tamano: 16 }) %></span>
+        <span class="barra-superior-nombre">Plataforma</span>
+      </a>
+    </header>
+
+    <aside class="lateral" id="menu-panel" aria-label="Menú de la plataforma">
       <div class="lateral-marca">
         <span class="lateral-logo" aria-hidden="true"><%- icono('candado', { tamano: 18 }) %></span>
         <span class="lateral-textos">
           <span class="lateral-tienda">Plataforma</span>
           <span class="lateral-sub">Administración</span>
         </span>
+        <a class="boton-icono lateral-cerrar" href="#contenido" data-cerrar-menu aria-label="Cerrar el menú"><%- icono('cerrar', { tamano: 18 }) %></a>
       </div>
       <nav class="lateral-menu" aria-label="Secciones">
         <% for (const [seccion, texto, nombreIcono] of secciones) { %>
           <a href="/plataforma/<%= seccion %>" class="menu-<%= seccion %><%= seccion === seccionActual ? ' activo' : '' %>"<%- seccion === seccionActual ? ' aria-current="page"' : '' %>>
-            <%- icono(nombreIcono) %>
+            <%- icono(nombreIcono, { tamano: 18 }) %>
             <span><%= texto %></span>
           </a>
         <% } %>
@@ -46,6 +54,19 @@
         </form>
       </div>
     </aside>
+
+    <nav class="barra-inferior" aria-label="Accesos rápidos">
+      <% for (const [seccion, texto, nombreIcono] of secciones) { %>
+        <a href="/plataforma/<%= seccion %>"<%- seccion === seccionActual ? ' class="activa" aria-current="page"' : '' %>>
+          <span class="barra-inferior-icono"><%- icono(nombreIcono, { tamano: 22 }) %></span>
+          <span><%= texto %></span>
+        </a>
+      <% } %>
+      <a href="#menu-panel" data-abrir-menu aria-controls="menu-panel" aria-label="Más opciones">
+        <span class="barra-inferior-icono"><%- icono('menu', { tamano: 22 }) %></span>
+        <span aria-hidden="true">Más</span>
+      </a>
+    </nav>
     <main class="contenido" id="contenido">
 <% } else { %>
   <%- include('../../parciales/tema', { flotante: true }) %>
