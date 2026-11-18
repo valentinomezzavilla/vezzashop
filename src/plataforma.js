@@ -293,3 +293,29 @@ export async function usoDeCliente(db, tiendaId) {
   return { limites: await limitesDeTienda(db, tiendaId), uso: await usoDeTienda(db, tiendaId) };
 }
 
+// ---------- Planes sugeridos ----------
+
+// Una propuesta para arrancar: sirve como punto de partida y después se edita en /plataforma/planes (los precios son del
+// momento y conviene revisarlos). Un tope en null es "sin límite". Las horas de trabajo y el soporte de cada plan no los
+// aplica el sistema: se cumplen a mano.
+export const PLANES_SUGERIDOS = [
+  { nombre: 'Prueba', precioCentavos: 0, maxProductos: 20, maxFotos: 3, maxBanners: 1 }, // 14 días: se le pone vencimiento al dar de alta
+  { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2 },
+  { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4 },
+  { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null },
+];
+
+// Crea los que no existan (por nombre, sin distinguir mayúsculas) y deja intactos los demás: se puede correr de nuevo sin pisar
+// lo que ya se editó. Devuelve { creados, existentes } con los nombres.
+export async function cargarPlanesSugeridos(db) {
+  const resultado = { creados: [], existentes: [] };
+  for (const plan of PLANES_SUGERIDOS) {
+    if (await db.prepare('SELECT 1 FROM planes WHERE lower(nombre) = lower(?)').get(plan.nombre)) {
+      resultado.existentes.push(plan.nombre);
+      continue;
+    }
+    await crearPlan(db, { ...plan, activo: true });
+    resultado.creados.push(plan.nombre);
+  }
+  return resultado;
+}

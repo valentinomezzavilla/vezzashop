@@ -13,6 +13,7 @@
     "test": "node --test \"test/**/*.test.js\"",
     "crear-tienda": "node scripts/crear-tienda.js",
     "crear-superadmin": "node scripts/crear-superadmin.js",
+    "cargar-planes": "node scripts/cargar-planes.js",
     "migrar-imagenes": "node scripts/migrar-imagenes.js"
   },
   "dependencies": {

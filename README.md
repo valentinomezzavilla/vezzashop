@@ -63,6 +63,7 @@ obligatoria. En tu compu dejala vacía y se usa PGlite. Las migraciones (`src/mi
 | `npm run crear-tienda -- --nombre "Mi Tienda" --email duenio@ejemplo.com` | Da de alta un cliente: crea la tienda y su usuario, y muestra la clave **una sola vez**. |
 | `npm run migrar-imagenes -- --dry-run` | Muestra qué haría para pasar las imágenes subidas antes del formato WebP al formato nuevo (ver [Imágenes](#imágenes)). Sin `--dry-run` las convierte. |
 | `npm run crear-superadmin -- --email vos@ejemplo.com` | Crea **tu** cuenta de administrador de la plataforma (ver [Administración de la plataforma](#administración-de-la-plataforma)). Con `--resetear` genera una clave nueva si la olvidás. |
+| `npm run cargar-planes` | Crea los planes sugeridos si no existen (ver [Administración de la plataforma](#administración-de-la-plataforma)). |
 | `npm run dev` | Levanta el servidor y lo reinicia cuando cambia el código. Panel en http://localhost:3000/admin y cada tienda en http://&lt;slug&gt;.localhost:3000 |
 | `npm start` | Levanta el servidor (para producción). |
 | `npm test` | Corre todos los tests (con PGlite, sin instalar nada). Para probar contra un PostgreSQL de verdad: `PRUEBAS_DATABASE_URL=postgres://usuario:clave@host:5432/base npm test` (cada prueba usa su propio esquema y lo borra al terminar). |
@@ -202,6 +203,8 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
   Un tope vacío es "sin límite". Al llegar a un tope, el cliente no puede cargar más y se le avisa que amplíe su plan;
   editar lo que ya tiene sigue andando, y vale también para la carga masiva por Excel. Las tiendas que ya existían quedaron
   en el plan **Sin límites**, para que nada cambie para ellas. Un plan con clientes no se puede borrar: se desactiva.
+- **Planes sugeridos.** `npm run cargar-planes` crea cuatro planes de arranque (Prueba, Esencial, Acompañado y A medida) si todavía no
+  existen; no toca los que ya hay, así que se puede correr de nuevo. Los precios son un punto de partida: ajustalos en **Planes**.
 - **Cobro manual.** Cobrás por fuera (transferencia, Mercado Pago…). Cada pago que registrás extiende el vencimiento
   desde la fecha en que vence (si todavía no venció) o desde hoy, y queda en un historial. Un cliente figura *al día*,
   *por vencer* (faltan 7 días o menos) o *vencido*, y él lo ve en su Inicio y en Cuenta. **Un vencimiento solo avisa**: no
@@ -365,6 +368,7 @@ src/
   publico/               CSS y scripts del panel (admin.js) y de la vidriera (tienda.js)
 scripts/crear-tienda.js
 scripts/crear-superadmin.js
+scripts/cargar-planes.js
 scripts/migrar-imagenes.js
 test/                    tests (node:test)
 ```
