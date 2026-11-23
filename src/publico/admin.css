@@ -903,6 +903,23 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
 .ingreso input { min-height: 42px; }
 .ingreso .boton-grande { margin-top: .35rem; }
 .ingreso-vezza { display: grid; justify-items: center; margin-bottom: 1rem; }
+.ingreso--ancho { width: min(560px, 100%); }
+
+/* "Cancelar el cobro automático": un desplegable, así no se cancela de un solo clic por error. */
+.cancelar-suscripcion { margin-top: .25rem; }
+.cancelar-suscripcion summary { cursor: pointer; width: fit-content; color: var(--texto-suave); font-size: .875rem; text-decoration: underline; }
+.cancelar-suscripcion form { margin-top: .75rem; }
+
+/* Alta de una cuenta nueva (/suscribirse): resumen del plan, link de la tienda y casilla de términos. */
+.alta-plan { display: grid; gap: .5rem; margin-top: 1rem; padding: 1rem 1.1rem; text-align: left; background: var(--superficie-hover); border: 1px solid var(--borde); border-radius: var(--radio); }
+.alta-plan-precio { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.alta-plan-precio small { font-size: .875rem; font-weight: 500; color: var(--texto-suave); }
+.alta-plan ul { margin: 0; padding-left: 1.1rem; color: var(--texto-suave); font-size: .875rem; }
+.alta-link { display: flex; align-items: center; gap: .25rem; }
+.alta-link input { min-width: 0; flex: 1; }
+.alta-link span { color: var(--texto-suave); font-size: .875rem; white-space: nowrap; }
+.campo label.alta-casilla { display: flex; align-items: flex-start; gap: .6rem; font-size: .875rem; font-weight: 400; text-align: left; }
+.ingreso .alta-casilla input { flex: none; width: 1.1rem; min-height: 0; height: 1.1rem; margin: .1rem 0 0; }
 .ingreso-firma { display: grid; justify-items: center; margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--borde); }
 .ingreso-icono {
   display: grid; place-items: center;

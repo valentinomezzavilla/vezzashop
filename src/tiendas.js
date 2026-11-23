@@ -25,11 +25,15 @@ export async function validarLink(db, texto, { tiendaId = null } = {}) {
 
 // planId y venceEn son opcionales: una tienda sin plan no tiene topes, y sin vencimiento no vence.
 // `slug` también: si no se pasa, el link sale del nombre ("Ufo Ambos" -> ufo-ambos).
-export async function crearTienda(db, { nombre, email, planId = null, venceEn = null, slug: enlace = '' }) {
+// `clave`: la que eligió el dueño; si no se pasa, se genera una y se devuelve para mostrarla una sola vez.
+// `titular`: { nombre, apellido } de quien usa la cuenta (opcional).
+// `tx`: para crearla dentro de una transacción que ya está abierta (por ejemplo, al crear una cuenta ya paga).
+export async function crearTienda(db, { nombre, email, planId = null, venceEn = null, slug: enlace = '', clave: claveElegida = null, titular = null }, { tx = null } = {}) {
+  const lector = tx ?? db;
   const conLinkElegido = String(enlace ?? '').trim() !== '';
   let slug;
   if (conLinkElegido) {
-    const link = await validarLink(db, enlace);
+    const link = await validarLink(lector, enlace);
     if (link.error) throw new Error(link.error);
     slug = link.slug;
   } else {
@@ -42,28 +46,34 @@ export async function crearTienda(db, { nombre, email, planId = null, venceEn = 
     if (SUBDOMINIOS_RESERVADOS.has(slug)) throw new Error(`"${nombre}" no se puede usar como nombre de tienda`);
   }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email ?? '')) throw new Error(`Email inválido: ${email}`);
-  if (await db.prepare('SELECT 1 FROM tiendas WHERE slug = ?').get(slug)) {
+  if (await lector.prepare('SELECT 1 FROM tiendas WHERE slug = ?').get(slug)) {
     throw new Error(`Ya existe una tienda con el nombre "${nombre}"`);
   }
-  if (await db.prepare('SELECT 1 FROM tienda_enlaces_anteriores WHERE slug = ?').get(slug)) {
+  if (await lector.prepare('SELECT 1 FROM tienda_enlaces_anteriores WHERE slug = ?').get(slug)) {
     throw new Error(`El link "${slug}" era de otra tienda y todavía redirige a ella`);
   }
-  if (await db.prepare('SELECT 1 FROM usuarios WHERE lower(email) = lower(?)').get(email)) {
+  if (await lector.prepare('SELECT 1 FROM usuarios WHERE lower(email) = lower(?)').get(email)) {
     throw new Error(`Ya existe un usuario con el email ${email}`);
   }
 
-  if (planId !== null && !(await db.prepare('SELECT 1 FROM planes WHERE id = ?').get(planId))) throw new Error('El plan elegido no existe');
+  if (planId !== null && !(await lector.prepare('SELECT 1 FROM planes WHERE id = ?').get(planId))) throw new Error('El plan elegido no existe');
+  if (claveElegida !== null && String(claveElegida).length < LARGO_MINIMO_CLAVE) {
+    throw new Error(`La clave tiene que tener al menos ${LARGO_MINIMO_CLAVE} caracteres`);
+  }
 
-  const clave = generarClave();
+  const clave = claveElegida ?? generarClave();
   const hash = await hashClave(clave);
-  return enTransaccion(db, async (tx) => {
-    const { rows } = await tx
+  const insertar = async (conexion) => {
+    const { rows } = await conexion
       .prepare('INSERT INTO tiendas (nombre, slug, plan_id, vence_en) VALUES (?, ?, ?, ?) RETURNING id')
       .run(nombre, slug, planId, venceEn);
     const tiendaId = rows[0].id;
-    await tx.prepare('INSERT INTO usuarios (tienda_id, email, hash_clave) VALUES (?, ?, ?)').run(tiendaId, email, hash);
+    await conexion
+      .prepare('INSERT INTO usuarios (tienda_id, email, hash_clave, nombre, apellido) VALUES (?, ?, ?, ?, ?)')
+      .run(tiendaId, email, hash, titular?.nombre || null, titular?.apellido || null);
     return { tienda: { id: tiendaId, nombre, slug }, email, clave };
-  });
+  };
+  return tx ? insertar(tx) : enTransaccion(db, insertar);
 }
 
 const SELECCION_TIENDA = `

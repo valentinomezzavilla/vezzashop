@@ -62,6 +62,9 @@
       <div class="uso-plan-fila"><span>Fotos por producto</span><strong>hasta <%= limites.maxFotos %></strong></div>
       <div class="uso-plan-fila"><span>Banners en la portada</span><strong><%= uso.banners %> de <%= limites.maxBanners %></strong></div>
     </div>
+    <% if (locals.pagosActivos) { %>
+      <div><a class="boton boton-secundario" href="/admin/suscripcion">Pagar o cambiar de plan</a></div>
+    <% } %>
     <p class="ayuda">¿Necesitás más? <%= contactoPlataforma ? `Contactanos: ${contactoPlataforma}.` : 'Contactanos para ampliar tu plan.' %></p>
   </div>
 </section>

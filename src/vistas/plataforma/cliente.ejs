@@ -15,7 +15,7 @@
   <div>
     <a class="volver" href="/plataforma/clientes"><%- icono('izquierda', { tamano: 16 }) %> Clientes</a>
     <h1><%= cliente.nombre %> <span class="pastilla <%= cliente.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= cliente.estado === 'activa' ? 'Activa' : (cliente.cerradaAlVencer ? 'Cerrada: venció' : 'Suspendida') %></span></h1>
-    <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
+    <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %><% if (cliente.titularNombre) { %> · <%= cliente.titularNombre %> <%= cliente.titularApellido %><% } %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
   </div>
   <div class="acciones">
     <a class="boton boton-secundario" href="<%= urlTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver su tienda</a>
@@ -110,10 +110,57 @@
   </div>
 </section>
 
+<% if (suscripcion) { %>
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Suscripción</h2>
+    <p class="texto-suave">El débito automático con Mercado Pago. Cada cobro aprobado suma un mes pagado solo.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% const { activa, pendiente, cancelada } = suscripcion %>
+    <dl class="datos-pedido">
+      <div>
+        <dt>Estado</dt>
+        <dd>
+          <% if (activa) { %><span class="pastilla pastilla-ok"><%= activa.estado === 'pausada' ? 'Pausada' : 'Activa' %></span> <%= activa.planNombre %> · <%= formatearPrecio(activa.montoCentavos) %> por mes
+          <% } else if (cancelada) { %><span class="pastilla">Cancelada</span> <%= cancelada.planNombre %>
+          <% } else { %>Sin suscripción automática<% } %>
+        </dd>
+      </div>
+      <% if (activa && activa.proximoCobro) { %><div><dt>Próximo cobro</dt><dd><%= formatearDia(activa.proximoCobro) %></dd></div><% } %>
+      <% if (activa && activa.mpId) { %><div><dt>Id en Mercado Pago</dt><dd><code><%= activa.mpId %></code></dd></div><% } %>
+      <% if (pendiente) { %><div><dt>Pago sin terminar</dt><dd>Plan <%= pendiente.planNombre %> · empezado el <%= formatearFecha(pendiente.creadaEn).split(',')[0] %></dd></div><% } %>
+    </dl>
+    <div class="acciones">
+      <% if (activa || pendiente) { %>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suscripcion/sincronizar">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-secundario" type="submit">Sincronizar con Mercado Pago</button>
+        </form>
+      <% } %>
+      <form method="post" action="/plataforma/clientes/<%= cliente.id %>/bienvenida">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="boton boton-secundario" type="submit">Reenviar mail de bienvenida</button>
+      </form>
+    </div>
+    <% if (activa) { %>
+      <details class="cancelar-suscripcion">
+        <summary>Cancelar el cobro automático</summary>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suscripcion/cancelar" class="formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <p class="ayuda">Da de baja la suscripción en Mercado Pago: no se cobran más meses. La tienda sigue abierta hasta el vencimiento ya pago.</p>
+          <div><button class="boton boton-secundario" type="submit" data-confirmar>Sí, cancelar la suscripción</button></div>
+        </form>
+      </details>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
 <section class="ajuste">
   <div class="ajuste-intro">
     <h2>Cobro</h2>
-    <p class="texto-suave">Cobrás por fuera; acá registrás hasta cuándo tiene pago. Un cliente vencido no se suspende solo: lo decidís vos.</p>
+    <p class="texto-suave"><%= suscripcion && suscripcion.activa ? 'Paga con débito automático: cada cobro aprobado suma un mes solo. Igual podés registrar un pago a mano o mover la fecha.' : 'Cobrás por fuera; acá registrás hasta cuándo tiene pago.' %> Un cliente vencido no se suspende solo: lo decidís vos.</p>
   </div>
   <div class="tarjeta ajuste-campos">
     <p><span class="pastilla <%= claseCobro %>"><%= textoCobro %></span></p>

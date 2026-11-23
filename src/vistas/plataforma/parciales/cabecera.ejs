@@ -21,7 +21,7 @@
 <a class="saltar" href="#contenido">Ir al contenido</a>
 <% if (superadmin) { %>
   <%# [sección, texto, ícono] %>
-  <% const secciones = [['clientes', 'Clientes', 'tienda'], ['planes', 'Planes', 'etiqueta'], ['cuenta', 'Mi cuenta', 'usuario']] %>
+  <% const secciones = [['clientes', 'Clientes', 'tienda'], ...(locals.pagosActivos ? [['altas', 'Altas', 'recibo']] : []), ['planes', 'Planes', 'etiqueta'], ['cuenta', 'Mi cuenta', 'usuario']] %>
   <div class="app">
     <header class="barra-superior">
       <a class="barra-superior-marca" href="/plataforma/clientes">

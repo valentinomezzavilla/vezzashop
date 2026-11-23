@@ -399,7 +399,7 @@
         </ul>
         <div class="nav__actions">
           <a class="nav__login" href="/admin">Ingresar a mi panel</a>
-          <a class="btn btn--primary" href="#contacto" data-cta="Hola, quiero probar VEZZA Shop 7 días gratis.">Probar gratis</a>
+          <a class="btn btn--primary" href="<%= pruebaHref || '#contacto' %>"<% if (!pruebaHref) { %> data-cta="Hola, quiero probar VEZZA Shop 7 días gratis."<% } %>>Probar gratis</a>
         </div>
       </nav>
     </div>
@@ -415,7 +415,7 @@
           <h1 id="hero-title">Tu tienda online, <em>sin vueltas.</em></h1>
           <p class="lead">VEZZA Shop te da una tienda lista para vender en tu propio link: catálogo, carrito, checkout y un panel para manejar tus pedidos, productos y diseño. Sin programar y sin comisión por venta.</p>
           <div class="hero__cta">
-            <a class="btn btn--primary btn--lg" href="#contacto" data-cta="Hola, quiero probar VEZZA Shop 7 días gratis.">Probá 7 días gratis <span class="arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn--primary btn--lg" href="<%= pruebaHref || '#contacto' %>"<% if (!pruebaHref) { %> data-cta="Hola, quiero probar VEZZA Shop 7 días gratis."<% } %>>Probá 7 días gratis <span class="arrow" aria-hidden="true">→</span></a>
             <a class="btn btn--ghost btn--lg" href="#capturas">Ver el sistema por dentro</a>
           </div>
           <ul class="hero__checks">
@@ -771,7 +771,7 @@
               <li><span class="check" aria-hidden="true"></span><%= item %></li>
               <% } %>
             </ul>
-            <a class="btn <%= plan.destacado ? 'btn--primary' : 'btn--ghost' %> btn--block" href="#contacto" data-cta="<%= plan.boton.mensaje %>"><%= plan.boton.texto %></a>
+            <a class="btn <%= plan.destacado ? 'btn--primary' : 'btn--ghost' %> btn--block" href="<%= plan.href || '#contacto' %>"<% if (!plan.href) { %> data-cta="<%= plan.boton.mensaje %>"<% } %>><%= plan.boton.texto %></a>
           </article>
           <% } %>
         </div>

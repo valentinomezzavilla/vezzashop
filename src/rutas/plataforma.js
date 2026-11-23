@@ -7,6 +7,9 @@ import { dominioDeTiendas, urlPanel, urlTienda } from '../util/dominios.js';
 import { formatearFecha, plural } from '../util/formato.js';
 import { formatearDia, hoy, sumarMeses } from '../util/fechas.js';
 import { precioParaEditar } from '../productos.js';
+import { precioDe } from '../landing.js';
+import { armarAvisoCuentaCreada } from '../notificaciones.js';
+import { cancelarSuscripcionDeTienda, estadoDeSuscripcion, leerSuscripcion, listarAltasSinCuenta, reenviarEnlaceDeAlta, sincronizarSuscripcion } from '../suscripciones.js';
 import {
   autenticarSuperadmin,
   cambiarClaveSuperadmin,
@@ -42,7 +45,8 @@ const id = (valor) => (/^\d+$/.test(String(valor)) ? Number(valor) : null);
 const regenerarSesion = (req) =>
   new Promise((resolver, rechazar) => req.session.regenerate((error) => (error ? rechazar(error) : resolver())));
 
-export function rutasPlataforma({ db, config }) {
+// servicios: las suscripciones con Mercado Pago y los mails por n8n (ver suscripciones.js); null si no están configuradas.
+export function rutasPlataforma({ db, config, servicios = null }) {
   const router = express.Router();
   // Frena a quien prueba claves: por IP y por email, en una ventana de 15 minutos. Solo cuentan los intentos fallidos.
   const intentos = crearLimite({ maximo: 8, ventanaMs: 15 * 60 * 1000 });
@@ -51,6 +55,7 @@ export function rutasPlataforma({ db, config }) {
   router.use((req, res, next) => {
     res.locals.csrf = tokenCsrf(req);
     res.locals.superadmin = req.session.superadmin ?? null;
+    res.locals.pagosActivos = Boolean(servicios);
     res.locals.aviso = req.session.aviso ?? null;
     delete req.session.aviso;
     // "/clientes/3" -> "clientes", para marcar la sección en el menú.
@@ -160,6 +165,7 @@ export function rutasPlataforma({ db, config }) {
       // El link se arma como "https://" + slug + ".dominio" (con el puerto en local): las dos puntas para mostrarlas alrededor del campo.
       partesLink: urlTienda(req, dominioDeTiendas(config), '\0').split('\0'),
       enlacesAnteriores: await listarEnlacesAnteriores(db, cliente.id),
+      suscripcion: servicios ? await estadoDeSuscripcion(db, cliente.id) : null,
       sugerido: sumarMeses(cliente.venceEn && cliente.venceEn >= hoy() ? cliente.venceEn : hoy(), 1),
       errores,
       valores,
@@ -247,6 +253,102 @@ export function rutasPlataforma({ db, config }) {
     await guardarNotas(db, req.cliente.id, req.body.notas);
     avisar(req, 'ok', 'Guardamos las notas.');
     volverAlCliente(req, res);
+  });
+
+  // ---------- Suscripciones (Mercado Pago) ----------
+
+  // Estas pantallas y botones solo existen con los pagos configurados.
+  const conPagos = (req, res, next) => {
+    if (servicios) return next();
+    avisar(req, 'error', 'Los pagos en línea no están configurados (falta MP_ACCESS_TOKEN).');
+    res.redirect('/plataforma/clientes');
+  };
+  const urlBase = (req) => urlPanel(req, config.dominio);
+
+  // Pone al día con Mercado Pago las suscripciones del cliente (la activa y la que quedó a medias).
+  router.post('/clientes/:clienteId/suscripcion/sincronizar', cargarCliente, conPagos, verificarCsrf, async (req, res) => {
+    const { activa, pendiente } = await estadoDeSuscripcion(db, req.cliente.id);
+    const mpIds = [activa?.mpId, pendiente?.mpId].filter(Boolean);
+    if (mpIds.length === 0) avisar(req, 'error', 'Este cliente no tiene una suscripción para sincronizar.');
+    else {
+      try {
+        for (const mpId of mpIds) await sincronizarSuscripcion(servicios, mpId, { urlBase: urlBase(req) });
+        avisar(req, 'ok', 'Sincronizamos la suscripción con Mercado Pago.');
+      } catch (error) {
+        console.error('No se pudo sincronizar con Mercado Pago:', error);
+        avisar(req, 'error', 'Mercado Pago no respondió. Probá de nuevo en un rato.');
+      }
+    }
+    volverAlCliente(req, res);
+  });
+
+  router.post('/clientes/:clienteId/suscripcion/cancelar', cargarCliente, conPagos, verificarCsrf, async (req, res) => {
+    try {
+      const resultado = await cancelarSuscripcionDeTienda(servicios, req.cliente.id);
+      if (resultado.error) avisar(req, 'error', resultado.error);
+      else avisar(req, 'ok', 'Cancelamos el cobro automático. La tienda sigue abierta hasta el vencimiento ya pago.');
+    } catch (error) {
+      console.error('No se pudo cancelar la suscripción en Mercado Pago:', error);
+      avisar(req, 'error', 'Mercado Pago no respondió: la suscripción sigue activa. Probá de nuevo en un rato.');
+    }
+    volverAlCliente(req, res);
+  });
+
+  // Vuelve a mandar el mail de "tu cuenta está lista" (por n8n).
+  router.post('/clientes/:clienteId/bienvenida', cargarCliente, conPagos, verificarCsrf, async (req, res) => {
+    const c = req.cliente;
+    if (!c.email) {
+      avisar(req, 'error', 'Este cliente no tiene usuario.');
+      return volverAlCliente(req, res);
+    }
+    const { precio, unidad } = precioDe({ precioCentavos: c.precioCentavos ?? 0, diasPrueba: c.diasPrueba });
+    const enviado = await servicios.avisar(
+      'cuenta_creada',
+      armarAvisoCuentaCreada({
+        email: c.email,
+        nombre: c.titularNombre ?? '',
+        apellido: c.titularApellido ?? '',
+        tiendaNombre: c.nombre,
+        tiendaUrl: urlTienda(req, dominioDeTiendas(config), c.slug),
+        planNombre: c.planNombre ?? 'Sin plan',
+        precio: `${precio} ${unidad}`.trim(),
+        urlPanel: `${urlBase(req)}/admin`,
+      }),
+    );
+    if (enviado) avisar(req, 'ok', `Le mandamos el mail de bienvenida a ${c.email}.`);
+    else avisar(req, 'error', 'No se pudo mandar el mail. Revisá que N8N_WEBHOOK_URL esté configurada y que el flujo de n8n esté activo.');
+    volverAlCliente(req, res);
+  });
+
+  // Altas sin cuenta: pagaron (o empezaron la prueba) y no completaron el formulario.
+  router.get('/altas', conPagos, async (req, res) => res.render('plataforma/altas', { altas: await listarAltasSinCuenta(db) }));
+
+  const cargarAlta = async (req, res, next) => {
+    const altaId = id(req.params.altaId);
+    req.alta = altaId === null ? null : await leerSuscripcion(db, altaId);
+    next(req.alta ? undefined : 'route');
+  };
+
+  router.post('/altas/:altaId/sincronizar', conPagos, cargarAlta, verificarCsrf, async (req, res) => {
+    if (!req.alta.mpId) avisar(req, 'error', 'Esta alta es una prueba gratis: no pasa por Mercado Pago.');
+    else {
+      try {
+        await sincronizarSuscripcion(servicios, req.alta.mpId, { urlBase: urlBase(req) });
+        avisar(req, 'ok', 'Sincronizamos el pago con Mercado Pago.');
+      } catch (error) {
+        console.error('No se pudo sincronizar con Mercado Pago:', error);
+        avisar(req, 'error', 'Mercado Pago no respondió. Probá de nuevo en un rato.');
+      }
+    }
+    res.redirect('/plataforma/altas');
+  });
+
+  router.post('/altas/:altaId/reenviar', conPagos, cargarAlta, verificarCsrf, async (req, res) => {
+    const resultado = await reenviarEnlaceDeAlta(servicios, req.alta.id, urlBase(req));
+    if (resultado.error) avisar(req, 'error', resultado.error);
+    else if (resultado.enviado) avisar(req, 'ok', `Le mandamos a ${req.alta.emailPagador} el link para crear su cuenta (vale 14 días desde ahora).`);
+    else avisar(req, 'error', 'No se pudo mandar el mail. Revisá que N8N_WEBHOOK_URL esté configurada y que el flujo de n8n esté activo.');
+    res.redirect('/plataforma/altas');
   });
 
   // ---------- Planes ----------

@@ -5,6 +5,7 @@ import { autenticar, buscarTienda } from '../tiendas.js';
 import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
 import { rutasAdminPedidos } from './admin-pedidos.js';
+import { rutasAdminSuscripcion } from './admin-suscripcion.js';
 import { contarPedidosNuevos } from '../pedidos.js';
 import { tokenCsrf, verificarCsrf } from '../csrf.js';
 import { plural } from '../util/formato.js';
@@ -64,7 +65,8 @@ const MEGAS_IMAGEN = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
 const regenerarSesion = (req) =>
   new Promise((resolver, rechazar) => req.session.regenerate((error) => (error ? rechazar(error) : resolver())));
 
-export function rutasAdmin({ db, config }) {
+// servicios: las suscripciones con Mercado Pago (ver suscripciones.js); null si no están configuradas.
+export function rutasAdmin({ db, config, servicios = null }) {
   const router = express.Router();
   // permitirLinksLocales solo lo activan los tests (el servidor de fotos de prueba está en 127.0.0.1).
   const descargar = crearDescargador({ permitirDireccion: config.permitirLinksLocales ? () => true : esDireccionPublica });
@@ -122,6 +124,7 @@ export function rutasAdmin({ db, config }) {
     res.locals.suspendida = tienda?.estado === 'suspendida';
     res.locals.motivoSuspension = tienda?.motivoSuspension ?? '';
     res.locals.contactoPlataforma = config.contactoPlataforma;
+    res.locals.pagosActivos = Boolean(servicios);
     // Para el número al lado de "Pedidos" en el menú.
     res.locals.pedidosNuevos = tienda ? await contarPedidosNuevos(db, tienda.id) : 0;
     // Para marcar en el menú la sección en la que se está: "/productos" -> "productos", "/importar/x" -> "importar".
@@ -162,7 +165,8 @@ export function rutasAdmin({ db, config }) {
   // Tienda suspendida: solo lectura. Se puede navegar y salir, pero cualquier cambio vuelve con un aviso.
   router.use((req, res, next) => {
     const soloLee = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-    if (!res.locals.suspendida || soloLee || req.path === '/salir') return next();
+    // Pagar o cancelar la suscripción también se puede con la tienda suspendida: es justo lo que la reabre cuando el motivo es el pago.
+    if (!res.locals.suspendida || soloLee || req.path === '/salir' || req.path.startsWith('/suscripcion/')) return next();
     const contacto = config.contactoPlataforma ? ` Contactanos para reactivarla: ${config.contactoPlataforma}.` : ' Contactanos para reactivarla.';
     req.session.aviso = { tipo: 'error', texto: `Tu tienda está suspendida: por ahora podés ver tus datos, pero no cambiarlos.${contacto}` };
     res.redirect('/admin/inicio');
@@ -171,6 +175,7 @@ export function rutasAdmin({ db, config }) {
   router.get('/', (req, res) => res.redirect('/admin/inicio'));
   router.use(rutasAdminTienda({ db, config }));
   router.use(rutasAdminPedidos({ db, config }));
+  router.use(rutasAdminSuscripcion({ db, config, servicios }));
 
   router.get('/importar', (req, res) => res.render('admin/importar', { error: null }));
 

@@ -7,12 +7,16 @@ import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
 import { rutasTienda } from './rutas/tienda.js';
 import { rutasPlataforma } from './rutas/plataforma.js';
+import { rutasWebhooks } from './rutas/webhooks.js';
+import { rutasSuscribirse } from './rutas/suscribirse.js';
 import { buscarTiendaPorSlug, enlaceActualDeAnterior } from './tiendas.js';
 import { formatearPrecio } from './util/formato.js';
 import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { vezza } from './util/vezza.js';
 import { datosLanding } from './landing.js';
+import { crearClienteMp } from './mercadopago.js';
+import { crearNotificador } from './notificaciones.js';
 import { dominioDeTiendas, slugDeHost, urlPanel, urlTienda } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
@@ -97,6 +101,14 @@ export function crearApp({ db, config }) {
     vidriera(req, res, next);
   });
 
+  // Suscripciones a los planes (Mercado Pago): sin MP_ACCESS_TOKEN quedan apagadas y la landing sigue mandando por WhatsApp.
+  // Un servicio es lo que necesita src/suscripciones.js: la base, Mercado Pago, el aviso a n8n y el secreto que firma los links.
+  const servicios = config.mercadopago
+    ? { db, mp: crearClienteMp(config.mercadopago), avisar: crearNotificador(config.n8n), secreto: config.secretoSesion }
+    : null;
+  // Los avisos de Mercado Pago no son de ninguna tienda ni de ninguna sesión: van antes de todo eso.
+  app.use('/webhooks', rutasWebhooks({ servicios, config }));
+
   // Más campos que los 1000 de fábrica: al borrar varios productos, cada uno marcado es un campo "ids".
   app.use(express.urlencoded({ extended: false, parameterLimit: 10_000, limit: '200kb' }));
 
@@ -116,12 +128,15 @@ export function crearApp({ db, config }) {
     });
 
   // Tiendas: 8 horas desde que ingresan.
-  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config }));
+  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config, servicios }));
+  // Alta de cuentas nuevas desde la landing. Usa la misma sesión que /admin: al completar el formulario, el cliente queda adentro del panel.
+  if (servicios) app.use('/suscribirse', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasSuscribirse({ servicios, config }));
+  else app.use('/suscribirse', (req, res) => res.redirect('/'));
   // Plataforma: 15 días, y cada uso los renueva: mientras se use, no hay que volver a ingresar.
-  app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config }));
+  app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config, servicios }));
   // El dominio principal muestra la página de presentación de la plataforma (vistas/landing.ejs, con los planes de la base); el panel
   // sigue en /admin. Sin sesión ni cookies.
-  app.get('/', async (req, res) => res.render('landing', await datosLanding(db)));
+  app.get('/', async (req, res) => res.render('landing', await datosLanding(db, { pagos: Boolean(servicios) })));
 
   app.use((req, res) => {
     res.status(404).render('error', { titulo: 'No encontrado', mensaje: 'Esta página no existe.' });

@@ -75,6 +75,14 @@ export async function leerPlan(db, id) {
   return (await db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes WHERE id = ?`).get(id)) ?? null;
 }
 
+// Se ofrecen a clientes los planes activos con precio o con período de prueba. Un plan gratis y sin prueba (como "Sin límites",
+// el que la migración 007 les puso a las tiendas que ya existían) es interno y no sale.
+export const seOfrece = (plan) => Boolean(plan.activo) && (plan.precioCentavos > 0 || plan.diasPrueba > 0);
+
+// Los que alguien puede contratar solo, sin hablar con nosotros: los que se ofrecen y tienen tope de productos. Un plan sin
+// tope ("A medida") se consulta: se arma a medida de cada negocio.
+export const esAutoservicio = (plan) => seOfrece(plan) && plan.maxProductos !== null;
+
 // Un tope vacío es "sin límite" (null); si se escribe, tiene que ser un entero dentro del rango.
 function tope(valor, minimo, maximo, nombre, errores, campo) {
   const limpio = texto(valor);
@@ -174,6 +182,8 @@ const SELECCION_CLIENTE = `
          t.creada_en AS "creadaEn", t.plan_id AS "planId", p.nombre AS "planNombre", p.precio_centavos AS "precioCentavos",
          p.max_productos AS "maxProductos", p.dias_prueba AS "diasPrueba", (p.suspender_al_vencer = 1) AS "suspenderAlVencer",
          (SELECT u.email FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS email,
+         (SELECT u.nombre FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS "titularNombre",
+         (SELECT u.apellido FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS "titularApellido",
          (SELECT count(*) FROM productos x WHERE x.tienda_id = t.id) AS productos,
          (SELECT count(*) FROM pedidos o WHERE o.tienda_id = t.id) AS pedidos
   FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id`;
@@ -293,16 +303,21 @@ export async function registrarPago(db, tiendaId, { meses, monto, nota }, dia = 
     if (!(error instanceof ErrorDeValor)) throw error;
     return { error: 'Escribí el monto en pesos, por ejemplo 15000 o 15.000,50 (o dejalo vacío)' };
   }
-  return enTransaccion(db, async (tx) => {
-    const { venceEn } = (await tx.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId)) ?? {};
-    const desde = venceEn && venceEn >= dia ? venceEn : dia;
-    const venceDespues = sumarMeses(desde, cantidad);
-    await tx.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceDespues, tiendaId);
-    await tx
-      .prepare('INSERT INTO pagos_plataforma (tienda_id, monto_centavos, meses, vencia_antes, vence_despues, nota) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(tiendaId, montoCentavos, cantidad, venceEn ?? null, venceDespues, texto(nota).slice(0, 200));
-    return { venceDespues };
-  });
+  return enTransaccion(db, (tx) => aplicarPago(tx, tiendaId, { meses: cantidad, montoCentavos, nota }, dia));
+}
+
+// Suma `meses` pagados a una tienda y deja el cobro anotado. Va dentro de una transacción (tx) para que el que la llama pueda
+// juntarlo con otros cambios: lo usan el cobro a mano (registrarPago) y los cobros automáticos de las suscripciones.
+// Devuelve { venceDespues }.
+export async function aplicarPago(tx, tiendaId, { meses, montoCentavos, nota }, dia = hoy()) {
+  const { venceEn } = (await tx.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId)) ?? {};
+  const desde = venceEn && venceEn >= dia ? venceEn : dia;
+  const venceDespues = sumarMeses(desde, meses);
+  await tx.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceDespues, tiendaId);
+  await tx
+    .prepare('INSERT INTO pagos_plataforma (tienda_id, monto_centavos, meses, vencia_antes, vence_despues, nota) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(tiendaId, montoCentavos, meses, venceEn ?? null, venceDespues, texto(nota).slice(0, 200));
+  return { venceDespues };
 }
 
 export function listarPagos(db, tiendaId) {

@@ -1,0 +1,80 @@
+<%- include('parciales/cabecera', { titulo: 'Creá tu cuenta' }) %>
+<%
+  const error = (campo) => include('parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<section class="ingreso ingreso--ancho">
+  <div class="ingreso-icono" aria-hidden="true"><%- icono('tienda', { tamano: 24 }) %></div>
+  <% if (prueba) { %>
+    <p><span class="pastilla pastilla-ok">Prueba gratis · <%= plan.unidad %></span></p>
+  <% } else { %>
+    <p><span class="pastilla pastilla-ok">Pago confirmado · Plan <%= plan.nombre %></span></p>
+  <% } %>
+  <h1>Creá tu cuenta</h1>
+  <p class="texto-suave">Completá tus datos: con ellos ingresás a tu panel para cargar tus productos y armar tu tienda.</p>
+
+  <% if (errores.general) { %>
+    <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= errores.general %></span></p>
+  <% } %>
+
+  <form method="post" action="/suscribirse/cuenta" class="formulario">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="t" value="<%= token %>">
+
+    <div class="ajuste-campos-dos">
+      <div class="campo">
+        <label for="nombre">Nombre</label>
+        <input id="nombre" type="text" name="nombre" value="<%= valores.nombre ?? '' %>" maxlength="60" autocomplete="given-name" required autofocus<%- invalido('nombre') %>>
+        <%- error('nombre') %>
+      </div>
+      <div class="campo">
+        <label for="apellido">Apellido</label>
+        <input id="apellido" type="text" name="apellido" value="<%= valores.apellido ?? '' %>" maxlength="60" autocomplete="family-name" required<%- invalido('apellido') %>>
+        <%- error('apellido') %>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="email">Email</label>
+      <input id="email" type="email" name="email" value="<%= valores.email ?? '' %>" autocomplete="username" required<%- invalido('email') %>>
+      <span class="ayuda">Con este email ingresás al panel, y ahí te mandamos el aviso de que tu cuenta está lista.</span>
+      <%- error('email') %>
+    </div>
+
+    <div class="ajuste-campos-dos">
+      <div class="campo">
+        <label for="clave">Clave</label>
+        <input id="clave" type="password" name="clave" autocomplete="new-password" minlength="<%= largoMinimoClave %>" required
+               aria-describedby="ayuda-clave<%= errores.clave ? ' error-clave' : '' %>"<%- errores.clave ? ' aria-invalid="true"' : '' %>>
+        <span class="ayuda" id="ayuda-clave">Al menos <%= largoMinimoClave %> caracteres.</span>
+        <%- error('clave') %>
+      </div>
+      <div class="campo">
+        <label for="claveRepetida">Repetí la clave</label>
+        <input id="claveRepetida" type="password" name="claveRepetida" autocomplete="new-password" required<%- invalido('claveRepetida') %>>
+        <%- error('claveRepetida') %>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="nombreTienda">Nombre de tu tienda</label>
+      <input id="nombreTienda" type="text" name="nombreTienda" value="<%= valores.nombreTienda ?? '' %>" maxlength="80" required<%- invalido('nombreTienda') %>>
+      <%- error('nombreTienda') %>
+    </div>
+
+    <div class="campo">
+      <label for="slug">Link de tu tienda <span class="texto-suave">(opcional)</span></label>
+      <div class="alta-link">
+        <span><%= partesLink[0] %></span>
+        <input id="slug" type="text" name="slug" value="<%= valores.slug ?? '' %>" maxlength="63" autocomplete="off" autocapitalize="none" spellcheck="false"
+               aria-describedby="ayuda-slug<%= errores.slug ? ' error-slug' : '' %>"<%- errores.slug ? ' aria-invalid="true"' : '' %>>
+        <span><%= partesLink[1] %></span>
+      </div>
+      <span class="ayuda" id="ayuda-slug">Si lo dejás vacío, lo armamos con el nombre de tu tienda.</span>
+      <%- error('slug') %>
+    </div>
+
+    <button class="boton boton-bloque boton-grande" type="submit">Crear mi cuenta</button>
+  </form>
+</section>
+<%- include('parciales/pie') %>

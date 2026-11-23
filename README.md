@@ -281,6 +281,82 @@ así que ingresar o salir de una tienda, aunque sea en el mismo navegador, no ci
 La de la plataforma dura 15 días y se renueva cada vez que se usa; la de una tienda, 8 horas desde que ingresa. Para que no
 se cierre al reiniciar o redesplegar, `SECRETO_SESION` tiene que ser siempre el mismo.
 
+## Suscripciones a los planes (Mercado Pago)
+
+Cualquiera puede contratar un plan desde la landing y pagar con **débito automático mensual de Mercado Pago**; la cuenta se crea
+**después de pagar** y un flujo de **n8n** le manda el mail de bienvenida. Es la cuenta de Mercado Pago **de la plataforma** (la tuya),
+aparte de la que usa cada tienda para cobrarle a sus compradores. **Sin `MP_ACCESS_TOKEN` todo esto queda apagado**: la landing sigue
+mandando por WhatsApp, `/suscribirse` vuelve a la portada y nada más cambia.
+
+**El recorrido de un visitante nuevo**
+
+1. En la landing elige un plan y llega a `/suscribirse?plan=<id>`: ve el plan y escribe su email (Mercado Pago lo pide para crear la suscripción).
+2. Lo mandamos a Mercado Pago, donde carga su tarjeta y autoriza el débito.
+3. Al volver (`/suscribirse/volver`) confirmamos el pago en el momento, sin esperar al webhook, y se abre el **formulario de la cuenta**:
+   nombre, apellido, email, clave y nombre de la tienda (el link es opcional: sale del nombre). Ese formulario **solo se abre con el pago
+   autorizado**: el link lleva un token firmado con `SECRETO_SESION`, de un solo uso y que vale 14 días.
+4. Al enviarlo se crea la tienda y su usuario, queda con la sesión iniciada en `/admin` y **n8n le manda el mail** con el link a su panel.
+   Si paga y cierra la pestaña antes de completar el formulario, otro mail de n8n le manda el link para crear la cuenta.
+5. El plan **Prueba** (gratis) hace el mismo recorrido sin Mercado Pago: va directo al formulario y la tienda queda abierta los días de prueba.
+
+**Cobros.** Cada cobro mensual aprobado por Mercado Pago **suma un mes pagado** (`vence_en`, igual que registrar un pago a mano) y queda en
+el historial con la nota *Mercado Pago · cobro N*. Si el cobro llega antes de que el cliente cree su cuenta, queda guardado y se aplica al
+crearla. Al crear la cuenta antes del primer cobro, la tienda queda abierta 2 días hasta que llegue. Cancelar el débito **no cierra la
+tienda**: sigue abierta hasta el vencimiento ya pago, y después rige lo que diga el plan (*Cerrar la tienda sola al vencer*). El monto de
+cada suscripción es el **precio del plan al momento de contratar**: si después cambiás el precio del plan, los que ya están suscriptos
+siguen con el anterior.
+
+**Los clientes que ya existen** contratan, cambian de plan o cancelan en **Cuenta → Pagar o cambiar de plan** (`/admin/suscripcion`).
+Al cambiar de plan se crea una suscripción nueva al precio nuevo y, cuando se autoriza, se da de baja la anterior (sin prorrateo). Una
+tienda suspendida puede pagar aunque el resto del panel esté en solo lectura. Los planes sin tope de productos (*A medida*) y los que no
+se ofrecen no se contratan solos: se consultan por WhatsApp.
+
+**En `/plataforma`.** **Altas** lista a quienes pagaron y todavía no crearon su cuenta (con *Sincronizar* con Mercado Pago y *Reenviar
+link por mail*). En la ficha de cada cliente aparece **Suscripción** (estado, próximo cobro, *Sincronizar*, *Cancelar el cobro automático*
+y *Reenviar mail de bienvenida*) y el titular de la cuenta.
+
+### Configurar Mercado Pago
+
+1. En [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/panel/app) creá una aplicación con tu cuenta (la que va a cobrar).
+2. En **Webhooks → Configurar notificaciones** cargá `https://<tu dominio>/webhooks/mercadopago` (una URL para pruebas y otra para producción),
+   con los eventos **Planes y suscripciones** (`subscription_preapproval` y `subscription_authorized_payment`). Al guardar te da una
+   **clave secreta**.
+3. Cargá en el `.env` (en Coolify, como variables de entorno):
+
+```
+MP_ACCESS_TOKEN=APP_USR-...      # Credenciales → Access Token (de prueba primero, de producción después)
+MP_WEBHOOK_SECRET=...            # la clave secreta del paso 2
+URL_TERMINOS=https://...         # opcional: si la ponés, el alta pide aceptar los términos y condiciones
+```
+
+4. **Probalo con credenciales de prueba antes de salir a producción**: creá usuarios de prueba (vendedor y comprador) en *Cuentas de prueba*,
+   y recorré: elegir plan → pagar → formulario de la cuenta → panel → cancelar. Los tests automáticos usan un Mercado Pago de mentira, así que
+   lo que **no** está probado contra el de verdad es: la fórmula exacta de la firma `x-signature` de los webhooks de suscripciones, si
+   `payer_email` tiene que coincidir con el email de la cuenta de Mercado Pago de quien paga, y cómo reintenta Mercado Pago ante una tarjeta
+   rechazada (la baja llega por webhook y la suscripción queda *cancelada*). Todo eso está en `src/mercadopago.js`, un solo archivo.
+
+### Mails con n8n
+
+La plataforma **no manda mails**: le avisa a un flujo de n8n por webhook y n8n arma y envía el mail. Configurá:
+
+```
+N8N_WEBHOOK_URL=https://tu-n8n/webhook/vezza-cuentas   # la URL de producción del nodo Webhook
+N8N_WEBHOOK_SECRET=...                                 # un secreto compartido (opcional pero recomendado)
+```
+
+Cada aviso es un `POST` con JSON y el secreto en el header `X-Webhook-Secret` (el nodo Webhook de n8n lo valida con *Header Auth*). Si n8n
+no está configurado, se cae o responde con error, queda en el log y **no se rompe nada**: el alta y los cobros siguen. El campo `evento` dice
+cuál es:
+
+| `evento` | Cuándo | Cuerpo |
+| --- | --- | --- |
+| `cuenta_creada` | Al crear la cuenta (y desde *Reenviar mail de bienvenida*) | `email`, `nombre`, `apellido`, `tienda: { nombre, url }`, `plan: { nombre, precio }`, `urlPanel` |
+| `pago_recibido` | Al confirmarse el pago, mientras no haya creado la cuenta (y desde *Reenviar link por mail*) | `email`, `plan: { nombre, precio }`, `urlCuenta` |
+
+`cuenta_creada` es el mail de "tu cuenta está lista" con el link `urlPanel` para entrar a gestionarla; **nunca lleva la clave**.
+`pago_recibido` lleva `urlCuenta`, el link para completar el formulario. Un flujo mínimo: *Webhook* (POST, Header Auth) → *Switch* por
+`evento` → un nodo *Send Email* (Gmail o SMTP) para cada uno → *Respond to Webhook* con 200.
+
 ## Logo de Vezza
 
 La firma "Desarrollado por VEZZA" aparece en la pantalla de ingreso y en el menú de la plataforma (donde además es el
@@ -421,6 +497,9 @@ src/
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
   imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
   landing.js             datos de la landing: tarjetas de planes y precios para Google (la vista es vistas/landing.ejs)
+  suscripciones.js       suscripciones a los planes: contratar, cobros, crear la cuenta después de pagar, cancelar
+  mercadopago.js         cliente de la API de Mercado Pago y validación de la firma de los webhooks
+  notificaciones.js      avisos a n8n (el flujo que manda los mails de alta)
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
   estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
   limites.js             topes del plan de cada tienda, uso y estado de cobro
@@ -441,6 +520,9 @@ src/
   rutas/admin-pedidos.js panel /admin: pedidos, y envíos y pagos
   rutas/tienda.js        vidriera (catálogo, destacados, categorías, ficha, checkout y pedido)
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
+  rutas/suscribirse.js   alta pública: elegir plan, pagar y crear la cuenta (/suscribirse)
+  rutas/admin-suscripcion.js  panel /admin: la suscripción del cliente a su plan
+  rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago)
   util/iconos.js         íconos SVG de las vistas
   util/vezza.js          logo y firma de Vezza (SVG de publico/vezza/ incrustado en las vistas)
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/

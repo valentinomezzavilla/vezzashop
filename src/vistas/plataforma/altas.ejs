@@ -1,0 +1,60 @@
+<%- include('parciales/cabecera', { titulo: 'Altas' }) %>
+<%
+  const ESTADOS = {
+    autorizada: ['pastilla-ambar', 'Pagó, falta crear la cuenta'],
+    pendiente: ['', 'Pago sin confirmar'],
+    prueba: ['', 'Prueba sin crear'],
+    pausada: ['', 'Pausada'],
+    cancelada: ['pastilla-cancelado', 'Cancelada'],
+  };
+%>
+<header class="encabezado">
+  <div>
+    <h1>Altas</h1>
+    <p class="texto-suave">Gente que eligió un plan desde la landing y todavía no creó su cuenta. Cuando la crean, pasan a Clientes.</p>
+  </div>
+</header>
+
+<% if (altas.length === 0) { %>
+  <section class="tarjeta estado-vacio">
+    <h2>No hay altas pendientes</h2>
+    <p class="texto-suave">Cuando alguien elija un plan desde la landing y no termine de crear su cuenta, lo ves acá.</p>
+  </section>
+<% } else { %>
+  <div class="tabla-contenedor">
+    <table class="tabla tabla-planes">
+      <thead>
+        <tr><th scope="col">Empezó</th><th scope="col">Email</th><th scope="col">Plan</th><th scope="col">Estado</th><th scope="col">Link</th><th scope="col"><span class="visualmente-oculto">Acciones</span></th></tr>
+      </thead>
+      <tbody>
+        <% for (const alta of altas) { %>
+          <% const [clase, texto] = ESTADOS[alta.estado] ?? ['', alta.estado] %>
+          <tr>
+            <td data-etiqueta="Empezó"><%= formatearFecha(alta.creadaEn) %></td>
+            <td data-etiqueta="Email" class="celda-envolver"><%= alta.emailPagador %></td>
+            <td data-etiqueta="Plan"><%= alta.planNombre %></td>
+            <td data-etiqueta="Estado"><span class="pastilla <%= clase %>"><%= texto %></span></td>
+            <td data-etiqueta="Link"><%= alta.enlaceVigente ? 'Vigente' : 'Venció' %></td>
+            <td data-etiqueta="Acciones">
+              <div class="acciones">
+                <% if (alta.mpId && (alta.estado === 'pendiente' || alta.estado === 'autorizada')) { %>
+                  <form method="post" action="/plataforma/altas/<%= alta.id %>/sincronizar">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="boton boton-secundario boton-chico" type="submit">Sincronizar</button>
+                  </form>
+                <% } %>
+                <% if (alta.estado === 'autorizada') { %>
+                  <form method="post" action="/plataforma/altas/<%= alta.id %>/reenviar">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <button class="boton boton-chico" type="submit">Reenviar link por mail</button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+<%- include('parciales/pie') %>

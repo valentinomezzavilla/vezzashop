@@ -1,0 +1,14 @@
+<%- include('parciales/cabecera', { titulo }) %>
+<section class="ingreso">
+  <div class="ingreso-icono" aria-hidden="true"><%- icono(recargar ? 'reloj' : 'alerta', { tamano: 24 }) %></div>
+  <h1><%= titulo %></h1>
+  <p class="texto-suave" <%- recargar ? 'role="status"' : '' %>><%= mensaje %></p>
+  <% if (!recargar) { %>
+    <div><a class="boton boton-bloque" href="<%= accion.href %>"><%= accion.texto %></a></div>
+  <% } else { %>
+    <%# Mercado Pago a veces tarda unos segundos en confirmar: la pantalla se vuelve a pedir sola. %>
+    <script>setTimeout(function () { location.replace(<%- JSON.stringify(recargar).replaceAll('<', '\\u003c') %>); }, 4000);</script>
+    <noscript><a class="boton boton-bloque" href="<%= recargar %>">Actualizar</a></noscript>
+  <% } %>
+</section>
+<%- include('parciales/pie') %>
