@@ -27,6 +27,23 @@ que se escribe; `admin.js` lo agrega solo y la clave vuelve a ocultarse al envia
 
 Los productos **destacados** aparecen en una sección propia arriba de la portada (hasta 8).
 
+## Página de presentación (landing)
+
+El dominio principal (`/`) muestra la página que presenta la plataforma: para qué sirve, capturas, objetivos, planes, lo que
+viene y preguntas frecuentes. El panel sigue en `/admin` (la landing tiene el link "Ingresar a mi panel"). Es una sola página
+estática, sin base de datos ni sesión: `src/publico/landing/index.html` (HTML, CSS y JS juntos, con los colores y tipografías de
+la marca VEZZA) y sus imágenes en `src/publico/landing/img/` (capturas en WebP y `og.png`, la imagen que se ve al compartir el link).
+
+- **Contacto.** Los botones "Probar gratis" y "Elegir plan" llevan a la sección de contacto del final, que apunta a
+  `vezzadev.com` e Instagram. Para que abran un chat de WhatsApp con el mensaje armado, completá `WHATSAPP` al final del
+  `<script>` de `index.html` (solo números, con código de país: `5493511234567`).
+- **Planes.** Los precios y topes de la sección Planes son los de `PLANES_SUGERIDOS` (`src/plataforma.js`). Si los cambiás en
+  `/plataforma/planes`, actualizá también la landing y el bloque `offers` de datos estructurados del `<head>`.
+- **Capturas.** Son de una tienda de ejemplo ("Nube Studio") con datos inventados. Para renovarlas, levantá la app con datos de
+  prueba, sacá las pantallas a 1440 px de ancho y convertilas a WebP de unos 1500 px (`sharp`).
+- **Dominio.** La imagen para compartir (`og:image`) usa `https://vezzashop.com`; cambiala en el `<head>` si el dominio es otro.
+- Lo cubre `test/landing.test.js` (la portada responde, no crea sesión y todas sus imágenes existen).
+
 ## Requisitos
 
 - Node.js 22 o más nuevo.

@@ -118,7 +118,8 @@ export function crearApp({ db, config }) {
   app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config }));
   // Plataforma: 15 días, y cada uso los renueva: mientras se use, no hay que volver a ingresar.
   app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config }));
-  app.get('/', (req, res) => res.redirect('/admin'));
+  // El dominio principal muestra la página de presentación de la plataforma (src/publico/landing/); el panel sigue en /admin.
+  app.get('/', (req, res) => res.sendFile(path.join(import.meta.dirname, 'publico', 'landing', 'index.html')));
 
   app.use((req, res) => {
     res.status(404).render('error', { titulo: 'No encontrado', mensaje: 'Esta página no existe.' });

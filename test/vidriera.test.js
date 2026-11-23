@@ -125,10 +125,10 @@ test('un subdominio que no es de ninguna tienda da 404', async () => {
   assert.match(cuerpo, /Esta tienda no existe/);
 });
 
-test('el panel se usa desde el dominio principal', async () => {
+test('el panel se usa desde el dominio principal (la portada es la landing, y el panel está en /admin)', async () => {
   const principal = await pedir('localhost', '/');
-  assert.equal(principal.status, 302);
-  assert.equal(principal.location, '/admin');
+  assert.equal(principal.status, 200);
+  assert.match(principal.cuerpo, /VEZZA Shop/);
 
   const desdeTienda = await pedir('ropa.localhost', '/admin/productos');
   assert.equal(desdeTienda.status, 302);
