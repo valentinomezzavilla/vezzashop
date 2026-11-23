@@ -32,12 +32,7 @@
     "description": "Plataforma de tiendas online: vidriera pública, carrito, checkout y panel de administración de productos, pedidos y diseño.",
     "inLanguage": "es-AR",
     "publisher": { "@type": "Organization", "name": "VEZZA", "url": "https://vezzadev.com/", "sameAs": ["https://www.instagram.com/vezza.dev/"] },
-    "offers": [
-      { "@type": "Offer", "name": "Prueba", "price": "0", "priceCurrency": "ARS" },
-      { "@type": "Offer", "name": "Esencial", "price": "12900", "priceCurrency": "ARS" },
-      { "@type": "Offer", "name": "Acompañado", "price": "34900", "priceCurrency": "ARS" },
-      { "@type": "Offer", "name": "A medida", "price": "89900", "priceCurrency": "ARS" }
-    ]
+    "offers": <%- ofertasJsonLd %>
   }
   </script>
 
@@ -300,8 +295,7 @@
 
     /* ---------- Planes ---------- */
     .plans { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
-    @media (min-width: 48rem) { .plans { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 75rem) { .plans { grid-template-columns: repeat(4, 1fr); } }
+    @media (min-width: 48rem) { .plans { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); } }
     .plan { position: relative; background: var(--paper); border: 1.5px solid var(--ink); border-radius: var(--radius); padding: 1.9rem 1.6rem; display: flex; flex-direction: column; gap: 1.1rem; }
     .plan--hl { background: var(--ink); color: var(--bg); box-shadow: 8px 8px 0 var(--accent); }
     .plan__badge { position: absolute; top: -.85rem; left: 1.4rem; background: var(--accent); color: #fff; font-family: var(--font-label); font-size: .72rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; padding: .35rem .8rem; border-radius: 999px; }
@@ -761,63 +755,33 @@
         <div class="head reveal">
           <p class="eyebrow">Planes</p>
           <h2 class="h2" id="planes-title">Elegí el plan que <span class="accent">acompañe tu ritmo.</span></h2>
-          <p class="lead">Empezá gratis y pasá de plan cuando tu catálogo crezca. Precios en pesos argentinos, por mes.</p>
+          <p class="lead"><%= hayPrueba ? 'Empezá gratis y pasá' : 'Pasá' %> de plan cuando tu catálogo crezca. Precios en pesos argentinos, por mes.</p>
         </div>
 
+        <% if (planes.length) { %>
         <div class="plans">
-          <article class="plan reveal">
-            <h3>Prueba</h3>
-            <p class="plan__for">Para conocer la plataforma y armar tu primera tienda.</p>
-            <p class="plan__price"><b>Gratis</b><span>7 días</span></p>
+          <% for (const plan of planes) { %>
+          <article class="plan<%= plan.destacado ? ' plan--hl' : '' %> reveal">
+            <% if (plan.destacado) { %><span class="plan__badge">Recomendado</span><% } %>
+            <h3><%= plan.nombre %></h3>
+            <p class="plan__for"><%= plan.descripcion %></p>
+            <p class="plan__price"><b><%= plan.precio %></b><% if (plan.unidad) { %><span><%= plan.unidad %></span><% } %></p>
             <ul>
-              <li><span class="check" aria-hidden="true"></span>Hasta 20 productos</li>
-              <li><span class="check" aria-hidden="true"></span>3 fotos por producto</li>
-              <li><span class="check" aria-hidden="true"></span>1 banner de bienvenida</li>
-              <li><span class="check" aria-hidden="true"></span>Al terminar, la tienda se pausa hasta que elijas un plan</li>
+              <% for (const item of plan.items) { %>
+              <li><span class="check" aria-hidden="true"></span><%= item %></li>
+              <% } %>
             </ul>
-            <a class="btn btn--ghost btn--block" href="#contacto" data-cta="Hola, quiero empezar la prueba gratis de 7 días de VEZZA Shop.">Empezar prueba</a>
+            <a class="btn <%= plan.destacado ? 'btn--primary' : 'btn--ghost' %> btn--block" href="#contacto" data-cta="<%= plan.boton.mensaje %>"><%= plan.boton.texto %></a>
           </article>
-
-          <article class="plan plan--hl reveal">
-            <span class="plan__badge">Recomendado</span>
-            <h3>Esencial</h3>
-            <p class="plan__for">Para arrancar a vender con un catálogo chico o mediano.</p>
-            <p class="plan__price"><b>$ 12.900</b><span>/ mes</span></p>
-            <ul>
-              <li><span class="check" aria-hidden="true"></span>Hasta 150 productos</li>
-              <li><span class="check" aria-hidden="true"></span>4 fotos por producto</li>
-              <li><span class="check" aria-hidden="true"></span>2 banners de bienvenida</li>
-              <li><span class="check" aria-hidden="true"></span>Todo lo del panel y la tienda</li>
-            </ul>
-            <a class="btn btn--primary btn--block" href="#contacto" data-cta="Hola, quiero contratar el plan Esencial de VEZZA Shop.">Elegir Esencial</a>
-          </article>
-
-          <article class="plan reveal">
-            <h3>Acompañado</h3>
-            <p class="plan__for">Para negocios que ya venden y quieren seguir creciendo.</p>
-            <p class="plan__price"><b>$ 34.900</b><span>/ mes</span></p>
-            <ul>
-              <li><span class="check" aria-hidden="true"></span>Hasta 1.000 productos</li>
-              <li><span class="check" aria-hidden="true"></span>8 fotos por producto</li>
-              <li><span class="check" aria-hidden="true"></span>4 banners de bienvenida</li>
-              <li><span class="check" aria-hidden="true"></span>Todo lo del panel y la tienda</li>
-            </ul>
-            <a class="btn btn--ghost btn--block" href="#contacto" data-cta="Hola, quiero contratar el plan Acompañado de VEZZA Shop.">Elegir Acompañado</a>
-          </article>
-
-          <article class="plan reveal">
-            <h3>A medida</h3>
-            <p class="plan__for">Para catálogos grandes o necesidades propias. Lo armamos juntos.</p>
-            <p class="plan__price"><b>$ 89.900</b><span>/ mes</span></p>
-            <ul>
-              <li><span class="check" aria-hidden="true"></span>Productos sin tope</li>
-              <li><span class="check" aria-hidden="true"></span>Hasta 10 fotos por producto</li>
-              <li><span class="check" aria-hidden="true"></span>Hasta 6 banners de bienvenida</li>
-              <li><span class="check" aria-hidden="true"></span>Todo lo del panel y la tienda</li>
-            </ul>
-            <a class="btn btn--ghost btn--block" href="#contacto" data-cta="Hola, quiero consultar por el plan A medida de VEZZA Shop.">Consultar</a>
-          </article>
+          <% } %>
         </div>
+        <% } else { %>
+        <div class="everyone reveal" style="margin-top:0">
+          <h3>Escribinos</h3>
+          <p>Contanos qué vendés y te armamos el plan que mejor te quede.</p>
+          <a class="btn btn--primary" href="#contacto" data-cta="Hola, quiero consultar por los planes de VEZZA Shop.">Consultar planes</a>
+        </div>
+        <% } %>
 
         <div class="everyone reveal">
           <h3>En todos los planes</h3>

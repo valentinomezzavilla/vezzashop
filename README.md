@@ -30,19 +30,23 @@ Los productos **destacados** aparecen en una sección propia arriba de la portad
 ## Página de presentación (landing)
 
 El dominio principal (`/`) muestra la página que presenta la plataforma: para qué sirve, capturas, objetivos, planes, lo que
-viene y preguntas frecuentes. El panel sigue en `/admin` (la landing tiene el link "Ingresar a mi panel"). Es una sola página
-estática, sin base de datos ni sesión: `src/publico/landing/index.html` (HTML, CSS y JS juntos, con los colores y tipografías de
-la marca VEZZA) y sus imágenes en `src/publico/landing/img/` (capturas en WebP y `og.png`, la imagen que se ve al compartir el link).
+viene y preguntas frecuentes. El panel sigue en `/admin` (la landing tiene el link "Ingresar a mi panel"). Es una vista EJS sin
+sesión ni cookies: `src/vistas/landing.ejs` (HTML, CSS y JS juntos, con los colores y tipografías de la marca VEZZA), sus datos en
+`src/landing.js` y sus imágenes en `src/publico/landing/img/` (capturas en WebP y `og.png`, la imagen que se ve al compartir el link).
 
-- **Contacto.** Los botones "Probar gratis" y "Elegir plan" llevan a la sección de contacto del final, que apunta a
-  `vezzadev.com` e Instagram. Para que abran un chat de WhatsApp con el mensaje armado, completá `WHATSAPP` al final del
-  `<script>` de `index.html` (solo números, con código de país: `5493511234567`).
-- **Planes.** Los precios y topes de la sección Planes son los de `PLANES_SUGERIDOS` (`src/plataforma.js`). Si los cambiás en
-  `/plataforma/planes`, actualizá también la landing y el bloque `offers` de datos estructurados del `<head>`.
+- **Planes: salen de la base.** Las tarjetas de la sección Planes y los precios de los datos estructurados para Google se arman
+  con los planes de `/plataforma/planes`: lo que editás ahí (nombre, precio, topes, días de prueba) se ve en la landing en el acto.
+  Salen los planes **activos** con precio o con período de prueba, del más barato al más caro; un plan **pausado**, o uno gratis y
+  sin prueba (como "Sin límites", el interno de las tiendas que ya existían), no se muestra. Cada tarjeta lista los topes de
+  productos, fotos y banners (un tope vacío se muestra como "sin tope" o con el máximo de la plataforma: 10 fotos y 6 banners). El
+  texto de arriba de cada tarjeta sale de los topes y de la prueba, y el **Recomendado** es el plan pago más barato (si hay más de
+  uno). Si no hay planes para mostrar, la sección queda con un botón para consultar. Se ordenan y redactan en `armarPlanes`.
+- **Contacto.** Los botones "Probar gratis" y "Elegir plan" abren WhatsApp con un mensaje armado (el número está en `WHATSAPP`,
+  al final del `<script>` de `landing.ejs`). Si lo dejás vacío, llevan a la sección de contacto, que apunta a `vezzadev.com` e Instagram.
 - **Capturas.** Son de una tienda de ejemplo ("Nube Studio") con datos inventados. Para renovarlas, levantá la app con datos de
   prueba, sacá las pantallas a 1440 px de ancho y convertilas a WebP de unos 1500 px (`sharp`).
 - **Dominio.** La imagen para compartir (`og:image`) usa `https://vezzashop.com`; cambiala en el `<head>` si el dominio es otro.
-- Lo cubre `test/landing.test.js` (la portada responde, no crea sesión y todas sus imágenes existen).
+- Lo cubre `test/landing.test.js` (la portada responde, no crea sesión, sus imágenes existen y los planes siguen a la base).
 
 ## Requisitos
 
@@ -416,6 +420,7 @@ src/
   pagos.js               formas de entrega y de pago (Envíos y pagos)
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
   imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
+  landing.js             datos de la landing: tarjetas de planes y precios para Google (la vista es vistas/landing.ejs)
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
   estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
   limites.js             topes del plan de cada tienda, uso y estado de cobro

@@ -12,6 +12,7 @@ import { formatearPrecio } from './util/formato.js';
 import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { vezza } from './util/vezza.js';
+import { datosLanding } from './landing.js';
 import { dominioDeTiendas, slugDeHost, urlPanel, urlTienda } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
@@ -118,8 +119,9 @@ export function crearApp({ db, config }) {
   app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config }));
   // Plataforma: 15 días, y cada uso los renueva: mientras se use, no hay que volver a ingresar.
   app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config }));
-  // El dominio principal muestra la página de presentación de la plataforma (src/publico/landing/); el panel sigue en /admin.
-  app.get('/', (req, res) => res.sendFile(path.join(import.meta.dirname, 'publico', 'landing', 'index.html')));
+  // El dominio principal muestra la página de presentación de la plataforma (vistas/landing.ejs, con los planes de la base); el panel
+  // sigue en /admin. Sin sesión ni cookies.
+  app.get('/', async (req, res) => res.render('landing', await datosLanding(db)));
 
   app.use((req, res) => {
     res.status(404).render('error', { titulo: 'No encontrado', mensaje: 'Esta página no existe.' });
