@@ -18,9 +18,18 @@ export function rutasWebhooks({ servicios, config }) {
       dataId,
       secreto: config.mercadopago.webhookSecret,
     });
-    if (!firmado) return res.status(401).end();
-
     const tema = String(req.body?.type ?? req.query.type ?? req.query.topic ?? '');
+    if (!firmado) {
+      // Para que en el log se vea por qué (sin mostrar ningún secreto): qué llegó y de qué largo es la clave configurada.
+      // Si el largo no coincide con el de la clave secreta del panel de Mercado Pago, la variable está mal cargada.
+      console.warn(
+        `Webhook de Mercado Pago rechazado (401): tema=${tema || '?'} data.id=${dataId || '-'} ` +
+          `x-signature=${req.get('x-signature') ? 'sí' : 'NO'} x-request-id=${req.get('x-request-id') ? 'sí' : 'NO'} ` +
+          `MP_WEBHOOK_SECRET=${config.mercadopago.webhookSecret.length} caracteres`,
+      );
+      return res.status(401).end();
+    }
+
     const opciones = { urlBase: urlPanel(req, config.dominio) };
     try {
       if (tema === 'subscription_preapproval' && dataId) await sincronizarSuscripcion(servicios, dataId, opciones);
