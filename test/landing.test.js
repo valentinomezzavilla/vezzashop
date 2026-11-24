@@ -1,7 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import path from 'node:path';
 import { abrirBase } from '../src/db.js';
 import { crearApp } from '../src/app.js';
@@ -150,4 +151,47 @@ test('la landing muestra los planes de la base y se actualiza cuando se editan o
   html = await pagina();
   assert.ok(!html.includes('<h3>A medida</h3>'));
   assert.ok(!html.includes('Productos sin tope'));
+});
+
+// ---------- Capa de movimiento ----------
+
+const leerPublico = (ruta) => readFileSync(path.join(PUBLICO, ruta), 'utf8');
+
+test('la landing carga su capa de movimiento, y los dos JS compilan', async () => {
+  const html = await pagina();
+  assert.ok(html.includes('<link rel="stylesheet" href="/landing/movimiento.css">'));
+  assert.ok(html.includes('<script src="/landing/movimiento.js" defer></script>'));
+  for (const archivo of ['landing/movimiento.js', 'alta.js']) {
+    assert.doesNotThrow(() => new vm.Script(leerPublico(archivo), { filename: archivo }), `${archivo} tiene que compilar`);
+  }
+});
+
+test('todo el movimiento respeta "reducir movimiento": ninguna animación ni transición queda fuera de su bloque', () => {
+  const sinComentarios = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const archivo of ['landing/movimiento.css', 'alta.css']) {
+    const css = sinComentarios(leerPublico(archivo));
+    assert.equal(css.split('{').length, css.split('}').length, `${archivo}: las llaves tienen que estar balanceadas`);
+    const inicio = css.indexOf('@media (prefers-reduced-motion: no-preference) {');
+    assert.ok(inicio >= 0, `${archivo}: falta el bloque de movimiento`);
+    let profundidad = 0;
+    let fin = -1;
+    for (let i = css.indexOf('{', inicio); i < css.length; i++) {
+      if (css[i] === '{') profundidad++;
+      else if (css[i] === '}' && --profundidad === 0) {
+        fin = i;
+        break;
+      }
+    }
+    assert.ok(fin > inicio, `${archivo}: el bloque de movimiento no se cierra`);
+    const fuera = css.slice(0, inicio) + css.slice(fin + 1);
+    assert.doesNotMatch(fuera, /animation\s*:|animation-name|transition\s*:|@keyframes|@view-transition/, `${archivo}: hay movimiento fuera de (prefers-reduced-motion: no-preference)`);
+  }
+});
+
+test('el JS de la landing no anima nada con "reducir movimiento"', () => {
+  const js = leerPublico('landing/movimiento.js');
+  // Lo primero que hace es leer la preferencia, y corta antes de armar cualquier efecto (solo deja las cifras en su valor final).
+  assert.match(js, /prefers-reduced-motion: reduce/);
+  assert.match(js, /if \(reducir\) return;/);
+  assert.ok(js.indexOf('if (reducir) return;') < js.indexOf('pointermove'), 'los efectos del mouse van después de cortar');
 });

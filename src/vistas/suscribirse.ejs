@@ -1,9 +1,9 @@
-<%- include('parciales/cabecera', { titulo: gratis ? 'Empezá tu prueba' : `Plan ${plan.nombre}` }) %>
+<%- include('parciales/cabecera', { titulo: gratis ? 'Empezá tu prueba' : `Plan ${plan.nombre}`, extraCss: '/alta.css', extraJs: '/alta.js' }) %>
 <%
   const error = (campo) => include('parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
   const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
 %>
-<section class="ingreso ingreso--ancho">
+<section class="ingreso ingreso--ancho" data-tilt>
   <div class="ingreso-icono" aria-hidden="true"><%- icono('tienda', { tamano: 24 }) %></div>
   <h1><%= gratis ? 'Empezá tu prueba gratis' : `Suscribite al plan ${plan.nombre}` %></h1>
   <p class="texto-suave">
@@ -14,9 +14,10 @@
     <% } %>
   </p>
 
-  <div class="alta-plan">
+  <%# El nombre de transición hace que, al venir de la landing, la tarjeta del plan "viaje" hasta acá. %>
+  <div class="alta-plan" style="view-transition-name: plan-<%= planId %>">
     <strong><%= plan.nombre %></strong>
-    <div class="alta-plan-precio"><%= plan.precio %> <small><%= plan.unidad %></small></div>
+    <div class="alta-plan-precio"><span data-precio><%= plan.precio %></span> <small><%= plan.unidad %></small></div>
     <ul>
       <% for (const item of plan.items) { %><li><%= item %></li><% } %>
     </ul>

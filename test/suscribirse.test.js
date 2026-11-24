@@ -285,3 +285,14 @@ test('pagar y no completar el formulario manda por n8n el link para crear la cue
   const otroNavegador = crearNavegador(`http://127.0.0.1:${puerto}`);
   assert.match(await (await otroNavegador.pedir(`/suscribirse/cuenta?t=${token}`)).text(), /Pago confirmado/);
 });
+
+test('las pantallas del alta cargan su CSS y JS de movimiento, y la tarjeta del plan viaja desde la landing', async () => {
+  const alta = await (await navegador.pedir(`/suscribirse?plan=${planes.esencial}`)).text();
+  assert.ok(alta.includes('<link rel="stylesheet" href="/alta.css">'));
+  assert.ok(alta.includes('<script src="/alta.js" defer></script>'));
+  // Mismo nombre de transición en las dos páginas: el navegador mueve la tarjeta de una a otra.
+  assert.ok(alta.includes(`view-transition-name: plan-${planes.esencial}`));
+  const landing = await (await navegador.pedir('/')).text();
+  assert.ok(landing.includes(`view-transition-name: plan-${planes.esencial}`));
+  for (const ruta of ['/alta.css', '/alta.js']) assert.equal((await navegador.pedir(ruta)).status, 200, `${ruta} no se sirve`);
+});

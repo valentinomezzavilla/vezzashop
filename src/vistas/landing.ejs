@@ -376,9 +376,12 @@
       .btn, .card, .arrow { transition: none; }
     }
   </style>
+  <%# Capa de movimiento: animaciones y efectos. Es opcional y respeta "reducir movimiento" (ver el archivo). %>
+  <link rel="stylesheet" href="/landing/movimiento.css">
 </head>
 
 <body>
+  <div class="progreso" aria-hidden="true"></div>
   <a class="skip" href="#contenido">Saltar al contenido</a>
 
   <!-- ============ HEADER ============ -->
@@ -412,7 +415,7 @@
       <div class="container hero__grid">
         <div>
           <p class="hero__tag"><i aria-hidden="true"></i>Plataforma de tiendas online · hecha en Argentina</p>
-          <h1 id="hero-title">Tu tienda online, <em>sin vueltas.</em></h1>
+          <h1 id="hero-title" data-split>Tu tienda online, <em>sin vueltas.</em></h1>
           <p class="lead">VEZZA Shop te da una tienda lista para vender en tu propio link: catálogo, carrito, checkout y un panel para manejar tus pedidos, productos y diseño. Sin programar y sin comisión por venta.</p>
           <div class="hero__cta">
             <a class="btn btn--primary btn--lg" href="<%= pruebaHref || '#contacto' %>"<% if (!pruebaHref) { %> data-cta="Hola, quiero probar VEZZA Shop 7 días gratis."<% } %>>Probá 7 días gratis <span class="arrow" aria-hidden="true">→</span></a>
@@ -425,7 +428,7 @@
           </ul>
         </div>
 
-        <div class="stage">
+        <div class="stage" data-tilt>
           <div class="chip chip--a" aria-hidden="true">
             <span class="chip__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></span>
             <div><b>Pedido nuevo · #1</b><span>Camila R. · $ 49.995</span></div>
@@ -448,10 +451,10 @@
     <!-- ============ CIFRAS ============ -->
     <section class="strip" aria-label="En números">
       <div class="container strip__grid">
-        <div class="stat"><b>10</b><span>fotos por producto, ordenables</span></div>
-        <div class="stat"><b>3</b><span>tipos de variante: talle, color, lo que necesites</span></div>
-        <div class="stat"><b>3</b><span>formas de pago: transferencia, efectivo y Mercado Pago</span></div>
-        <div class="stat"><b>0%</b><span>de comisión sobre tus ventas</span></div>
+        <div class="stat"><b data-count="10">10</b><span>fotos por producto, ordenables</span></div>
+        <div class="stat"><b data-count="3">3</b><span>tipos de variante: talle, color, lo que necesites</span></div>
+        <div class="stat"><b data-count="3">3</b><span>formas de pago: transferencia, efectivo y Mercado Pago</span></div>
+        <div class="stat"><b data-count="0" data-from="30" data-suffix="%">0%</b><span>de comisión sobre tus ventas</span></div>
       </div>
     </section>
 
@@ -761,7 +764,7 @@
         <% if (planes.length) { %>
         <div class="plans">
           <% for (const plan of planes) { %>
-          <article class="plan<%= plan.destacado ? ' plan--hl' : '' %> reveal">
+          <article class="plan<%= plan.destacado ? ' plan--hl' : '' %> reveal" style="view-transition-name: plan-<%= plan.id %>">
             <% if (plan.destacado) { %><span class="plan__badge">Recomendado</span><% } %>
             <h3><%= plan.nombre %></h3>
             <p class="plan__for"><%= plan.descripcion %></p>
@@ -988,5 +991,6 @@
       }
     })();
   </script>
+  <script src="/landing/movimiento.js" defer></script>
 </body>
 </html>

@@ -1,12 +1,17 @@
-<%- include('parciales/cabecera', { titulo }) %>
-<section class="ingreso">
-  <div class="ingreso-icono" aria-hidden="true"><%- icono(recargar ? 'reloj' : 'alerta', { tamano: 24 }) %></div>
+<%- include('parciales/cabecera', { titulo, extraCss: '/alta.css', extraJs: '/alta.js' }) %>
+<section class="ingreso" data-tilt>
+  <% if (recargar) { %>
+    <div class="alta-orbita-caja" aria-hidden="true"><div class="alta-orbita"><i></i><i></i><i></i></div></div>
+  <% } else { %>
+    <div class="ingreso-icono" aria-hidden="true"><%- icono('alerta', { tamano: 24 }) %></div>
+  <% } %>
   <h1><%= titulo %></h1>
   <p class="texto-suave" <%- recargar ? 'role="status"' : '' %>><%= mensaje %></p>
   <% if (!recargar) { %>
     <div><a class="boton boton-bloque" href="<%= accion.href %>"><%= accion.texto %></a></div>
   <% } else { %>
     <%# Mercado Pago a veces tarda unos segundos en confirmar: la pantalla se vuelve a pedir sola. %>
+    <div class="alta-barra" aria-hidden="true"><span></span></div>
     <script>setTimeout(function () { location.replace(<%- JSON.stringify(recargar).replaceAll('<', '\\u003c') %>); }, 4000);</script>
     <noscript><a class="boton boton-bloque" href="<%= recargar %>">Actualizar</a></noscript>
   <% } %>

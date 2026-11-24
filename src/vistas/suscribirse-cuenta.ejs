@@ -1,14 +1,14 @@
-<%- include('parciales/cabecera', { titulo: 'Creá tu cuenta' }) %>
+<%- include('parciales/cabecera', { titulo: 'Creá tu cuenta', extraCss: '/alta.css', extraJs: '/alta.js' }) %>
 <%
   const error = (campo) => include('parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
   const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
 %>
-<section class="ingreso ingreso--ancho">
+<section class="ingreso ingreso--ancho"<%- prueba ? '' : ' data-confeti' %>>
   <div class="ingreso-icono" aria-hidden="true"><%- icono('tienda', { tamano: 24 }) %></div>
   <% if (prueba) { %>
     <p><span class="pastilla pastilla-ok">Prueba gratis · <%= plan.unidad %></span></p>
   <% } else { %>
-    <p><span class="pastilla pastilla-ok">Pago confirmado · Plan <%= plan.nombre %></span></p>
+    <p><span class="pastilla pastilla-ok alta-pago"><svg class="alta-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7" pathLength="1"/></svg>Pago confirmado · Plan <%= plan.nombre %></span></p>
   <% } %>
   <h1>Creá tu cuenta</h1>
   <p class="texto-suave">Completá tus datos: con ellos ingresás a tu panel para cargar tus productos y armar tu tienda.</p>
@@ -47,6 +47,8 @@
         <input id="clave" type="password" name="clave" autocomplete="new-password" minlength="<%= largoMinimoClave %>" required
                aria-describedby="ayuda-clave<%= errores.clave ? ' error-clave' : '' %>"<%- errores.clave ? ' aria-invalid="true"' : '' %>>
         <span class="ayuda" id="ayuda-clave">Al menos <%= largoMinimoClave %> caracteres.</span>
+        <span class="alta-fuerza" data-fuerza aria-hidden="true"><i></i></span>
+        <span class="alta-fuerza-texto" data-fuerza-texto aria-live="polite"></span>
         <%- error('clave') %>
       </div>
       <div class="campo">

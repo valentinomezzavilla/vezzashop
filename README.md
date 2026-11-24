@@ -34,6 +34,13 @@ viene y preguntas frecuentes. El panel sigue en `/admin` (la landing tiene el li
 sesión ni cookies: `src/vistas/landing.ejs` (HTML, CSS y JS juntos, con los colores y tipografías de la marca VEZZA), sus datos en
 `src/landing.js` y sus imágenes en `src/publico/landing/img/` (capturas en WebP y `og.png`, la imagen que se ve al compartir el link).
 
+- **Movimiento.** Las animaciones viven aparte del HTML, en `src/publico/landing/movimiento.css` y `movimiento.js` (landing) y en `src/publico/alta.css` y `alta.js`
+  (alta de cuentas y pantalla de suscripción), sin librerías: titulares que suben palabra por palabra, escena 3D que sigue al mouse, cifras que
+  cuentan, animaciones atadas al scroll, píldora deslizante en las pestañas, borde de colores en el plan recomendado, transición de vista entre
+  la landing y el alta (la tarjeta del plan viaja de una página a otra), medidor de fuerza de la clave y confeti al confirmarse el pago. Todo está
+  dentro de `prefers-reduced-motion: no-preference` (con "reducir movimiento" la página queda quieta y completa), anima solo `transform` y
+  `opacity`, y lo más nuevo (`animation-timeline`, `@view-transition`, `::details-content`) está detrás de `@supports`: los navegadores que no lo
+  tienen ven la versión de siempre. Un test (`test/landing.test.js`) verifica que ninguna animación quede fuera de ese bloque.
 - **Planes: salen de la base.** Las tarjetas de la sección Planes y los precios de los datos estructurados para Google se arman
   con los planes de `/plataforma/planes`: lo que editás ahí (nombre, precio, topes, días de prueba) se ve en la landing en el acto.
   Salen los planes **activos** con precio o con período de prueba, del más barato al más caro; un plan **pausado**, o uno gratis y
