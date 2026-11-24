@@ -1,5 +1,6 @@
-<%- include('../parciales/cabecera', { titulo: 'Envíos y pagos' }) %>
+<%- include('../parciales/cabecera', { titulo: 'Envíos y pagos', extraJs: '/calculadora-mp.js' }) %>
 <%
+  const porcentaje = (bp) => `${(bp / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
   const accesibilidad = (campo, conAyuda = false) => {
     const describe = [conAyuda && `ayuda-${campo}`, errores[campo] && `error-${campo}`].filter(Boolean).join(' ');
     return (errores[campo] ? ' aria-invalid="true"' : '') + (describe ? ` aria-describedby="${describe}"` : '');
@@ -159,13 +160,20 @@
         <label class="interruptor">
           <input type="checkbox" name="pagoMercadopago" value="1"<%= marcado('pagoMercadopago') %> data-activar-forma>
           <span class="interruptor-pista" aria-hidden="true"></span>
-          <span class="interruptor-texto"><strong><%- icono('tarjeta', { tamano: 18 }) %> Mercado Pago (tarjetas y cuotas)</strong><span class="ayuda">Le mandás al cliente un link de pago por el total del pedido (desde la app de Mercado Pago: "Cobrar" → "Link de pago").</span></span>
+          <span class="interruptor-texto"><strong><%- icono('tarjeta', { tamano: 18 }) %> Mercado Pago (tarjetas y cuotas)</strong>
+            <% if (mercadopago.conexion) { %>
+              <span class="ayuda">Tu cuenta está conectada: el cliente paga en Mercado Pago en el momento y el pedido pasa a "Pagado" solo.</span>
+            <% } else { %>
+              <span class="ayuda">Por ahora le mandás al cliente un link de pago por el total del pedido (desde la app de Mercado Pago: "Cobrar" → "Link de pago"). <a href="#mercadopago">Conectá tu cuenta</a> para que pague en el momento, sin links a mano.</span>
+            <% } %>
+          </span>
         </label>
         <div class="ajuste-campos-dos forma-pago-campos" data-campos-forma>
           <div class="campo campo-ancho">
             <label for="mercadopagoInstrucciones">Qué le decimos al cliente <span class="opcional">(opcional)</span></label>
             <textarea id="mercadopagoInstrucciones" name="mercadopagoInstrucciones" rows="2" maxlength="300" placeholder="<%= instruccionesMercadopago %>"<%- accesibilidad('mercadopagoInstrucciones') %>><%= valores.mercadopagoInstrucciones %></textarea>
             <%- error('mercadopagoInstrucciones') %>
+            <% if (mercadopago.conexion) { %><span class="ayuda">Con tu cuenta conectada este texto no se usa: el cliente tiene un botón para pagar en el momento.</span><% } %>
           </div>
           <div class="campo">
             <label for="cuotasSinInteres">Cuotas sin interés</label>
@@ -183,6 +191,152 @@
       <div class="barra-guardar">
         <span class="ayuda" data-sin-guardar hidden><%- icono('alerta', { tamano: 16 }) %> Tenés cambios sin guardar</span>
         <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar formas de pago</button>
+      </div>
+    </div>
+  </section>
+</form>
+
+<section class="ajuste" id="mercadopago">
+  <div class="ajuste-intro">
+    <h2>Mercado Pago</h2>
+    <p class="texto-suave">Conectá tu cuenta para que tus clientes paguen en el momento, sin que tengas que mandar un link por cada venta. La plata va directo a tu cuenta de Mercado Pago.</p>
+  </div>
+  <div class="ajuste-campos">
+    <div class="tarjeta mp-conexion">
+      <% if (mercadopago.conexion) { %>
+        <p class="mp-estado">
+          <span class="pastilla pastilla-ok">Conectada</span>
+          <strong><%= mercadopago.conexion.apodo || 'Tu cuenta de Mercado Pago' %></strong>
+          <span class="ayuda">Cuenta N.º <%= mercadopago.conexion.userId %> · <%= mercadopago.conexion.modo === 'oauth' ? 'conectada con el botón' : 'conectada con tu Access Token' %></span>
+        </p>
+        <p class="ayuda">Cuando un cliente paga, el pedido pasa a "Pagado" solo, y en el pedido ves lo que te cobró Mercado Pago y lo que te llega. Si el costo del envío se coordina después, ese pedido no se puede pagar así (todavía no hay un monto final).</p>
+        <% if (!valores.pagoMercadopago) { %>
+          <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>Falta activar "Mercado Pago" en las formas de pago (arriba) para que tus clientes puedan pagar así.</span></p>
+        <% } %>
+        <form method="post" action="/admin/pagos/mercadopago/desconectar" class="mp-acciones">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-peligro-suave boton-chico" type="submit">Desconectar mi cuenta</button>
+        </form>
+      <% } else { %>
+        <p>Todavía no conectaste tu cuenta: tus clientes que eligen Mercado Pago reciben tu link de pago por WhatsApp.</p>
+        <% if (mercadopago.oauth) { %>
+          <div class="mp-acciones">
+            <a class="boton" href="/admin/pagos/mercadopago/conectar"><%- icono('tarjeta', { tamano: 18 }) %> Conectar con Mercado Pago</a>
+          </div>
+          <p class="ayuda">Te llevamos a Mercado Pago para que autorices la conexión con tu cuenta. No vemos tu clave.</p>
+        <% } %>
+        <details class="mp-token"<%= mercadopago.oauth ? '' : ' open' %>>
+          <summary><%= mercadopago.oauth ? 'O pegá tu Access Token' : 'Pegá tu Access Token' %></summary>
+          <ol class="ayuda mp-pasos">
+            <li>Entrá a <strong>mercadopago.com.ar/developers</strong> con tu cuenta, a "Tus integraciones", y creá una aplicación (tipo "Checkout Pro").</li>
+            <li>En "Credenciales de producción", copiá el <strong>Access Token</strong> (empieza con <code>APP_USR-</code>).</li>
+            <li>Pegalo acá. Lo guardamos cifrado y no lo volvemos a mostrar.</li>
+          </ol>
+          <form method="post" action="/admin/pagos/mercadopago/token" class="mp-formulario-token">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="campo">
+              <label for="accessToken">Access Token</label>
+              <input id="accessToken" type="password" name="accessToken" autocomplete="off" spellcheck="false" autocapitalize="off" required maxlength="400">
+            </div>
+            <button class="boton boton-secundario" type="submit">Conectar con mi Access Token</button>
+          </form>
+        </details>
+      <% } %>
+    </div>
+
+    <div class="tarjeta mp-calculadora" data-calculadora-mp>
+      <h3>Comisiones de Mercado Pago</h3>
+      <p class="ayuda">Mercado Pago se queda un porcentaje de cada venta (más IVA), según cuándo quieras recibir la plata: cuanto más esperás, menos cobra. Son las tasas que publica para cobrar con link de pago o Checkout Pro; pueden variar un poco según tu provincia y el medio de pago, y no hay un costo fijo por venta.</p>
+
+      <form method="post" action="/admin/pagos/comisiones" class="ajuste-campos-dos mp-datos">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="campo">
+          <label for="mpPlazo">Cuándo querés recibir la plata</label>
+          <select id="mpPlazo" name="mpPlazo" data-mp-plazo>
+            <% for (const plazo of mercadopago.plazos) { %>
+              <option value="<%= plazo.clave %>"<%= plazo.clave === mercadopago.plazo ? ' selected' : '' %>><%= plazo.titulo %> (<%= porcentaje(plazo.tasaBp) %> + IVA)</option>
+            <% } %>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="mpOtros">Otros costos <span class="opcional">(opcional)</span></label>
+          <div class="campo-con-sufijo">
+            <input id="mpOtros" type="text" name="mpOtros" value="<%= mercadopago.otrosPorcentaje %>" inputmode="decimal" autocomplete="off" aria-describedby="ayuda-mpOtros" data-mp-otros>
+            <span class="sufijo">%</span>
+          </div>
+          <span class="ayuda" id="ayuda-mpOtros">Por ejemplo, las cuotas sin interés que absorbés o las retenciones. 0 si no tenés.</span>
+        </div>
+        <div class="campo campo-ancho">
+          <button class="boton boton-secundario boton-chico" type="submit">Guardar estos datos</button>
+          <span class="ayuda">Quedan guardados para la próxima vez que abras esta pantalla.</span>
+        </div>
+      </form>
+
+      <div class="mp-calculos">
+        <div class="mp-calculo">
+          <div class="campo">
+            <label for="mpPrecio">Si vendés a (en pesos)</label>
+            <input id="mpPrecio" type="text" value="<%= mercadopago.ejemplo.precio / 100 %>" inputmode="decimal" autocomplete="off" data-mp-precio>
+          </div>
+          <dl class="mp-resultado" aria-live="polite">
+            <div><dt>Comisión (<span data-mp="tasa"><%= porcentaje(mercadopago.ejemplo.porVenta.tasaBp) %></span>)</dt><dd data-mp="comision">−<%= formatearPrecio(mercadopago.ejemplo.porVenta.comision) %></dd></div>
+            <div><dt>IVA sobre la comisión</dt><dd data-mp="iva">−<%= formatearPrecio(mercadopago.ejemplo.porVenta.iva) %></dd></div>
+            <div<%= mercadopago.ejemplo.porVenta.otros ? '' : ' hidden' %> data-mp-fila-otros><dt>Otros costos</dt><dd data-mp="otros">−<%= formatearPrecio(mercadopago.ejemplo.porVenta.otros) %></dd></div>
+            <div class="mp-total"><dt>Te quedan</dt><dd data-mp="neto"><%= formatearPrecio(mercadopago.ejemplo.porVenta.neto) %></dd></div>
+          </dl>
+        </div>
+        <div class="mp-calculo">
+          <div class="campo">
+            <label for="mpNeto">Si querés que te queden (en pesos)</label>
+            <input id="mpNeto" type="text" value="<%= mercadopago.ejemplo.precio / 100 %>" inputmode="decimal" autocomplete="off" data-mp-neto>
+          </div>
+          <p class="mp-precio-necesario" aria-live="polite">Tenés que vender a <strong data-mp="precio-necesario"><%= mercadopago.ejemplo.precioNecesario === null ? '—' : formatearPrecio(mercadopago.ejemplo.precioNecesario) %></strong></p>
+          <p class="ayuda">Redondeado a un peso entero, para que siempre te queden al menos esos pesos.</p>
+        </div>
+      </div>
+
+      <div class="tabla-contenedor mp-tabla">
+        <table class="tabla">
+          <caption class="visualmente-oculto">Lo que te queda de la venta según cuándo recibís la plata</caption>
+          <thead><tr><th scope="col">Cuándo recibís la plata</th><th scope="col" class="numero">Tasa + IVA</th><th scope="col" class="numero">Mercado Pago se queda</th><th scope="col" class="numero">Te quedan</th></tr></thead>
+          <tbody>
+            <% for (const fila of mercadopago.ejemplo.tabla) { %>
+              <tr data-mp-fila="<%= fila.plazo %>"<%- fila.plazo === mercadopago.plazo ? ' class="mp-fila-elegida"' : '' %>>
+                <th scope="row"><%= fila.titulo %></th>
+                <td class="numero"><%= porcentaje(Math.round((fila.tasaBp * (10_000 + mercadopago.ivaBp)) / 10_000)) %></td>
+                <td class="numero" data-mp-celda="descuento"><%= formatearPrecio(fila.total) %></td>
+                <td class="numero" data-mp-celda="neto"><strong><%= formatearPrecio(fila.neto) %></strong></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="ayuda">La tabla usa el precio de arriba ("si vendés a"). Son valores de referencia: lo que cobró Mercado Pago de verdad figura en cada pedido pago.</p>
+    </div>
+  </div>
+</section>
+
+<form method="post" action="/admin/pagos/avisos" class="ajustes" id="avisos">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Avisos al cliente</h2>
+      <p class="texto-suave">Contale a quien compró cómo va su pedido: pago confirmado, despachado, en camino, entregado.</p>
+    </div>
+    <div class="ajuste-campos">
+      <fieldset class="tarjeta forma-pago">
+        <legend class="visualmente-oculto">Avisos por mail</legend>
+        <label class="interruptor">
+          <input type="checkbox" name="avisosPedidoEmail" value="1"<%= avisosPedidoEmail ? ' checked' : '' %>>
+          <span class="interruptor-pista" aria-hidden="true"></span>
+          <span class="interruptor-texto"><strong><%- icono('mail', { tamano: 18 }) %> Avisar por mail cuando cambia el estado de un pedido</strong><span class="ayuda">Le llega solo si dejó su email al comprar, y sale con el nombre de tu tienda. Si lo dejás apagado, igual podés avisarle pedido por pedido (por mail o por WhatsApp) desde cada pedido.</span></span>
+        </label>
+        <% if (!correoActivo) { %>
+          <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>El envío de mails todavía no está activado en la plataforma: por ahora avisale por WhatsApp. Lo activa quien administra la plataforma.</span></p>
+        <% } %>
+      </fieldset>
+      <div class="barra-guardar">
+        <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar avisos</button>
       </div>
     </div>
   </section>

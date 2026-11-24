@@ -548,6 +548,39 @@ if (barraSeleccion) {
   actualizar();
 }
 
+// ---------- Listados: los selects de orden y categoría se aplican al elegirlos ----------
+// Sin JavaScript queda el botón "Aplicar" (data-sin-js), que acá se oculta.
+for (const select of document.querySelectorAll('select[data-autoenviar]')) {
+  select.addEventListener('change', () => select.form.requestSubmit());
+  for (const boton of select.form.querySelectorAll('[data-sin-js]')) boton.hidden = true;
+}
+
+// ---------- Menús de acciones (los de cada fila de la lista de pedidos) ----------
+// El menú es un popover: se dibuja arriba de todo (la tabla tiene su propio scroll y lo recortaría) y se cierra solo con un clic afuera
+// o con Esc. Acá se lo ubica al lado de su botón, sin salirse de la pantalla, y se cierra si la página se mueve.
+for (const menu of document.querySelectorAll('[data-menu-acciones]')) {
+  const boton = document.querySelector(`[popovertarget="${menu.id}"]`);
+  if (!boton) continue;
+  menu.addEventListener('toggle', (evento) => {
+    if (evento.newState !== 'open') return;
+    const b = boton.getBoundingClientRect();
+    const m = menu.getBoundingClientRect();
+    const izquierda = Math.min(Math.max(8, b.right - m.width), window.innerWidth - m.width - 8);
+    const abajo = b.bottom + 4;
+    menu.style.left = `${izquierda}px`;
+    menu.style.top = `${abajo + m.height > window.innerHeight - 8 ? Math.max(8, b.top - m.height - 4) : abajo}px`;
+    const cerrar = () => {
+      try {
+        if (menu.matches(':popover-open')) menu.hidePopover();
+      } catch {
+        // Un navegador sin popover no llega hasta acá: el menú no se abre.
+      }
+    };
+    addEventListener('scroll', cerrar, { once: true, passive: true, capture: true });
+    addEventListener('resize', cerrar, { once: true });
+  });
+}
+
 // Formularios que no se pueden mandar dos veces (por ejemplo, confirmar un borrado): se desactiva el botón al enviar.
 for (const formulario of document.querySelectorAll('form[data-un-solo-envio]')) {
   formulario.addEventListener('submit', () => {
@@ -643,3 +676,10 @@ if (vistaMenu) {
     vistaMenu.querySelector('.vista-previa-marca').replaceChildren(imagen);
   });
 }
+
+// Diseño por plan: al elegir un color, se tilda solo su casilla "usar otro color" (si no, el color elegido se ignoraría sin que se note).
+document.addEventListener('input', (evento) => {
+  if (!evento.target.matches('[data-color-opcional]')) return;
+  const casilla = evento.target.closest('.color-opcional')?.querySelector('[data-color-propio]');
+  if (casilla && !casilla.checked) casilla.checked = true;
+});

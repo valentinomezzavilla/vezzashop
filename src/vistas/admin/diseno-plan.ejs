@@ -1,0 +1,171 @@
+<%#
+  Las secciones de Diseño que dependen del nivel de diseño del plan (ver src/diseno-por-plan.js). Van adentro del formulario de Diseño.
+  Cada una se muestra siempre; si el plan no la incluye sale bloqueada (con un aviso y "Ver planes") y sus campos deshabilitados, que no se envían.
+  Recibe: plan = { nivel, nombre, niveles, puede: { acompanado, a_medida }, opciones }, valores, errores y csrf.
+%>
+<%
+  const { nivel, niveles, puede, opciones } = plan;
+  const err = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  // Si el formulario volvió con errores, `valores` es lo que se envió (puede faltar algún campo); si no, lo guardado.
+  const volvio = valores._csrf !== undefined;
+  const esColor = (texto) => /^#[0-9a-f]{6}$/i.test(texto ?? '');
+  const elegida = (campo, mapa, porDefecto) => (Object.hasOwn(mapa, valores[campo]) ? valores[campo] : porDefecto);
+  // Un color con su casilla "usar otro": sin marcarla, la tienda usa el de siempre.
+  const colorOpcional = (campo, titulo, defecto, ayuda = '') => {
+    const propio = volvio ? Boolean(valores[`${campo}Propio`]) : esColor(valores[campo]);
+    return `
+      <div class="campo color-opcional">
+        <label class="casilla"><input type="checkbox" name="${campo}Propio" value="1"${propio ? ' checked' : ''} data-color-propio> Usar otro color para ${titulo}</label>
+        <input id="${campo}" type="color" name="${campo}" value="${esColor(valores[campo]) ? valores[campo] : defecto}" aria-label="Color: ${titulo}" data-color-opcional${invalido(campo)}>
+        ${ayuda ? `<span class="ayuda">${ayuda}</span>` : ''}
+        ${include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` })}
+      </div>`;
+  };
+  const bloqueo = (requerido) => `
+    <div class="nivel-bloqueado" role="note">
+      ${icono('candado', { tamano: 18 })}
+      <span>Disponible desde el plan <strong>${niveles[requerido].titulo}</strong>. Tu plan incluye el diseño ${niveles[nivel].titulo}.${locals.pagosActivos ? '' : (locals.contactoPlataforma ? ` Para cambiar de plan, contactanos: ${locals.contactoPlataforma}.` : ' Contactanos para cambiar de plan.')}</span>
+      ${locals.pagosActivos ? '<a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a>' : ''}
+    </div>`;
+  // Las opciones de elegir una (radios con su ayuda).
+  const opcionesRadio = (campo, mapa, actual, clases = 'tipos-entrega tipos-tres') => `
+    <fieldset class="${clases}">
+      <legend class="etiqueta">__LEYENDA__</legend>
+      ${Object.entries(mapa).map(([clave, op]) => `
+        <label class="opcion-tipo">
+          <input type="radio" name="${campo}" value="${clave}"${actual === clave ? ' checked' : ''}>
+          <span><strong>${op.titulo}</strong></span>
+          <span class="ayuda">${op.ayuda}</span>
+        </label>`).join('')}
+      ${include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` })}
+    </fieldset>`;
+  const radio = (campo, leyenda, mapa, porDefecto, clases) => opcionesRadio(campo, mapa, elegida(campo, mapa, porDefecto), clases).replace('__LEYENDA__', leyenda);
+
+  // Portada: las secciones en el orden elegido (las que no se muestran, al final).
+  const secciones = opciones.secciones;
+  const clavesSecciones = Object.keys(secciones);
+  const mostradas = volvio && valores.portadaEnviada !== undefined
+    ? clavesSecciones.filter((c) => valores[`portadaMostrar_${c}`] === '1').sort((a, b) => (Number.parseInt(valores[`portadaOrden_${a}`], 10) || 99) - (Number.parseInt(valores[`portadaOrden_${b}`], 10) || 99))
+    : opciones.seccionesActuales;
+  const ordenadas = [...mostradas, ...clavesSecciones.filter((c) => !mostradas.includes(c))];
+  const sinFuente = (campo) => valores[campo] ?? '';
+%>
+
+<section class="ajuste ajuste-plan<%= puede.acompanado ? '' : ' ajuste-bloqueado' %>" id="colores">
+  <div class="ajuste-intro">
+    <h2>Colores <span class="pastilla pastilla-nivel">Plan Acompañado</span></h2>
+    <p class="texto-suave">El fondo, el texto y las tarjetas de tu tienda, y el color de la cabecera. Siempre se tiene que leer bien: si elegís colores que se confunden, te avisamos.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <%- puede.acompanado ? '' : bloqueo('acompanado') %>
+    <fieldset class="bloqueable"<%= puede.acompanado ? '' : ' disabled' %>>
+      <legend class="visualmente-oculto">Colores de la tienda</legend>
+      <div class="ajuste-campos-dos">
+        <%- colorOpcional('colorFondo', 'el fondo de la página', '#ffffff', 'Si lo cambiás sin elegir el color del texto, el texto se ajusta solo para leerse.') %>
+        <%- colorOpcional('colorTexto', 'el texto', '#18181b', 'Tiene que contrastar con el fondo.') %>
+        <%- colorOpcional('colorTarjetas', 'las tarjetas de producto', '#ffffff', 'Se ve con las tarjetas "Con borde" o "Con sombra" (más abajo).') %>
+        <%- colorOpcional('colorCabecera', 'la cabecera', '#ffffff', 'El logo, el menú y los íconos se ajustan para leerse. El checkout y la página del pedido mantienen sus colores.') %>
+      </div>
+    </fieldset>
+  </div>
+</section>
+
+<section class="ajuste ajuste-plan<%= puede.acompanado ? '' : ' ajuste-bloqueado' %>" id="portada">
+  <div class="ajuste-intro">
+    <h2>Portada y tarjetas <span class="pastilla pastilla-nivel">Plan Acompañado</span></h2>
+    <p class="texto-suave">Qué se ve arriba en la portada y en qué orden, cómo se muestran tus banners y cómo es cada tarjeta de producto.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <%- puede.acompanado ? '' : bloqueo('acompanado') %>
+    <fieldset class="bloqueable"<%= puede.acompanado ? '' : ' disabled' %>>
+      <legend class="visualmente-oculto">Portada y tarjetas</legend>
+
+      <fieldset class="campo">
+        <legend class="etiqueta">Secciones de arriba de la portada</legend>
+        <input type="hidden" name="portadaEnviada" value="1">
+        <span class="ayuda">Tildá las que querés mostrar y elegí el orden. Abajo va siempre el catálogo completo.</span>
+        <ul class="portada-secciones">
+          <% ordenadas.forEach((clave) => { %>
+            <li class="portada-seccion">
+              <label class="casilla"><input type="checkbox" name="portadaMostrar_<%= clave %>" value="1"<%= mostradas.includes(clave) ? ' checked' : '' %>> <strong><%= secciones[clave].titulo %></strong></label>
+              <span class="ayuda"><%= secciones[clave].ayuda %></span>
+              <label class="portada-orden">Lugar
+                <select name="portadaOrden_<%= clave %>" aria-label="Lugar de <%= secciones[clave].titulo %>">
+                  <% for (let lugar = 1; lugar <= clavesSecciones.length; lugar++) { %><option value="<%= lugar %>"<%= ordenadas.indexOf(clave) + 1 === lugar ? ' selected' : '' %>><%= lugar %>.º</option><% } %>
+                </select>
+              </label>
+            </li>
+          <% }) %>
+        </ul>
+      </fieldset>
+
+      <%- radio('bannersAncho', 'Banners de bienvenida', opciones.bannersAncho, 'contenedor', 'tipos-entrega') %>
+      <%- radio('tarjetaEstilo', 'Estilo de las tarjetas de producto', opciones.tarjetaEstilo, 'plana') %>
+      <%- radio('tarjetaFoto', 'Proporción de la foto', opciones.tarjetaFoto, 'vertical') %>
+      <%- radio('tarjetaTexto', 'Alineación del nombre y el precio', opciones.tarjetaTexto, 'izquierda', 'tipos-entrega') %>
+    </fieldset>
+  </div>
+</section>
+
+<section class="ajuste ajuste-plan<%= puede.acompanado ? '' : ' ajuste-bloqueado' %>" id="logo-pie">
+  <div class="ajuste-intro">
+    <h2>Logo y pie de página <span class="pastilla pastilla-nivel">Plan Acompañado</span></h2>
+    <p class="texto-suave">Dónde va el logo en la cabecera, si la cabecera acompaña al bajar y cómo se ve el pie de la tienda.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <%- puede.acompanado ? '' : bloqueo('acompanado') %>
+    <fieldset class="bloqueable"<%= puede.acompanado ? '' : ' disabled' %>>
+      <legend class="visualmente-oculto">Logo y pie de página</legend>
+      <%- radio('logoPosicion', 'Posición del logo', opciones.logoPosicion, 'izquierda') %>
+      <% const fija = volvio ? valores.cabeceraFija !== '0' : valores.cabeceraFija !== false %>
+      <fieldset class="tipos-entrega">
+        <legend class="etiqueta">Cabecera al bajar por la página</legend>
+        <label class="opcion-tipo"><input type="radio" name="cabeceraFija" value="1"<%= fija ? ' checked' : '' %>><span><strong>Fija</strong></span><span class="ayuda">Queda arriba mientras se baja, como siempre.</span></label>
+        <label class="opcion-tipo"><input type="radio" name="cabeceraFija" value="0"<%= fija ? '' : ' checked' %>><span><strong>Se va con la página</strong></span><span class="ayuda">Solo se ve arriba de todo.</span></label>
+      </fieldset>
+      <%- radio('pieEstilo', 'Pie de página', opciones.pieEstilo, 'claro', 'tipos-entrega tipos-varios') %>
+      <%- colorOpcional('colorPie', 'el pie de página', '#18181b', 'Se usa cuando elegís "Otro color" arriba.') %>
+    </fieldset>
+  </div>
+</section>
+
+<section class="ajuste ajuste-plan<%= puede.a_medida ? '' : ' ajuste-bloqueado' %>" id="a-medida">
+  <div class="ajuste-intro">
+    <h2>A medida <span class="pastilla pastilla-nivel">Plan A medida</span></h2>
+    <p class="texto-suave">Para una tienda 100 % tuya: tipografías de Google Fonts a elección, el ancho de la página y tu propio CSS. También podés usar tu dominio propio.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <%- puede.a_medida ? '' : bloqueo('a_medida') %>
+    <fieldset class="bloqueable"<%= puede.a_medida ? '' : ' disabled' %>>
+      <legend class="visualmente-oculto">Diseño a medida</legend>
+      <div class="ajuste-campos-dos">
+        <div class="campo">
+          <label for="fuenteTitulos">Tipografía de los títulos <span class="opcional">(opcional)</span></label>
+          <input id="fuenteTitulos" type="text" name="fuenteTitulos" value="<%= sinFuente('fuenteTitulos') %>" list="fuentes-populares" maxlength="40" placeholder="Playfair Display" autocomplete="off" spellcheck="false" aria-describedby="ayuda-fuentes"<%- invalido('fuenteTitulos') %>>
+          <%- err('fuenteTitulos') %>
+        </div>
+        <div class="campo">
+          <label for="fuenteTexto">Tipografía del texto <span class="opcional">(opcional)</span></label>
+          <input id="fuenteTexto" type="text" name="fuenteTexto" value="<%= sinFuente('fuenteTexto') %>" list="fuentes-populares" maxlength="40" placeholder="Lora" autocomplete="off" spellcheck="false" aria-describedby="ayuda-fuentes"<%- invalido('fuenteTexto') %>>
+          <%- err('fuenteTexto') %>
+        </div>
+      </div>
+      <span class="ayuda" id="ayuda-fuentes">Escribí el nombre tal como figura en <a href="https://fonts.google.com" target="_blank" rel="noopener">fonts.google.com</a>. Vacío usa la tipografía que elegiste en Estilo. Si el nombre no existe, la tienda sigue con la tipografía de siempre.</span>
+      <datalist id="fuentes-populares">
+        <% for (const nombre of ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Nunito', 'DM Sans', 'Work Sans', 'Inter', 'Playfair Display', 'Lora', 'Merriweather', 'Cormorant Garamond', 'Oswald', 'Bebas Neue']) { %><option value="<%= nombre %>"></option><% } %>
+      </datalist>
+
+      <%- radio('anchoPagina', 'Ancho de la página', opciones.anchoPagina, 'normal', 'tipos-entrega tipos-varios') %>
+
+      <div class="campo">
+        <label for="cssPropio">CSS propio <span class="opcional">(opcional)</span></label>
+        <textarea id="cssPropio" class="codigo-css" name="cssPropio" rows="10" maxlength="<%= opciones.maxCss %>" spellcheck="false" autocapitalize="off" aria-describedby="ayuda-cssPropio"<%- invalido('cssPropio') %>><%= sinFuente('cssPropio') %></textarea>
+        <span class="ayuda" id="ayuda-cssPropio">Se agrega al final de la hoja de estilos de tu tienda, así que pisa lo demás (hasta <%= opciones.maxCss.toLocaleString('es-AR') %> caracteres). No se puede usar <code>@import</code> ni el signo <code>&lt;</code>; los <code>url()</code> tienen que ser https. En el checkout y la página del pedido también se aplica: probalo antes de comprar.</span>
+        <%- err('cssPropio') %>
+      </div>
+
+      <p class="ayuda">¿Querés tu propio dominio (por ejemplo <strong>mitienda.com</strong>)? Lo pedís desde <a href="/admin/cuenta#dominio">Cuenta → Dominio propio</a>.</p>
+    </fieldset>
+  </div>
+</section>

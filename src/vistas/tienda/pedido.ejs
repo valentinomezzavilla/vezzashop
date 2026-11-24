@@ -60,12 +60,30 @@
       <% } else if (esperandoPago && pedido.pago === 'mercadopago') { %>
         <section class="pedido-tarjeta pedido-pago" aria-labelledby="titulo-pago">
           <h2 id="titulo-pago"><%- icono('tarjeta', { tamano: 22 }) %> Pagá con Mercado Pago</h2>
-          <p><%= instruccionesMercadopago %></p>
-          <p>Total a pagar: <strong class="pedido-monto"><%= totalTexto %></strong></p>
-          <% if (whatsapp) { %>
-            <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= whatsapp %>" target="_blank" rel="noopener">
-              <%- icono('whatsapp', { tamano: 20 }) %> Pedir el link de pago por WhatsApp
-            </a>
+          <% if (pagoEnLinea) { %>
+            <% if (pagoPendiente) { %>
+              <p class="pedido-nota" role="status">Tu pago está pendiente de acreditación. Apenas Mercado Pago lo confirme, tu pedido pasa a "Pago confirmado". Si ya pagaste, no hace falta que hagas nada más.</p>
+            <% } else { %>
+              <% if (retornoMp === 'error') { %>
+                <p class="pedido-nota pedido-nota-error" role="alert">No pudimos completar el pago. Podés intentar de nuevo.</p>
+              <% } %>
+              <p>Total a pagar: <strong class="pedido-monto"><%= totalTexto %></strong></p>
+              <form method="post" action="/pedido/<%= pedido.token %>/pagar">
+                <button class="boton boton-grande boton-bloque" type="submit"><%- icono('tarjeta', { tamano: 20 }) %> Pagar con Mercado Pago</button>
+              </form>
+              <p class="pedido-nota">Pagás en Mercado Pago con tarjeta de crédito, débito o dinero en cuenta. Cuando se acredita, tu pedido pasa a "Pago confirmado" solo.</p>
+            <% } %>
+            <% if (whatsapp) { %>
+              <p class="pedido-nota">¿Tenés algún problema para pagar? <a href="<%= whatsapp %>" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p>
+            <% } %>
+          <% } else { %>
+            <p><%= instruccionesMercadopago %></p>
+            <p>Total a pagar: <strong class="pedido-monto"><%= totalTexto %></strong></p>
+            <% if (whatsapp) { %>
+              <a class="boton boton-grande boton-bloque boton-whatsapp-ficha" href="<%= whatsapp %>" target="_blank" rel="noopener">
+                <%- icono('whatsapp', { tamano: 20 }) %> Pedir el link de pago por WhatsApp
+              </a>
+            <% } %>
           <% } %>
         </section>
       <% } else if (pedido.estado === 'nuevo' && pedido.pago === 'efectivo') { %>
@@ -82,10 +100,49 @@
         <section class="pedido-tarjeta">
           <h2><%= estado %></h2>
           <p>
-            <% if (pedido.estado === 'pagado') { %>Ya recibimos tu pago. Estamos preparando tu pedido.
+            <% if (pedido.despacho.estado === 'preparacion') { %>Estamos preparando tu pedido. Cuando salga, vas a ver acá cómo seguirlo.
+            <% } else if (pedido.despacho.estado === 'despachado') { %>Tu pedido ya salió del local. Pronto lo vas a recibir.
+            <% } else if (pedido.despacho.estado === 'en_camino') { %>Tu pedido está en camino. Pronto lo vas a recibir.
+            <% } else if (pedido.estado === 'pagado') { %>Ya recibimos tu pago. Estamos preparando tu pedido.
             <% } else if (pedido.estado === 'enviado') { %><%= pedido.entrega.tipo === 'retiro' ? 'Tu pedido ya está listo. Podés pasar a buscarlo.' : 'Tu pedido ya salió. Pronto lo vas a recibir.' %>
             <% } else { %>¡Que lo disfrutes! Gracias por tu compra.<% } %>
           </p>
+        </section>
+      <% } %>
+
+      <% if (seguimiento) { %>
+        <section class="pedido-tarjeta pedido-seguimiento" aria-labelledby="titulo-seguimiento">
+          <h2 id="titulo-seguimiento"><%- icono(pedido.entrega.tipo === 'retiro' ? 'tienda' : 'camion', { tamano: 22 }) %> Seguimiento</h2>
+          <ol class="seguimiento">
+            <% for (const paso of seguimiento.pasos) { %>
+              <li class="seguimiento-paso seguimiento-<%= paso.estado %>"<%- paso.estado === 'actual' ? ' aria-current="step"' : '' %>>
+                <span class="seguimiento-marca" aria-hidden="true"><% if (paso.estado === 'hecho') { %><%- icono('check', { tamano: 12 }) %><% } %></span>
+                <span class="seguimiento-textos">
+                  <strong><%= paso.titulo %></strong>
+                  <% if (paso.fecha) { %><span class="seguimiento-fecha"><%= paso.fecha %></span><% } %>
+                </span>
+              </li>
+            <% } %>
+          </ol>
+          <% if (seguimiento.envio) { %>
+            <dl class="datos-cuenta">
+              <% if (seguimiento.envio.empresa) { %><div><dt>Empresa</dt><dd><span class="dato-cuenta"><%= seguimiento.envio.empresa %></span></dd></div><% } %>
+              <% if (seguimiento.envio.codigo) { %>
+                <div>
+                  <dt>Seguimiento</dt>
+                  <dd>
+                    <span class="dato-cuenta"><%= seguimiento.envio.codigo %></span>
+                    <button class="boton-copiar" type="button" data-copiar="<%= seguimiento.envio.codigo %>" aria-label="Copiar el número de seguimiento"><%- icono('copiar', { tamano: 16 }) %><span data-copiar-texto>Copiar</span></button>
+                  </dd>
+                </div>
+              <% } %>
+              <% if (seguimiento.envio.detalle) { %><div><dt>Aclaración</dt><dd><span class="dato-cuenta"><%= seguimiento.envio.detalle %></span></dd></div><% } %>
+            </dl>
+            <% if (seguimiento.envio.enlace) { %>
+              <a class="boton boton-contorno" href="<%= seguimiento.envio.enlace %>" target="_blank" rel="noopener noreferrer"><%- icono('externo', { tamano: 18 }) %> Seguir mi envío</a>
+              <% if (!seguimiento.envio.conEnlaceExacto && seguimiento.envio.codigo) { %><p class="pedido-nota">En el sitio de la empresa, escribí el número de seguimiento.</p><% } %>
+            <% } %>
+          <% } %>
         </section>
       <% } %>
 

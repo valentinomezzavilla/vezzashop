@@ -3,6 +3,7 @@
 import { listarPlanes, seOfrece, esAutoservicio } from './plataforma.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
+import { NIVELES } from './diseno-por-plan.js';
 
 const NUMERO = new Intl.NumberFormat('es-AR', { useGrouping: 'always' });
 const PESOS = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
@@ -54,6 +55,8 @@ export function armarPlanes(planes, { pagos = false } = {}) {
     const items = topes(plan);
     if (plan.diasPrueba && !gratis) items.push(`${plan.diasPrueba} días de prueba`);
     if (plan.diasPrueba && plan.suspenderAlVencer) items.push('Al terminar, la tienda se pausa hasta que elijas un plan');
+    // Cuánto del diseño de la tienda se puede personalizar con este plan (ver diseno-por-plan.js).
+    items.push((NIVELES[plan.nivelDiseno] ?? NIVELES.esencial).resumen);
     if (!plan.diasPrueba) items.push('Todo lo del panel y la tienda');
     return {
       id: plan.id,

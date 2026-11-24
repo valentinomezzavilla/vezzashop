@@ -976,6 +976,8 @@ body:has(.ingreso) { background: radial-gradient(900px 520px at 50% -8%, var(--p
 }
 .ajustes .ajuste:first-of-type { border-top: 0; padding-top: .25rem; }
 .encabezado + .ajuste, .aviso + .ajuste { border-top: 0; padding-top: .25rem; }
+/* Una sección con una tabla ancha: el título arriba y el contenido a todo el ancho (en dos columnas la tabla pasaría a tarjetas). */
+.ajuste-ancho { grid-template-columns: minmax(0, 1fr); }
 .ajuste-intro { display: grid; gap: .35rem; align-content: start; }
 .ajuste-intro .texto-suave { color: var(--texto-tenue); font-size: .875rem; }
 .ajuste-intro .ayuda { display: block; }
@@ -1190,6 +1192,26 @@ a.numero-tarjeta:hover { border-color: var(--borde-fuerte); box-shadow: var(--so
 .paso-tienda.hecho .paso-textos strong { color: var(--texto-tenue); text-decoration: line-through; text-decoration-color: var(--borde-fuerte); font-weight: 400; }
 .paso-tienda .boton { margin-left: auto; }
 
+/* Tus pedidos (en el Inicio, cuando ya no falta ningún paso). */
+.pedidos-inicio { display: grid; gap: 1rem; align-content: start; }
+.lista-pedidos-inicio { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.lista-pedidos-inicio a {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .25rem 1rem;
+  min-height: 56px; padding: .5rem .6rem; margin: 0 -.6rem; border-radius: var(--radio-control);
+  color: var(--texto); text-decoration: none; transition: background-color var(--rapido);
+}
+.lista-pedidos-inicio a:hover { background: var(--superficie-hover); }
+.lista-pedidos-numero { font-weight: 600; font-variant-numeric: tabular-nums; }
+.lista-pedidos-datos { display: grid; min-width: 0; }
+.lista-pedidos-datos strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.lista-pedidos-total { font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
+@media (max-width: 560px) {
+  .lista-pedidos-inicio a { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .lista-pedidos-total { grid-column: 2; grid-row: 2; }
+  .lista-pedidos-inicio .pastilla { grid-column: 3; grid-row: 1 / span 2; }
+}
+.pedidos-inicio-vacio { flex-wrap: wrap; }
+
 .alertas { display: grid; gap: .6rem; align-content: start; }
 .alertas-titulo { display: flex; gap: .45rem; align-items: center; margin-top: .4rem; color: var(--texto-tenue); font-size: .6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 .alertas-titulo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
@@ -1363,12 +1385,78 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
 
 .menu-contador { margin-left: auto; min-width: 20px; height: 20px; padding: 0 .4rem; border-radius: 99px; background: var(--error-solido); color: #fff; font-size: .6875rem; font-weight: 700; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 
+/* ---------- Productos: orden, categoría y acciones sobre varios ---------- */
+
+.filtros-lista { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem 1rem; margin: -.25rem 0 1rem; }
+.filtros-lista-campos { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem 1rem; }
+.campo-inline { display: grid; gap: .25rem; }
+.campo-inline label { font-size: .75rem; font-weight: 500; color: var(--texto-tenue); }
+.campo-inline select { min-height: 34px; padding-top: 0; padding-bottom: 0; font-size: .875rem; max-width: 100%; }
+/* Un aviso que pide confirmar algo que no es peligroso (por ejemplo, ocultar): sin el rojo del borrado. */
+.confirmar-neutro .confirmar-cuerpo { border-color: var(--borde-fuerte); background: var(--segmento); }
+.filtros-lista-accion { margin-left: auto; }
+@media (max-width: 640px) { .filtros-lista-accion { margin-left: 0; } .campo-inline { flex: 1 1 140px; } }
+
+.barra-seleccion-cuenta { padding-left: .6rem; font-size: .875rem; color: var(--texto-suave); white-space: nowrap; }
+.barra-seleccion select { min-height: 34px; padding-top: 0; padding-bottom: 0; font-size: .875rem; max-width: 190px; }
+
+/* ---------- Envío de un pedido: pasos e historial ---------- */
+
+.pasos-envio { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.paso-envio { position: relative; display: flex; flex-direction: column; align-items: center; gap: .4rem; text-align: center; color: var(--texto-tenue); font-size: .8125rem; }
+/* La línea que une cada paso con el anterior, por detrás de los círculos. */
+.paso-envio::before { content: ""; position: absolute; top: 13px; left: calc(-50% + 16px); right: calc(50% + 16px); height: 2px; background: var(--borde-fuerte); }
+.paso-envio:first-child::before { display: none; }
+.paso-envio-marca {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--superficie); box-shadow: inset 0 0 0 2px var(--borde-fuerte); font-size: .75rem; font-weight: 600;
+}
+.paso-envio.hecho, .paso-envio.actual { color: var(--texto); }
+.paso-envio.actual { font-weight: 600; }
+.paso-envio.hecho::before, .paso-envio.actual::before { background: var(--ok-solido); }
+.paso-envio.hecho .paso-envio-marca { background: var(--ok-solido); box-shadow: none; color: #fff; }
+.paso-envio.actual .paso-envio-marca { background: var(--primario); box-shadow: none; color: var(--primario-contraste, #fff); }
+
+.historial { list-style: none; margin: 0 0 .5rem; padding: 0; display: grid; }
+.historial-item { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: .1rem 1rem; padding: .7rem 0; border-bottom: 1px solid var(--borde); }
+.historial-item:last-child { border-bottom: 0; }
+.historial-fecha { grid-row: 1 / span 3; color: var(--texto-tenue); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.historial-item > :not(.historial-fecha) { grid-column: 2; }
+.historial-etiquetas { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .25rem; }
+.historial-interno strong { color: var(--texto-suave); font-weight: 500; }
+@media (max-width: 560px) {
+  .historial-item { grid-template-columns: minmax(0, 1fr); }
+  .historial-fecha { grid-row: auto; }
+  .historial-item > :not(.historial-fecha) { grid-column: 1; }
+  .paso-envio { font-size: .75rem; }
+}
+
 /* ---------- Pedidos ---------- */
 
 .celda-pedido { color: var(--texto); font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: none; }
 .celda-pedido:hover { color: var(--primario-texto); text-decoration: underline; }
 .tabla-pedidos td { vertical-align: top; }
 .tabla-pedidos td .celda-fila { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.tabla-pedidos .celda-acciones-pedido { width: 1%; text-align: right; vertical-align: middle; }
+.acciones-angosto { display: none; }
+
+/* Menú de acciones de cada pedido: un popover (arriba de todo; la tabla tiene scroll y lo recortaría). Lo ubica admin.js. */
+.menu-acciones-panel {
+  position: fixed; inset: auto; margin: 0; padding: .35rem;
+  min-width: 15rem; max-width: calc(100vw - 1rem); overflow: visible;
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--superficie-solida, var(--superficie)); color: var(--texto);
+  box-shadow: var(--sombra-flotante);
+}
+.menu-acciones-panel form { margin: 0; }
+.menu-acciones-panel a, .menu-acciones-panel button {
+  display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 38px; padding: 0 .75rem;
+  border: 0; border-radius: 8px; background: none; color: inherit;
+  font: inherit; font-size: .875rem; text-align: left; text-decoration: none; cursor: pointer;
+}
+.menu-acciones-panel a:hover, .menu-acciones-panel button:hover { background: var(--superficie-hover); }
+.menu-acciones-panel .icono { flex-shrink: 0; color: var(--texto-suave); }
+.menu-acciones-panel .menu-acciones-peligro, .menu-acciones-panel .menu-acciones-peligro .icono { color: var(--error); }
 
 .siguiente-paso {
   grid-template-columns: minmax(0, 1fr) auto; align-items: center;
@@ -1457,6 +1545,68 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
 .forma-pago:has([data-activar-forma]:not(:checked)) .forma-pago-campos { opacity: .5; }
 .formas-pago .barra-guardar { margin: 0; }
 
+/* Mercado Pago: la conexión de la cuenta y la calculadora de comisiones (Envíos y pagos). */
+.mp-conexion, .mp-calculadora { display: grid; gap: 1rem; }
+.mp-conexion > *, .mp-calculadora > * { margin: 0; }
+.mp-calculadora h3 { font-size: 1rem; font-weight: 600; }
+.mp-estado { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; }
+.mp-acciones { display: flex; flex-wrap: wrap; gap: .5rem; }
+.mp-token { border-top: 1px solid var(--borde); padding-top: 1rem; }
+.mp-token > summary { cursor: pointer; font-weight: 500; }
+.mp-token[open] > summary { margin-bottom: .75rem; }
+.mp-pasos { margin: 0 0 1rem; padding-left: 1.25rem; display: grid; gap: .3rem; }
+.mp-pasos code { font-size: .85em; }
+.mp-formulario-token { display: grid; gap: .75rem; max-width: 34rem; }
+.mp-calculos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; padding: 1rem; border-radius: 12px; background: var(--primario-suave); }
+.mp-calculo { display: grid; gap: .75rem; align-content: start; min-width: 0; }
+.mp-resultado { display: grid; gap: .35rem; margin: 0; }
+.mp-resultado > div { display: flex; justify-content: space-between; gap: 1rem; }
+.mp-resultado dt { color: var(--texto-tenue); }
+.mp-resultado dd { margin: 0; font-variant-numeric: tabular-nums; }
+.mp-resultado .mp-total { margin-top: .25rem; padding-top: .5rem; border-top: 1px solid var(--borde-fuerte); font-weight: 600; }
+.mp-resultado .mp-total dt { color: var(--texto); }
+.mp-resultado .mp-total dd { font-size: 1.15rem; }
+.mp-precio-necesario { font-size: 1rem; }
+.mp-precio-necesario strong { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.mp-tabla .tabla th[scope="row"] { color: var(--texto); font-size: inherit; font-weight: 500; background: transparent; }
+.mp-tabla .mp-fila-elegida { background: var(--primario-suave); }
+.mp-datos .boton { justify-self: start; }
+
+/* Diseño por plan: el nivel del plan, las secciones bloqueadas y las opciones propias de cada nivel. */
+.pastilla-nivel { margin-left: .5rem; vertical-align: middle; background: var(--primario-suave); color: var(--primario-texto); font-weight: 600; }
+.nivel-resumen { display: grid; gap: .75rem; margin-bottom: 1.5rem; }
+.nivel-resumen > * { margin: 0; }
+.nivel-resumen-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; }
+.nivel-resumen h2 { font-size: 1.05rem; }
+.nivel-detalle > summary { cursor: pointer; font-weight: 500; }
+.niveles-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: .85rem; }
+.nivel-columna { padding: 1rem; border: 1px solid var(--borde); border-radius: 12px; }
+.nivel-columna h3 { margin: 0 0 .2rem; font-size: .95rem; }
+.nivel-columna ul { margin: .6rem 0 0; padding-left: 1.1rem; display: grid; gap: .3rem; font-size: .875rem; }
+.nivel-actual { border-color: var(--primario); background: var(--primario-suave); }
+.nivel-bloqueado { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .75rem 1rem; border-radius: 10px; background: var(--primario-suave); }
+.nivel-bloqueado .icono { flex-shrink: 0; color: var(--primario-texto); }
+.nivel-bloqueado span { flex: 1 1 14rem; }
+.bloqueable { display: grid; gap: 1.25rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.ajuste-bloqueado .bloqueable { opacity: .5; }
+.portada-secciones { list-style: none; display: grid; gap: .5rem; margin: .5rem 0 0; padding: 0; }
+.portada-seccion { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem 1rem; align-items: center; padding: .7rem .9rem; border: 1px solid var(--borde); border-radius: 10px; }
+.portada-seccion .ayuda { grid-column: 1; }
+.portada-orden { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: .5rem; font-size: .8125rem; color: var(--texto-tenue); }
+.color-opcional input[type="color"] { width: 4.5rem; height: 2.5rem; padding: 2px; cursor: pointer; }
+.codigo-css { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8125rem; line-height: 1.5; tab-size: 2; white-space: pre; overflow: auto; }
+/* Dominio propio: el registro DNS que hay que cargar (tipo, nombre y valor) en una fila. */
+.dominio-registros { display: grid; gap: .75rem; }
+.dominio-registros > p { margin: 0; }
+.dominio-registros .datos-pedido { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); padding: .8rem 1rem; border-radius: 10px; background: var(--primario-suave); }
+.dominio-registros code { font-size: .875rem; overflow-wrap: anywhere; }
+/* En un celular la tabla no entra: se saca la tasa (ya está en el desplegable de arriba) y los textos pueden bajar de renglón, para que
+   se vea "Te quedan" sin tener que deslizar. */
+@container (max-width: 520px) {
+  .mp-tabla .tabla th:nth-child(2), .mp-tabla .tabla td:nth-child(2) { display: none; }
+  .mp-tabla .tabla th, .mp-tabla .tabla td { padding: .65rem .6rem; white-space: normal; }
+}
+
 .tipos-entrega { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: 0; border: 0; min-width: 0; }
 .tipos-entrega legend { margin-bottom: .5rem; padding: 0; }
 .tipos-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1512,13 +1662,17 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
   .tabla-productos .numero { text-align: left; }
   .tabla-productos .celda-acciones { margin-left: auto; }
 
-  /* Pedidos: número y estado arriba; cliente, entrega y total debajo. */
+  /* Pedidos: número y estado arriba; cliente, entrega y total debajo; y el botón "Ver" al final. */
   .tabla-pedidos tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .7rem 1rem; }
   .tabla-pedidos td { grid-column: 1 / -1; min-width: 0; }
   .tabla-pedidos td:first-child { grid-column: 1; grid-row: 1; }
-  .tabla-pedidos td:last-child { grid-column: 2; grid-row: 1; }
+  .tabla-pedidos td:nth-last-child(2) { grid-column: 2; grid-row: 1; }
   .tabla-pedidos .numero { text-align: left; }
   .tabla-pedidos td .celda-fila { max-width: none; white-space: normal; }
+  /* Sin lugar para un menú: la acción es entrar al pedido, con un botón que ocupa todo el ancho de la tarjeta. */
+  .acciones-ancho, .menu-acciones-panel { display: none !important; }
+  .tabla-pedidos .celda-acciones-pedido { width: auto; text-align: left; }
+  .acciones-angosto { display: flex; width: 100%; justify-content: center; min-height: 40px; }
 }
 
 /* Variantes: la tabla lleva el borde (el contenedor no), así en modo tarjetas cada variante es su propia tarjeta. */

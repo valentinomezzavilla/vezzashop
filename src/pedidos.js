@@ -5,6 +5,8 @@ import { variantesParaCarrito } from './vidriera.js';
 import { FORMAS_DE_PAGO } from './pagos.js';
 import { formatearPrecio } from './util/formato.js';
 import { slugificar } from './util/slug.js';
+import { ESTADOS, ORDEN_ESTADOS, esEstado, tituloEstado } from './estados-pedido.js';
+import { ESTADOS_ENVIO, registrarEvento, sincronizarEnvioConEstado } from './envios.js';
 
 export const MAX_LINEAS = 50;
 export const MAX_POR_LINEA = 50;
@@ -17,21 +19,8 @@ export const PROVINCIAS = [
   'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán',
 ];
 
-// Estados de un pedido. "enviado" se lee "Listo para retirar" cuando el cliente lo busca.
-export const ESTADOS = {
-  nuevo: { titulo: 'Nuevo', cliente: 'Recibido' },
-  pagado: { titulo: 'Pagado', cliente: 'Pago confirmado' },
-  enviado: { titulo: 'Enviado', tituloRetiro: 'Listo para retirar', cliente: 'En camino', clienteRetiro: 'Listo para retirar' },
-  entregado: { titulo: 'Entregado', cliente: 'Entregado' },
-  cancelado: { titulo: 'Cancelado', cliente: 'Cancelado' },
-};
-export const esEstado = (valor) => typeof valor === 'string' && Object.hasOwn(ESTADOS, valor);
-
-export function tituloEstado(estado, tipoEntrega, { paraCliente = false } = {}) {
-  const datos = ESTADOS[estado];
-  if (paraCliente) return (tipoEntrega === 'retiro' && datos.clienteRetiro) || datos.cliente;
-  return (tipoEntrega === 'retiro' && datos.tituloRetiro) || datos.titulo;
-}
+// Los estados de un pedido viven en estados-pedido.js; acá se vuelven a exportar para quien ya los importaba de pedidos.js.
+export { ESTADOS, esEstado, tituloEstado };
 
 export class ErrorDeStock extends Error {
   constructor(problemas) {
@@ -142,6 +131,9 @@ export function validarCheckout(campos, { entregas, pagos }) {
   if (!pago) errores.pago = 'Elegí cómo querés pagar';
   else if (pago.clave === 'efectivo' && entrega && !entrega.aceptaEfectivo) {
     errores.pago = `El pago en efectivo no está disponible con "${entrega.nombre}". Elegí otra forma de pago.`;
+  } else if (pago.clave === 'mercadopago' && pago.enLinea && entrega && entrega.costo === null) {
+    // Mercado Pago cobra en el momento y necesita el monto final: con un envío que se coordina después todavía no se sabe.
+    errores.pago = `El pago con Mercado Pago no está disponible con "${entrega.nombre}", porque su costo se coordina después. Elegí otra forma de pago.`;
   }
 
   const conDireccion = entrega?.tipo === 'domicilio';
@@ -204,6 +196,7 @@ export function crearPedido(db, tiendaId, items, datos) {
       'INSERT INTO pedido_items (pedido_id, sku, nombre, detalle, slug, precio_centavos, cantidad) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
     for (const l of lineas) await insertarItem.run(pedido.id, l.sku, l.nombre, l.detalle, l.slug, l.precio, l.cantidad);
+    await registrarEvento(tx, pedido.id, { paso: 'recibido', titulo: 'Recibimos tu pedido' });
     return { id: pedido.id, numero: pedido.numero, token: pedido.token };
   });
 }
@@ -215,6 +208,8 @@ const SELECCION_PEDIDO = `SELECT id, numero, token, estado, creado_en AS "creado
   direccion_calle, direccion_piso, direccion_ciudad, direccion_provincia, direccion_cp, direccion_referencias,
   pago, notas, subtotal_centavos AS subtotal, descuento_porcentaje AS "descuentoPorcentaje", descuento_centavos AS descuento,
   envio_centavos AS envio, total_centavos AS total,
+  envio_estado, envio_empresa, envio_seguimiento, envio_enlace, envio_detalle, nota_interna,
+  mp_preferencia_id, mp_init_point, mp_preferencia_creada_en, mp_pago_id, mp_pago_estado, mp_comision_centavos, mp_neto_centavos, mp_acreditacion,
   (SELECT coalesce(sum(cantidad), 0) FROM pedido_items i WHERE i.pedido_id = pedidos.id) AS unidades
   FROM pedidos`;
 
@@ -241,6 +236,27 @@ function filaAPedido(f) {
     envio: f.envio,
     total: f.total,
     unidades: f.unidades,
+    // El seguimiento de un envío a domicilio (ver envios.js): en qué paso está, con quién, el número y el link. `envio` es el costo.
+    despacho: {
+      estado: f.envio_estado,
+      empresa: f.envio_empresa,
+      seguimiento: f.envio_seguimiento,
+      enlace: f.envio_enlace,
+      detalle: f.envio_detalle,
+    },
+    notaInterna: f.nota_interna,
+    // El cobro con Mercado Pago (ver cobros-mp.js): el pago que se le armó al comprador y, cuando Mercado Pago lo informa, cómo salió y cuánto
+    // se quedó y cuánto le llega a la tienda. comision y neto son null mientras no se sabe.
+    mp: {
+      preferenciaId: f.mp_preferencia_id,
+      initPoint: f.mp_init_point,
+      preferenciaCreadaEn: f.mp_preferencia_creada_en,
+      pagoId: f.mp_pago_id,
+      pagoEstado: f.mp_pago_estado,
+      comision: f.mp_comision_centavos,
+      neto: f.mp_neto_centavos,
+      acreditacion: f.mp_acreditacion,
+    },
   };
 }
 
@@ -275,7 +291,8 @@ export const FILTROS_PEDIDOS = {
 };
 export const esFiltroPedidos = (valor) => typeof valor === 'string' && Object.hasOwn(FILTROS_PEDIDOS, valor);
 
-export async function listarPedidos(db, tiendaId, { filtro = 'abiertos', busqueda = '' } = {}) {
+// `limite`: cuántos como máximo (los más nuevos primero); el listado del panel muestra 200, el Inicio los últimos pocos.
+export async function listarPedidos(db, tiendaId, { filtro = 'abiertos', busqueda = '', limite = 200 } = {}) {
   const parametros = [tiendaId];
   let donde = `tienda_id = ? AND ${FILTROS_PEDIDOS[filtro].donde}`;
   const limpio = busqueda.trim().replace(/^#/, '');
@@ -284,7 +301,7 @@ export async function listarPedidos(db, tiendaId, { filtro = 'abiertos', busqued
     const patron = `%${limpio}%`;
     parametros.push(Number.parseInt(limpio, 10) || -1, `%${slugificar(limpio)}%`, patron, patron);
   }
-  return (await db.prepare(`${SELECCION_PEDIDO} WHERE ${donde} ORDER BY numero DESC LIMIT 200`).all(...parametros)).map(filaAPedido);
+  return (await db.prepare(`${SELECCION_PEDIDO} WHERE ${donde} ORDER BY numero DESC LIMIT ${Math.max(1, Math.trunc(Number(limite)) || 200)}`).all(...parametros)).map(filaAPedido);
 }
 
 export async function contarPedidosPorFiltro(db, tiendaId) {
@@ -298,17 +315,37 @@ export const contarPedidosNuevos = async (db, tiendaId) =>
 
 // ---------- Cambios de estado ----------
 
+// El paso de la línea de tiempo y el título del movimiento que deja un cambio de estado general.
+function movimientoDeEstado(estado, tipoEntrega) {
+  const retiro = tipoEntrega === 'retiro';
+  switch (estado) {
+    case 'nuevo': return { paso: 'recibido', titulo: 'Recibimos tu pedido' };
+    case 'pagado': return { paso: 'pagado', titulo: 'Pago confirmado' };
+    case 'enviado': return retiro ? { paso: 'listo', titulo: 'Listo para retirar' } : { paso: 'despachado', titulo: 'Despachado' };
+    default: return { paso: 'entregado', titulo: retiro ? 'Retirado' : 'Entregado' };
+  }
+}
+
 // Pasa un pedido a otro estado (salvo cancelar, que tiene su propia función). Un pedido cancelado no vuelve atrás.
-export async function cambiarEstado(db, tiendaId, id, estado) {
-  if (!esEstado(estado) || estado === 'cancelado') return false;
-  return (
-    (await db
-      .prepare(
-        `UPDATE pedidos SET estado = ?, actualizado_en = ahora()
-         WHERE tienda_id = ? AND id = ? AND estado <> 'cancelado'`,
-      )
-      .run(estado, tiendaId, id)).changes > 0
-  );
+// Si es a domicilio, el paso del envío acompaña (ver sincronizarEnvioConEstado), y el movimiento queda en el historial; una vuelta atrás
+// (por un error de botón) se anota pero no se le muestra al comprador. Devuelve { cambio } (el movimiento nuevo, o null si ya estaba así) o false.
+export function cambiarEstado(db, tiendaId, id, estado) {
+  if (!esEstado(estado) || estado === 'cancelado') return Promise.resolve(false);
+  return enTransaccion(db, async (tx) => {
+    const p = await tx
+      .prepare('SELECT id, estado, entrega_tipo AS "entregaTipo", envio_estado AS "envioEstado" FROM pedidos WHERE tienda_id = ? AND id = ? FOR UPDATE')
+      .get(tiendaId, id);
+    if (!p || p.estado === 'cancelado') return false;
+    await tx.prepare('UPDATE pedidos SET estado = ?, actualizado_en = ahora() WHERE id = ?').run(estado, id);
+    if (estado === p.estado) return { cambio: null };
+    await sincronizarEnvioConEstado(tx, p, estado);
+    const retroceso = ORDEN_ESTADOS.indexOf(estado) < ORDEN_ESTADOS.indexOf(p.estado);
+    const { paso, titulo } = movimientoDeEstado(estado, p.entregaTipo);
+    const cambio = await registrarEvento(tx, id, retroceso
+      ? { paso, titulo: `Corrección: pasó a ${tituloEstado(estado, p.entregaTipo)}`, visible: false }
+      : { paso, titulo });
+    return { cambio: { ...cambio, paso, titulo, retroceso } };
+  });
 }
 
 // Cancela el pedido y devuelve el stock de lo que todavía existe en el catálogo.
@@ -321,6 +358,7 @@ export function cancelarPedido(db, tiendaId, id) {
       )
       .run(tiendaId, id)).changes > 0;
     if (!cancelado) return false;
+    await registrarEvento(tx, id, { paso: 'cancelado', titulo: 'Pedido cancelado' });
     const devolver = tx.prepare(`UPDATE variantes SET stock = stock + ?, actualizado_en = ahora() WHERE tienda_id = ? AND sku = ?`);
     for (const item of await tx.prepare('SELECT sku, cantidad FROM pedido_items WHERE pedido_id = ?').all(id)) {
       await devolver.run(item.cantidad, tiendaId, item.sku);
@@ -330,6 +368,36 @@ export function cancelarPedido(db, tiendaId, id) {
 }
 
 // ---------- Ayudas para mostrar ----------
+
+// El paso siguiente de un pedido, para el botón principal del detalle y para el menú de acciones de la lista. Devuelve null si no hay nada más
+// que hacer (entregado o cancelado), o uno de:
+//   { estado, texto }               un cambio del estado general (POST .../estado)
+//   { envio, texto }                un paso del envío, de un clic (POST .../envio)
+//   { envio, ancla: 'envio', texto } un paso del envío que pide cargar antes la empresa y el número: lleva a la tarjeta del envío (#envio)
+export function siguientePaso(pedido) {
+  if (pedido.estado === 'cancelado' || pedido.estado === 'entregado') return null;
+  if (pedido.estado === 'nuevo' && pedido.pago !== 'efectivo') return { estado: 'pagado', texto: 'Marcar como pagado' };
+  if (pedido.entrega.tipo === 'retiro') {
+    return pedido.estado === 'enviado'
+      ? { estado: 'entregado', texto: 'Marcar como retirado' }
+      : { estado: 'enviado', texto: 'Marcar como listo para retirar' };
+  }
+  // A domicilio, lo que sigue es el envío.
+  switch (pedido.despacho.estado) {
+    case null: return { envio: 'preparacion', texto: 'Empezar a preparar el pedido' };
+    case 'preparacion': return { envio: 'despachado', ancla: 'envio', texto: 'Marcar como despachado…' };
+    case 'despachado': return { envio: 'en_camino', texto: 'Marcar como en camino' };
+    case 'en_camino': return { envio: 'entregado', texto: 'Marcar como entregado' };
+    default: return null;
+  }
+}
+
+// Cómo se llama el estado de un pedido para el negocio: en uno a domicilio, el paso del envío ("En camino") si ya empezó; si no, el estado general.
+export const tituloVisible = (pedido) =>
+  pedido.estado !== 'cancelado' && pedido.despacho.estado ? ESTADOS_ENVIO[pedido.despacho.estado].titulo : tituloEstado(pedido.estado, pedido.entrega.tipo);
+
+// Un pedido se puede cancelar mientras no esté entregado ni cancelado.
+export const sePuedeCancelar = (pedido) => pedido.estado !== 'cancelado' && pedido.estado !== 'entregado';
 
 // Número para wa.me a partir de lo que escribió el cliente: "351 15-123 4567" -> "5493511234567" (lo mejor posible).
 export function telefonoParaWhatsapp(telefono) {

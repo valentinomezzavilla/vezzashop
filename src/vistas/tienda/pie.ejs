@@ -22,7 +22,15 @@
       <nav class="pie-bloque pie-categorias" aria-label="Categorías">
         <p class="pie-titulo">Categorías</p>
         <div class="pie-enlaces">
-          <% for (const categoria of categorias) { %><a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a><% } %>
+          <% for (const categoria of categorias.slice(0, limiteCategoriasPie)) { %><a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a><% } %>
+          <% if (categorias.length > limiteCategoriasPie) { %>
+            <details class="chips-mas pie-mas">
+              <summary><span class="chips-mas-abrir">Ver todas (<%= categorias.length %>)</span><span class="chips-mas-cerrar">Ver menos</span></summary>
+              <div class="pie-enlaces">
+                <% for (const categoria of categorias.slice(limiteCategoriasPie)) { %><a href="<%= urlCategoria(categoria) %>"><%= categoria.nombre %></a><% } %>
+              </div>
+            </details>
+          <% } %>
         </div>
       </nav>
     <% } %>
@@ -99,5 +107,7 @@
   </dialog>
 <% } %>
 <p class="visualmente-oculto" role="status" aria-live="polite" data-anuncio></p>
+<%# Código de seguimiento al pie que carga quien administra la plataforma: solo con el plan a medida. %>
+<% if (locals.codigoPie) { %><%- codigoPie %><% } %>
 </body>
 </html>

@@ -13,6 +13,15 @@ import { buscarTienda } from '../tiendas.js';
 import { cancelarSuscripcionDeTienda, estadoDeSuscripcion, iniciarSuscripcion, retomarPago, sincronizarSuscripcion } from '../suscripciones.js';
 import { urlPanel } from '../util/dominios.js';
 import { formatearFecha } from '../util/formato.js';
+import { formatearDiaLargo, hoy } from '../util/fechas.js';
+
+// El aviso de una baja (la de un cliente en su panel y la que hace el administrador): hasta cuándo sigue activa la tienda y que se puede reactivar.
+export function textoDeBaja(venceEn, dia = hoy()) {
+  const vigente = Boolean(venceEn) && venceEn >= dia;
+  return vigente
+    ? `Cancelaste la suscripción: no se te cobran más meses. Tu tienda sigue activa hasta el ${formatearDiaLargo(venceEn)} (lo que ya pagaste). Podés reactivarla cuando quieras desde esta pantalla.`
+    : 'Cancelaste la suscripción: no se te cobran más meses. Podés reactivarla cuando quieras desde esta pantalla.';
+}
 
 export function rutasAdminSuscripcion({ db, config, servicios }) {
   const router = express.Router();
@@ -27,11 +36,18 @@ export function rutasAdminSuscripcion({ db, config, servicios }) {
     const estado = servicios ? await estadoDeSuscripcion(db, tiendaId) : { activa: null, pendiente: null, cancelada: null };
     // Los planes que se pueden contratar solos y se cobran: la prueba gratis es solo para cuentas nuevas.
     const contratables = servicios ? (await listarPlanes(db)).filter((p) => esAutoservicio(p) && p.precioCentavos > 0) : [];
+    const planes = armarPlanes(contratables);
+    // Con la suscripción cancelada: ¿todavía tiene días pagos? ¿Se puede volver al mismo plan? Si le quedan días, el primer cobro de la reactivación es el día
+    // en que vencen (no se cobra de más); si no, se cobra apenas autoriza.
+    const acceso = Boolean(limites.venceEn) && limites.cobro.estado !== 'vencido';
     res.render('admin/suscripcion', {
       tienda,
       limites,
       ...estado,
-      planes: armarPlanes(contratables),
+      acceso,
+      primerCobroAlReactivar: acceso && limites.cobro.dias > 0 ? limites.venceEn : null,
+      planAnterior: estado.cancelada ? (planes.find((p) => p.id === estado.cancelada.planId) ?? null) : null,
+      planes,
       pagos: await listarPagos(db, tiendaId),
       formatearFecha,
       pagosActivos: Boolean(servicios),
@@ -99,7 +115,10 @@ export function rutasAdminSuscripcion({ db, config, servicios }) {
       }
     }
     const despues = await estadoDeSuscripcion(db, req.session.usuario.tiendaId);
-    if (despues.activa && despues.activa.id !== activa?.id) avisar(req, 'ok', `¡Listo! Tu suscripción al plan ${despues.activa.planNombre} está activa.`);
+    if (despues.activa && despues.activa.id !== activa?.id) {
+      const proximo = despues.activa.proximoCobro ? ` Tu próximo cobro es el ${formatearDiaLargo(despues.activa.proximoCobro)}.` : '';
+      avisar(req, 'ok', `¡Listo! Tu suscripción al plan ${despues.activa.planNombre} está activa.${proximo}`);
+    }
     else if (despues.pendiente) avisar(req, 'ok', 'Estamos confirmando tu pago. En unos minutos se actualiza esta pantalla.');
     volver(res);
   });
@@ -107,14 +126,14 @@ export function rutasAdminSuscripcion({ db, config, servicios }) {
   router.post('/suscripcion/cancelar', verificarCsrf, async (req, res) => {
     let resultado;
     try {
-      resultado = await cancelarSuscripcionDeTienda(servicios, req.session.usuario.tiendaId);
+      resultado = await cancelarSuscripcionDeTienda(servicios, req.session.usuario.tiendaId, { urlBase: urlBase(req) });
     } catch (error) {
       console.error('No se pudo cancelar la suscripción en Mercado Pago:', error);
       avisar(req, 'error', 'No pudimos cancelar la suscripción: Mercado Pago no respondió. Probá de nuevo en un rato.');
       return volver(res);
     }
     if (resultado.error) avisar(req, 'error', resultado.error);
-    else avisar(req, 'ok', 'Cancelaste el débito automático: no se te cobran más meses. Tu tienda sigue funcionando hasta el vencimiento ya pago.');
+    else avisar(req, 'ok', textoDeBaja(resultado.venceEn));
     volver(res);
   });
 

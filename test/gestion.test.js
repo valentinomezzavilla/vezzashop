@@ -440,11 +440,26 @@ test('cuenta: cambiar el nombre de la tienda y la clave', async () => {
   const distinta = await nav.enviar('/admin/cuenta/clave', { claveActual: clave, claveNueva: 'una-clave-larga', claveRepetida: 'otra-clave-larga' }, { desde: '/admin/cuenta' });
   assert.match(await distinta.text(), /no coinciden/);
   const corta = await nav.enviar('/admin/cuenta/clave', { claveActual: clave, claveNueva: 'corta', claveRepetida: 'corta' }, { desde: '/admin/cuenta' });
-  assert.match(await corta.text(), /al menos 10 caracteres/);
+  assert.match(await corta.text(), /al menos 6 caracteres/);
 
   assert.equal((await nav.enviar('/admin/cuenta/clave', { claveActual: clave, claveNueva: 'una-clave-larga', claveRepetida: 'una-clave-larga' }, { desde: '/admin/cuenta' })).status, 302);
   assert.ok(await autenticar(db, 'cuenta@ejemplo.com', 'una-clave-larga'));
   assert.equal(await autenticar(db, 'cuenta@ejemplo.com', clave), null);
+});
+
+test('la clave mínima es de 6 caracteres: con 5 no se cambia, con 6 sí', async () => {
+  const { nav, clave } = await tiendaConPanel('clave-seis');
+  const cinco = await nav.enviar('/admin/cuenta/clave', { claveActual: clave, claveNueva: 'abcde', claveRepetida: 'abcde' }, { desde: '/admin/cuenta' });
+  assert.equal(cinco.status, 400);
+  assert.match(await cinco.text(), /al menos 6 caracteres/);
+  assert.ok(await autenticar(db, 'clave-seis@ejemplo.com', clave), 'con 5 caracteres no cambió nada');
+  const seis = await nav.enviar('/admin/cuenta/clave', { claveActual: clave, claveNueva: 'abcdef', claveRepetida: 'abcdef' }, { desde: '/admin/cuenta' });
+  assert.equal(seis.status, 302);
+  assert.ok(await autenticar(db, 'clave-seis@ejemplo.com', 'abcdef'));
+  assert.equal(await autenticar(db, 'clave-seis@ejemplo.com', clave), null);
+  // Al crear una tienda a mano con una clave elegida también vale el mínimo de 6.
+  await assert.rejects(crearTienda(db, { nombre: 'Clave Corta', email: 'corta@ejemplo.com', clave: 'abcde' }), /al menos 6 caracteres/);
+  assert.ok(await crearTienda(db, { nombre: 'Clave Justa', email: 'justa@ejemplo.com', clave: 'abcdef' }));
 });
 
 // ---------- Inicio ----------

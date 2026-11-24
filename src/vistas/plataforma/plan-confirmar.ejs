@@ -1,0 +1,129 @@
+<%- include('parciales/cabecera', { titulo: `Confirmar cambios · ${plan.nombre}` }) %>
+<%
+  // Pantalla intermedia al editar un plan que ya tienen clientes: nada se guardó todavía. Lo que se editó viaja escondido (campos) y,
+  // al confirmar, el servidor vuelve a validarlo y a leer los clientes de la base.
+  const cambiaPrecio = cambios.some((c) => c.precio);
+  const cantidad = clientes.length === 1 ? '1 cliente' : `${clientes.length} clientes`;
+%>
+<header class="encabezado">
+  <div>
+    <a class="volver" href="/plataforma/planes/<%= plan.id %>"><%- icono('izquierda', { tamano: 16 }) %> Volver al plan</a>
+    <h1>Confirmá los cambios en "<%= plan.nombre %>"</h1>
+    <p class="texto-suave">Este plan lo tienen <%= cantidad %>. Todavía no se guardó nada.</p>
+  </div>
+</header>
+
+<form method="post" action="/plataforma/planes/<%= plan.id %>/confirmar" class="ajustes">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <% for (const [nombre, valor] of Object.entries(campos)) { %><input type="hidden" name="<%= nombre %>" value="<%= valor %>"><% } %>
+  <% for (const c of clientes) { %><input type="hidden" name="visto" value="<%= c.id %>"><% } %>
+
+  <section class="ajuste ajuste-ancho">
+    <div class="ajuste-intro">
+      <h2>Qué cambia</h2>
+      <p class="texto-suave">Un cambio de precio se aplica desde el próximo cobro de cada cliente. Los topes y las condiciones valen desde ya.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="tabla-contenedor tabla-sin-borde">
+        <table class="tabla tabla-planes">
+          <thead><tr><th scope="col">Qué</th><th scope="col">Antes</th><th scope="col">Después</th><th scope="col">Para los clientes</th></tr></thead>
+          <tbody>
+            <% for (const c of cambios) { %>
+              <tr>
+                <td data-etiqueta="Qué"><%= c.etiqueta %></td>
+                <td data-etiqueta="Antes"><%= c.antes %></td>
+                <td data-etiqueta="Después"><strong><%= c.despues %></strong></td>
+                <td data-etiqueta="Para los clientes"><%= !c.afecta ? 'No les cambia nada' : c.precio ? 'Desde su próximo cobro' : 'Desde ya' %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste ajuste-ancho">
+    <div class="ajuste-intro">
+      <h2>Clientes</h2>
+      <p class="texto-suave">
+        <% if (sube) { %>Destildá a quienes <strong>no</strong> tengan que pagar más: conservan lo que pagan hoy como <strong>precio fijo</strong>, y los aumentos que vengan tampoco los alcanzan hasta que lo cambies en su ficha.
+        <% } else if (baja) { %>La baja se aplica a todos los que no tienen precio fijo.
+        <% } else { %>Estos clientes reciben los cambios.<% } %>
+      </p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="tabla-contenedor tabla-sin-borde">
+        <table class="tabla tabla-planes">
+          <thead>
+            <tr>
+              <% if (sube) { %><th scope="col">Aumento</th><% } %>
+              <th scope="col">Cliente</th>
+              <% if (cambiaPrecio) { %>
+                <th scope="col" class="numero">Hoy paga</th>
+                <th scope="col" class="numero">Pasaría a pagar</th>
+                <th scope="col">Próximo cobro</th>
+              <% } %>
+              <th scope="col">Mail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const c of clientes) { %>
+              <tr>
+                <% if (sube) { %>
+                  <td data-etiqueta="Aumento">
+                    <% if (c.alcanzado) { %>
+                      <label class="casilla"><input type="checkbox" name="aplicar" value="<%= c.id %>" checked> <span>Aplicar</span></label>
+                    <% } else { %>
+                      <span class="pastilla pastilla-ambar">Precio fijo</span>
+                    <% } %>
+                  </td>
+                <% } %>
+                <td data-etiqueta="Cliente">
+                  <a href="/plataforma/clientes/<%= c.id %>"><%= c.nombre %></a>
+                  <span class="ayuda celda-nota"><%= c.slug %></span>
+                </td>
+                <% if (cambiaPrecio) { %>
+                  <td data-etiqueta="Hoy paga" class="numero precio-celda"><%= formatearPrecio(c.paga) %></td>
+                  <td data-etiqueta="Pasaría a pagar" class="numero precio-celda">
+                    <% if (c.alcanzado) { %><%= formatearPrecio(datos.precioCentavos) %>
+                    <% } else { %><%= formatearPrecio(c.paga) %><span class="ayuda celda-nota">precio fijo: no cambia</span><% } %>
+                  </td>
+                  <td data-etiqueta="Próximo cobro">
+                    <% if (c.proximoCobro) { %>
+                      <%= formatearDia(c.proximoCobro) %>
+                      <% if (c.cobraPronto && c.alcanzado) { %><span class="pastilla pastilla-ambar">Cobra en menos de 7 días</span><% } %>
+                    <% } else { %><span class="ayuda"><%= c.mpId ? '—' : 'Sin débito automático' %></span><% } %>
+                  </td>
+                <% } %>
+                <td data-etiqueta="Mail" class="celda-envolver"><%= c.email || 'Sin email' %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Aviso a los clientes</h2>
+      <p class="texto-suave">Un mail con lo que cambió, desde cuándo, y el link a su panel.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <label class="interruptor">
+        <input type="checkbox" name="avisarPorMail" value="1" checked>
+        <span class="interruptor-pista" aria-hidden="true"></span>
+        <span class="interruptor-texto"><strong>Avisarles por mail</strong><span class="ayuda">Solo a quienes les cambia algo: a quien conserva su precio no se le avisa del precio, pero sí de los topes y las condiciones.</span></span>
+      </label>
+      <% if (!hayCorreo) { %>
+        <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>No hay un flujo de n8n configurado (<code>N8N_WEBHOOK_URL</code>): el cambio se aplica, pero no sale ningún mail.</span></p>
+      <% } %>
+    </div>
+  </section>
+
+  <div class="acciones">
+    <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Confirmar y guardar</button>
+    <a class="boton boton-secundario" href="/plataforma/planes/<%= plan.id %>">Volver al plan</a>
+  </div>
+</form>
+<%- include('parciales/pie') %>

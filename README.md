@@ -5,22 +5,23 @@ instalación, y cada cliente entra a su panel en `/admin` con su email y clave.
 
 **Estado:** ya funcionan el panel (inicio, pedidos, productos con fotos, categorías, carga masiva desde Excel,
 diseño, envíos y pagos, y cuenta), la **vidriera pública de cada tienda en su subdominio** y el **checkout**:
-el cliente elige cómo recibir el pedido y cómo pagar, y el pedido llega al panel. El cobro con tarjeta todavía
-es manual (link de pago de Mercado Pago que manda la tienda; ver [Qué falta](#qué-falta)).
+el cliente elige cómo recibir el pedido y cómo pagar, y el pedido llega al panel. Cada tienda puede **conectar su cuenta
+de Mercado Pago** para que el cliente pague en el momento (y el pedido pase a Pagado solo); sin conectarla, el cobro con
+tarjeta sigue siendo manual (link de pago que manda la tienda; ver [Mercado Pago en cada tienda](#mercado-pago-en-cada-tienda)).
 
 ## El panel
 
 | Sección | Qué hace el cliente |
 |---|---|
-| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. |
-| **Pedidos** | Ve los pedidos que llegan desde la tienda (por atender, nuevos, pagados, enviados, entregados, cancelados), busca por número, nombre, teléfono o email, y en cada uno: productos, datos del cliente, entrega, pago, el próximo paso con un botón ("Marcar como pagado", "Enviado" / "Listo para retirar", "Entregado"), WhatsApp al cliente y cancelar (devuelve el stock). |
-| **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, sin stock, sin foto); oculta o destaca con un clic; crea, edita y borra productos, también varios a la vez (se marcan en la lista y se confirma viendo cuáles). |
+| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. Cuando ya está hecho el último paso, la lista desaparece y en su lugar se ven los últimos pedidos. |
+| **Pedidos** | Ve los pedidos que llegan desde la tienda (por atender, nuevos, pagados, enviados, entregados, cancelados), busca por número, nombre, teléfono o email, y en cada uno: productos, datos del cliente, entrega, pago, el próximo paso con un botón ("Marcar como pagado", "Enviado" / "Listo para retirar", "Entregado"), WhatsApp al cliente y cancelar (devuelve el stock). Cada fila de la lista tiene un menú **Acciones** (ver el pedido, el paso siguiente, escribirle por WhatsApp, cancelar); en el celular, donde la fila es una tarjeta, hay un botón **Ver**. |
+| **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, con stock, pocas unidades, sin stock, en oferta, sin foto) y por categoría (con sus subcategorías, o sin categoría); ordena por nombre, precio, stock o antigüedad; oculta o destaca con un clic; crea, edita y borra productos. Con varios marcados en la lista: mostrar, ocultar, destacar, quitar de destacados o borrar (se confirma viendo cuáles). **"Ocultar los sin stock"** saca de la tienda, de una vez, todo lo visible que no tiene stock. |
 | **Editor de producto** | Nombre, descripción, marca, visible, destacado, categorías y variantes (hasta 3 tipos, por ejemplo Talle y Color) con SKU, precio, oferta y stock. Crea todas las combinaciones de una vez y aplica un precio o stock a todas las variantes. Hasta 10 fotos por producto, ordenables; la primera es la principal. |
 | **Categorías** | Crea, renombra, mueve dentro de otra y borra (con sus subcategorías; los productos no se borran). |
 | **Carga masiva** | Ver más abajo. |
 | **Diseño** | Ver más abajo. |
 | **Envíos y pagos** | Ver más abajo. |
-| **Cuenta** | Cambia el nombre de la tienda (el link no cambia; lo cambia quien administra la plataforma) y su clave (mínimo 10 caracteres). |
+| **Cuenta** | Cambia el nombre de la tienda (el link no cambia; lo cambia quien administra la plataforma) y su clave (mínimo 6 caracteres). |
 
 Todos los campos de clave (ingreso y cambio de clave, en el panel y en la plataforma) tienen un **ojo** al costado para ver lo
 que se escribe; `admin.js` lo agrega solo y la clave vuelve a ocultarse al enviar el formulario.
@@ -166,6 +167,10 @@ es el del panel; si un cliente entra a `/admin` desde su subdominio, lo manda al
 - Transiciones entre páginas con View Transitions; todo respeta "reducir movimiento".
 - Solo se muestran los productos visibles y con al menos una variante. Las categorías sin productos
   visibles no aparecen en el menú.
+- **Productos sin stock:** cada tienda elige en Diseño qué hacer con ellos: mostrarlos como a los demás (lo de siempre), mostrarlos al final de cada lista u ocultarlos
+  del catálogo, las categorías y el buscador (su link directo sigue abierto, con la etiqueta "Sin stock").
+- **Muchas categorías:** la portada muestra las primeras 8 como botones y un "Ver todas (N)" con el resto (el pie, las primeras 12); en Diseño se puede elegir mostrar todas
+  o ninguna.
 - No pueden usarse como nombre de tienda: `www`, `admin`, `panel`, `api`, `app`, `mail`.
 
 ## Diseño de la tienda
@@ -187,7 +192,8 @@ variables CSS que pone `estiloDeTienda` en el `<head>`, así que no hay estilos 
   pasa de 44) y **qué categorías de primer nivel aparecen en el menú de arriba** (el pie de página las muestra todas).
   Una categoría sin productos visibles no se muestra, la elijan o no.
 - **Catálogo:** orden por defecto (nombre, más nuevos o precio; el visitante lo puede cambiar), **tamaño de las
-  tarjetas** (chicas, normales o grandes: 5, 4 o 3 por fila en la computadora; en el celular siempre 2) y los
+  tarjetas** (chicas, normales o grandes: 5, 4 o 3 por fila en la computadora; en el celular siempre 2), qué hacer con los **productos sin stock**
+  (mostrar, al final u ocultar), cuántas **categorías** se ven en la portada (las primeras 8, todas o ninguna) y los
   **títulos** de la portada ("Todos los productos" y "Destacados" se pueden cambiar).
 - **Sobre la tienda:** una **descripción** corta (sale en el pie y como descripción para buscadores y para el link
   que se comparte) y una **nota al pie** (condiciones de compra, aclaraciones).
@@ -212,6 +218,40 @@ Para producción hace falta un solo dominio, con dos registros DNS apuntando al 
 (DNS challenge en el proxy). Ver [Publicar en Coolify](#publicar-en-coolify).
 Detrás del proxy, `NODE_ENV=production` hace que se respete el host original (`trust proxy`).
 
+### Diseño por plan
+
+Cada plan tiene un **nivel de diseño** (se elige en `/plataforma/planes`) que dice cuánto de la vidriera puede personalizar quien lo tiene. En **Diseño**,
+lo que el plan no incluye aparece **bloqueado** (con el nivel que lo trae) y arriba hay una comparación de qué incluye cada nivel:
+
+| Nivel | Qué suma |
+| --- | --- |
+| **Esencial** | Lo que ya existía: logo, color principal, franja, tipografía y esquinas, cabecera y menú, catálogo (orden, tamaño de tarjetas, sin stock, categorías), sobre la tienda, contacto, banners. |
+| **Acompañado** | **Colores** de fondo, texto, tarjetas y cabecera (el texto tiene que leerse: se exige un contraste mínimo de 4,5 a 1 y, si solo se cambia el fondo, el texto se ajusta solo); **logo** a la izquierda, al centro o a la derecha; cabecera fija o que se va con el scroll; **portada** con las secciones que se quieren (banners, **ofertas** —los productos con precio promocional— y destacados) en el orden que se elija, y banners dentro de la página o de punta a punta; **tarjetas de producto** sin marco, con borde o con sombra, foto vertical, cuadrada o apaisada y texto a la izquierda o centrado; **pie** claro, oscuro, del color de la marca o de otro color. |
+| **A medida** | **CSS propio** (hasta 20.000 caracteres; sin `<`, `@import`, `expression()`, `javascript:` ni `url()` que no sean https o rutas de la tienda), **tipografías de Google Fonts** a elección para títulos y texto, **ancho de la página** (angosto, normal, ancho, todo el ancho), **dominio propio** y **códigos de seguimiento** (píxeles, analítica) en la cabecera y el pie, que carga quien administra la plataforma desde la ficha del cliente. |
+
+El nivel se aplica **al leer**: si un cliente baja de plan, lo que había elegido de más queda guardado pero la vidriera deja de aplicarlo, y vuelve si sube.
+Una tienda sin plan, o con el plan interno "Sin límites", vale como A medida (nada cambia para las que ya existían). Las migraciones asignan Acompañado y A medida a los
+planes de esos nombres; los demás quedan en Esencial. Todo lo nuevo tiene como valor por defecto la vidriera de siempre: mientras la tienda no elija nada, no cambia nada.
+Los colores no se aplican al checkout ni a la página del pedido (tienen sus propias tarjetas y fondos fijos); el CSS propio, sí. El nivel viaja también en la tarjeta de cada
+plan de la landing y de `/admin/suscripcion`, y un cambio de nivel figura entre los cambios de un plan que se avisan por mail a sus clientes. Todo está en `src/diseno-por-plan.js`.
+
+### Dominio propio
+
+Los clientes del plan **A medida** pueden usar su propio dominio (`www.mitienda.com`). El recorrido tiene tres pasos:
+
+1. **Solicitado.** El cliente lo escribe en *Cuenta → Dominio propio* (o lo carga la plataforma desde su ficha). El panel le muestra el registro DNS que tiene que crear en el proveedor
+   del dominio: un **CNAME** al dominio del panel (para `www.` o cualquier subdominio) o un registro **A** (para el dominio sin `www`, que no puede ser un CNAME; para mostrarlo hace falta
+   `IP_SERVIDOR`, la IP pública del servidor).
+2. **DNS verificado.** *Verificar ahora* comprueba el DNS (CNAME al panel, o direcciones A iguales a las del panel o a `IP_SERVIDOR`). Si más tarde deja de apuntar, vuelve al primer paso.
+3. **Activo.** Lo activás vos desde la ficha del cliente en `/plataforma` (en la lista de clientes aparece "Dominio por activar" mientras falte). **Antes**, agregalo en Coolify:
+   aplicación → *Configuration* → *Domains* → sumá `https://www.mitienda.com` a los que ya hay (separados por coma) y *Redeploy*; Coolify pide solo el certificado. Abrí
+   `https://www.mitienda.com`, comprobá que carga con el candado y recién ahí tocá **Activar**.
+
+Con el dominio activo, la tienda se resuelve por ese host (`buscarTiendaPorDominio`), el subdominio de siempre **redirige con un 301** (con el mismo camino y las mismas búsquedas), y los mails,
+los links de pedidos, "Ver mi tienda" y las vueltas de Mercado Pago usan el dominio propio. Una vez activo, el cliente ya no lo puede cambiar ni quitar desde su panel (lo hacés vos: *Desactivar* o *Quitar*).
+Si usan Cloudflare, el registro tiene que estar en "solo DNS" (nube gris): con el proxy, el DNS no apunta al servidor y no se puede verificar (igual podés activarlo a mano si ya anda).
+Un dominio no puede ser de la plataforma ni de otra tienda. Dominios sin `www` (`mitienda.com`) y subdominios del cliente sirven por igual.
+
 ## Envíos y pagos
 
 En el panel, **Envíos y pagos**: lo que el cliente elige al finalizar la compra. La tienda vende online cuando
@@ -224,11 +264,69 @@ tiene al menos una forma de entrega y una de pago activas (si no, el carrito sig
   todo el país; se abren completos para revisar el costo antes de guardar.
 - **Formas de pago:** *transferencia* (alias, CBU/CVU, titular, banco y % de descuento; el descuento también
   se muestra en cada producto), *efectivo* (% de descuento; solo con entregas que lo aceptan) y *Mercado Pago*
-  (la tienda manda un link de pago por el total; texto para el cliente y cuotas sin interés, que se muestran en
-  cada producto). El descuento se aplica solo sobre los productos, no sobre el envío.
+  (con la cuenta de la tienda conectada, el cliente paga en el momento; si no, la tienda manda un link de pago por
+  el total; texto para el cliente y cuotas sin interés, que se muestran en cada producto). El descuento se aplica
+  solo sobre los productos, no sobre el envío.
+
+### Mercado Pago en cada tienda
+
+Cada tienda cobra con **su propia cuenta** de Mercado Pago (la plata va directo a ella; la plataforma no la toca). Desde *Envíos y pagos →
+Mercado Pago* se conecta de dos maneras: el botón **Conectar con Mercado Pago** (la tienda autoriza desde Mercado Pago, sin ver ni copiar
+claves; requiere que cargues `MP_CLIENT_ID` y `MP_CLIENT_SECRET`, ver abajo) o **pegando su Access Token** (siempre disponible: el panel explica
+dónde se saca). Los tokens se guardan **cifrados** (AES-256-GCM, con una clave derivada de `SECRETO_SESION`: igual que las sesiones, esa variable
+no puede cambiar, o cada tienda tiene que volver a conectar) y nunca se vuelven a mostrar. El token del botón vence a los 180 días y se **renueva
+solo** (se guarda el refresh token que devuelve cada renovación).
+
+Con la cuenta conectada:
+
+1. **Cobro en el momento.** Si el comprador elige Mercado Pago, al confirmar el pedido se lo lleva **directo a Mercado Pago** (se arma el pago con los
+   productos y el envío, con el pedido como referencia; vale 3 días). Si algo falla, el pedido igual queda hecho y en su página tiene un botón
+   **Pagar con Mercado Pago** para intentar de nuevo (reutiliza el mismo pago mientras no venza). Con una entrega de costo "a coordinar" Mercado Pago
+   no se puede elegir (todavía no hay un monto final).
+2. **El pedido pasa a Pagado solo.** Cuando Mercado Pago avisa (`POST /webhooks/mercadopago/tienda/<id>`) o el comprador vuelve a la tienda, la
+   plataforma **consulta el pago a Mercado Pago con el token de la tienda** y recién ahí, si está aprobado, es de ese pedido y por su monto
+   exacto, lo pasa a *Pagado* (queda en el historial y, si la tienda activó los avisos por mail, le llega el mail al comprador). Lo que trae el
+   aviso o la URL nunca decide nada: un aviso armado a mano no logra nada. Es idempotente (Mercado Pago repite los avisos). Un pago que llega a
+   un pedido cancelado, un segundo pago a un pedido ya pago o una devolución dejan una **nota interna** (no la ve el comprador) y no cambian el
+   estado: reembolsar o no lo decide la tienda desde Mercado Pago. Si el aviso no llegó, **Verificar pago** en el pedido lo consulta a mano.
+3. **Cuánto cobró Mercado Pago.** En el pedido pago, la tienda ve el estado del pago, lo que se quedó Mercado Pago (comisión e impuestos), lo que le
+   llega y cuándo se acredita: son los valores **reales** que informa Mercado Pago.
+4. **Calculadora de comisiones** (misma sección, también sin conectar): la tienda elige cuándo quiere recibir la plata y otros costos (cuotas sin interés,
+   retenciones) y ve **cuánto le queda** de una venta (por ejemplo $50.000) y, al revés, **a cuánto tiene que vender** para que le queden $50.000,
+   más una tabla con los cuatro plazos. Las tasas son las que publica Mercado Pago para link de pago y Checkout Pro en Argentina, **sin IVA**: 6,29 % al
+   instante, 4,39 % a los 10 días, 3,39 % a los 18 y 1,49 % a los 35, más 21 % de IVA sobre la comisión, sin cargo fijo; pueden variar por provincia
+   (consultadas en noviembre de 2026; si cambian, se editan en `src/publico/comisiones-mp.js`, el único lugar). La cuenta la hace el mismo código
+   en el servidor y en el navegador.
+
+Sin la cuenta conectada nada cambia: el cliente recibe el link de pago por WhatsApp y la tienda marca el pedido como pagado a mano.
+
+**Para activar el botón "Conectar con Mercado Pago"** (una sola vez, en tu aplicación de [Mercado Pago Developers](https://www.mercadopago.com.ar/developers/panel/app)):
+habilitá OAuth/"Redirect URLs" y cargá `https://<tu dominio del panel>/admin/pagos/mercadopago/volver` (exactamente así), y poné en el `.env`
+(en Coolify, como variables de entorno) `MP_CLIENT_ID` y `MP_CLIENT_SECRET` (los de la aplicación; las dos juntas o ninguna). Sin ellas el botón no aparece
+y queda el token pegado. Probalo con una cuenta de prueba de vendedor y otra de comprador antes de usarlo con clientes: los tests automáticos usan
+un Mercado Pago de mentira, así que lo que **no** está probado contra el de verdad es el canje del código OAuth, la renovación del token (si el
+refresh token es de un solo uso) y el formato exacto de las fechas del pago; todo eso está en `src/mercadopago-tiendas.js`.
 
 Los pedidos guardan una copia de lo comprado (productos, precios, entrega, dirección), así no cambian si después
 cambia el catálogo. Cancelar un pedido devuelve el stock de lo que todavía existe.
+
+**Envío de los pedidos a domicilio.** El estado general del pedido (nuevo, pagado, enviado, entregado, cancelado) sigue siendo el de los filtros, el stock y cancelar;
+en un pedido a domicilio, su **paso del envío** lo afina: *En preparación → Despachado → En camino → Entregado* (preparar no cambia el estado general; despachado y en camino
+son "enviado"; entregado es "entregado"). En el detalle del pedido, la tarjeta **Envío** deja elegir el paso, la **empresa** (Correo Argentino, Andreani, OCA, moto o cadete propio u otra),
+el **n.º de seguimiento**, un link de seguimiento exacto (opcional) y una aclaración para el comprador ("Llega entre el 12 y el 14"). Los botones de un clic del listado y del "¿Qué sigue?"
+pasan al paso siguiente; despachar lleva a la tarjeta para cargar los datos. Cada movimiento queda en el **historial** del pedido (una vuelta atrás por un error se anota, pero el
+comprador no la ve), el pedido tiene una **nota interna** que solo ve la tienda y una hoja para **imprimir el remito** (dirección grande, productos y control de bultos).
+Sin un link exacto, "Seguir mi envío" lleva al sitio de la empresa (correoargentino.com.ar, andreani.com, oca.com.ar), donde el comprador escribe el número: no se inventan links
+directos porque cada empresa cambia los suyos.
+
+**Lo que ve quien compró.** La página de su pedido (`/pedido/<código>`) trae una **línea de tiempo** con lo que ya pasó (con su fecha), el paso de ahora y lo que falta: *Recibimos tu pedido →
+Pago confirmado → En preparación → Despachado → En camino → Entregado* (sin el pago si se paga al recibir; en un retiro, *Listo para retirar → Retirado*), y, cuando ya salió, la empresa, el número
+con un botón para copiarlo, la aclaración y "Seguir mi envío".
+
+**Avisarle a quien compró.** Cada movimiento se puede comunicar de tres maneras: la propia página del pedido; **WhatsApp**, con un mensaje armado según el estado (con el seguimiento cuando ya salió);
+y **mail** (lo manda n8n, ver [Mails con n8n](#mails-con-n8n)), desde el nombre de la tienda y respondiendo a su email de contacto. El mail se tilda en cada actualización del envío; y en
+*Envíos y pagos → Avisos al cliente* la tienda puede activar que **cada cambio de estado** le llegue solo al comprador (por defecto está apagado: nada cambia hasta que la tienda lo active).
+Una corrección hacia atrás nunca se avisa. Aparte, "Volver a avisar por mail" reenvía el estado de ahora.
 
 ## Administración de la plataforma
 
@@ -247,7 +345,8 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
 - **Clientes.** Listado con filtros (activos, suspendidos, por vencer, vencidos), búsqueda y el ingreso mensual esperado.
   **Nuevo cliente** crea la tienda y su acceso, y te muestra la clave **una sola vez** junto con un mensaje listo para
   mandarle (con el link de la tienda y del panel). Desde la ficha de cada cliente: cambiarle el plan, registrar pagos,
-  fijar el vencimiento, suspender o reactivar, generarle una clave nueva, cambiarle el email y tomar notas internas.
+  fijar el vencimiento, fijarle un precio (que no cambie con los aumentos del plan), suspender o reactivar, generarle una clave nueva,
+  cambiarle el email y tomar notas internas.
 - **Link de la tienda.** El link (subdominio) sale del nombre al dar de alta, o se elige a mano en el campo *Link*. Se cambia desde
   la ficha del cliente, en **Link de la tienda**: el link se normaliza (sin tildes ni espacios), tiene que ser un subdominio
   válido, no estar reservado (`www`, `admin`, `plataforma`…) ni usarlo otra tienda. **El link anterior sigue funcionando y redirige
@@ -260,7 +359,8 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
   Un tope vacío es "sin límite". Al llegar a un tope, el cliente no puede cargar más y se le avisa que amplíe su plan;
   editar lo que ya tiene sigue andando, y vale también para la carga masiva por Excel. Las tiendas que ya existían quedaron
   en el plan **Sin límites**, para que nada cambie para ellas. Un plan con clientes no se puede borrar: se **pausa** (botón *Pausar* en la lista): deja de ofrecerse al dar de alta o cambiar de
-  plan, y los clientes que ya lo tienen no notan nada. *Reanudar* lo vuelve a ofrecer.
+  plan, y los clientes que ya lo tienen no notan nada. *Reanudar* lo vuelve a ofrecer. Si editás el precio o los topes de un plan que ya tiene clientes, antes de guardar
+  ves a quiénes les toca (ver *Aumentos de precio* más abajo).
 - **Período de prueba.** Un plan puede tener **días de prueba** (el plan *Prueba* trae 7): a cada cliente que entra al plan, ya sea al darlo
   de alta o al cambiarle el plan, le vence a los N días de ese momento. Si al dar de alta elegís una fecha, vale esa (para darle más o menos
   días a un cliente puntual); cambiar a un plan sin prueba no toca el vencimiento.
@@ -309,9 +409,21 @@ mandando por WhatsApp, `/suscribirse` vuelve a la portada y nada más cambia.
 **Cobros.** Cada cobro mensual aprobado por Mercado Pago **suma un mes pagado** (`vence_en`, igual que registrar un pago a mano) y queda en
 el historial con la nota *Mercado Pago · cobro N*. Si el cobro llega antes de que el cliente cree su cuenta, queda guardado y se aplica al
 crearla. Al crear la cuenta antes del primer cobro, la tienda queda abierta 2 días hasta que llegue. Cancelar el débito **no cierra la
-tienda**: sigue abierta hasta el vencimiento ya pago, y después rige lo que diga el plan (*Cerrar la tienda sola al vencer*). El monto de
-cada suscripción es el **precio del plan al momento de contratar**: si después cambiás el precio del plan, los que ya están suscriptos
-siguen con el anterior.
+tienda**: sigue abierta hasta el vencimiento ya pago, y después rige lo que diga el plan (*Cerrar la tienda sola al vencer*).
+
+**Aumentos de precio.** Al editar un plan que ya tienen clientes (`/plataforma/planes`), si cambia el precio, los topes o lo que pasa al vencer,
+**no se guarda de entrada**: primero se ve a qué clientes les toca, con lo que pagan hoy, lo que pasarían a pagar y su próximo cobro. En un aumento
+se puede **sacar de él** a quien no tenga que pagar más (casilla *Aplicar* sin marcar): conserva lo que paga hoy como **precio fijo**, y los aumentos
+que vengan tampoco lo alcanzan hasta que se cambie en su ficha (sección *Precio*) o lo pasen de plan. Al confirmar, el precio nuevo se aplica al
+cobro de Mercado Pago de cada cliente alcanzado (`PUT /preapproval/{id}`, vale desde su próximo cobro); si Mercado Pago rechaza el cambio de alguno, el plan igual
+se guarda y ese cliente queda listado para reintentar desde su ficha (*Actualizar el cobro a $X*). Una baja se aplica a todos los que no tienen precio fijo.
+Y por cada cliente al que algo le cambia (el precio solo si no tiene precio fijo; los topes a todos) se le manda un mail por n8n (evento `plan_modificado`).
+
+**Bajas.** Cuando una suscripción se cancela, por el cliente en su panel, por vos desde la ficha o por el propio cliente desde su cuenta de Mercado
+Pago, se le manda **una sola vez** un mail (`suscripcion_cancelada`) que dice hasta cuándo sigue activa su tienda (el vencimiento ya pago: si pagó por última vez
+el 25 de octubre y cancela el 10 de noviembre, sigue activa hasta el 25 de noviembre) y que puede reactivarla cuando quiera. En su panel el aviso también dice la fecha, y la
+pantalla *Suscripción* ofrece **Reactivar mi suscripción**: si todavía le quedan días pagos, el primer cobro se programa para el día en que vencen (`start_date`),
+así no se cobra de más ni se interrumpe la tienda; si ya venció, cobra apenas autoriza. El cambio de plan (que da de baja la suscripción anterior a propósito) no manda ese aviso.
 
 **Los clientes que ya existen** contratan, cambian de plan o cancelan en **Cuenta → Pagar o cambiar de plan** (`/admin/suscripcion`).
 Al cambiar de plan se crea una suscripción nueva al precio nuevo y, cuando se autoriza, se da de baja la anterior (sin prorrateo). Una
@@ -359,6 +471,14 @@ cuál es:
 | --- | --- | --- |
 | `cuenta_creada` | Al crear la cuenta (y desde *Reenviar mail de bienvenida*) | `email`, `nombre`, `apellido`, `tienda: { nombre, url }`, `plan: { nombre, precio }`, `urlPanel` |
 | `pago_recibido` | Al confirmarse el pago, mientras no haya creado la cuenta (y desde *Reenviar link por mail*) | `email`, `plan: { nombre, precio }`, `urlCuenta` |
+| `plan_modificado` | Al confirmar un cambio de precio o de topes de un plan que tiene clientes (y desde *Actualizar el cobro* en la ficha) | `email`, `nombre`, `tienda: { nombre }`, `plan: { nombre }`, `cambios: [{ etiqueta, antes, despues, cuando }]`, `urlPanel` |
+| `suscripcion_cancelada` | Al cancelarse una suscripción (una sola vez por suscripción) | `email`, `nombre`, `apellido`, `tienda: { nombre }`, `plan: { nombre }`, `accesoHasta`, `accesoHastaTexto`, `vencida`, `urlReactivar` |
+| `pedido_actualizado` | Al cambiar el estado o el envío de un pedido (y desde *Volver a avisar por mail*), si hay email del comprador | `email`, `cliente: { nombre }`, `tienda: { nombre, url, email, whatsapp }`, `pedido: { numero, url, total, estado }`, `titulo`, `mensaje`, `seguimiento: { empresa, codigo, url, detalle }` o `null` |
+
+**El código del nodo está en el repo:** `n8n/validar-y-armar-mail.js` es el contenido del nodo *Code* "Validar y armar mail" del flujo (valida cada aviso, arma el HTML y el texto del mail y decide el
+remitente: `VEZZA Shop` para los mails de la plataforma y el nombre de la tienda para `pedido_actualizado`, con `Reply-To` al email de contacto de la tienda). Para actualizar el flujo, pegá ese
+archivo en el nodo y, en el nodo *Send Email*, poné como remitente `{{ $json.desde }}` y, en las opciones, *Reply To* = `{{ $json.responderA }}`. Lo prueba `test/n8n-mails.test.js` (con los avisos
+reales que arma la app), así que si se cambia un aviso, el test avisa si el nodo quedó desactualizado.
 
 `cuenta_creada` es el mail de "tu cuenta está lista" con el link `urlPanel` para entrar a gestionarla; **nunca lleva la clave**.
 `pago_recibido` lleva `urlCuenta`, el link para completar el formulario. Un flujo mínimo: *Webhook* (POST, Header Auth) → *Switch* por
@@ -500,11 +620,21 @@ src/
   inicio.js              datos del tablero de Inicio
   vidriera.js            consultas de la vidriera pública
   diseno.js              ajustes de diseño de cada tienda y banners
+  diseno-por-plan.js     niveles de diseño (esencial, acompañado, a medida): qué puede personalizar cada plan, validaciones y el estilo que se genera
+  dominios-propios.js    dominio propio de una tienda: validar, pedir, verificar el DNS, activar
   pagos.js               formas de entrega y de pago (Envíos y pagos)
+  secretos.js            cifrado (AES-256-GCM) de los tokens de Mercado Pago de cada tienda
+  mercadopago-tiendas.js cliente de Mercado Pago con el token de una tienda: OAuth, armar el pago y consultarlo
+  tienda-mercadopago.js  la conexión de cada tienda con su cuenta: guardar (cifrado), renovar el token y desconectar
+  cobros-mp.js           cobrar un pedido con Mercado Pago: armar el pago, comprobarlo y pasar el pedido a Pagado
+  comisiones-mp.js       cuánto cobra Mercado Pago y cuánto le queda a la tienda (el código vive en publico/comisiones-mp.js)
   pedidos.js             checkout: totales, validación, crear el pedido; pedidos del panel
+  estados-pedido.js      los estados de un pedido y cómo se llaman (para el negocio y para el comprador)
+  envios.js              envío de los pedidos a domicilio: pasos, empresas, historial, línea de tiempo y avisos al comprador
   imagenes.js            imágenes subidas: conversión a WebP, miniaturas y medidas
   landing.js             datos de la landing: tarjetas de planes y precios para Google (la vista es vistas/landing.ejs)
-  suscripciones.js       suscripciones a los planes: contratar, cobros, crear la cuenta después de pagar, cancelar
+  suscripciones.js       suscripciones a los planes: contratar, cobros, crear la cuenta después de pagar, cancelar y reactivar
+  cambios-de-plan.js     cambios en un plan con clientes: qué cambió, aumentos con excepciones (precio fijo), Mercado Pago y avisos
   mercadopago.js         cliente de la API de Mercado Pago y validación de la firma de los webhooks
   notificaciones.js      avisos a n8n (el flujo que manda los mails de alta)
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
@@ -529,7 +659,7 @@ src/
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   rutas/suscribirse.js   alta pública: elegir plan, pagar y crear la cuenta (/suscribirse)
   rutas/admin-suscripcion.js  panel /admin: la suscripción del cliente a su plan
-  rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago)
+  rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago y /webhooks/mercadopago/tienda/:id)
   util/iconos.js         íconos SVG de las vistas
   util/vezza.js          logo y firma de Vezza (SVG de publico/vezza/ incrustado en las vistas)
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/
@@ -545,12 +675,12 @@ test/                    tests (node:test)
 
 Etapas siguientes, en orden sugerido:
 
-1. Cobro automático con Mercado Pago (Checkout Pro con las credenciales de cada tienda y aviso de pago por
-   webhook, que marque el pedido como pagado solo). Hoy la tienda manda el link de pago a mano.
-2. Avisos por email: a la tienda cuando entra un pedido y al cliente con el detalle y los cambios de estado
-   (hoy se avisa por el contador del panel y por WhatsApp).
+1. Cancelar solos los pedidos de Mercado Pago que no se pagan (hoy reservan el stock hasta que la tienda los cancela) y devolver el
+   dinero desde la plataforma (hoy el reembolso se hace desde Mercado Pago).
+2. Avisos por email: a la tienda cuando entra un pedido y al comprador con el detalle al hacerlo (los cambios de estado y de envío ya le llegan por mail y por WhatsApp;
+   hoy la tienda se entera de un pedido nuevo por el contador del panel).
 3. Cotizar envíos con Correo Argentino / Andreani según el código postal (hoy: costo fijo o "a coordinar").
-4. Dominio propio por cliente.
+4. Que el dominio propio se agregue solo en Coolify (hoy lo hacés a mano, ver [Dominio propio](#dominio-propio)) y un aviso por mail cuando un cliente pide o verifica el suyo.
 5. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
 6. Foto por color en las variantes.
 7. Para producción: límite de intentos de login en el panel de cada tienda (el de `/plataforma` ya lo tiene), que cada dueño

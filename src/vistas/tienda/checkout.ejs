@@ -126,15 +126,20 @@
       <fieldset class="opciones-checkout"<%- errores.pago ? ' aria-describedby="error-pago"' : '' %>>
         <legend class="visualmente-oculto">¿Cómo querés pagar?</legend>
         <% for (const p of pagos) { %>
-          <% const sinEfectivo = p.clave === 'efectivo' && entregaElegida && !entregaElegida.aceptaEfectivo %>
-          <label class="opcion-checkout<%= sinEfectivo ? ' no-disponible' : '' %>" data-opcion-pago="<%= p.clave %>">
+          <%
+            // Hay formas de pago que no se pueden usar con la entrega elegida: el efectivo con las que no lo aceptan, y Mercado Pago (cobra en el momento)
+            // cuando el costo del envío se coordina después.
+            const sinOpcion = (p.clave === 'efectivo' && entregaElegida && !entregaElegida.aceptaEfectivo)
+              || (p.clave === 'mercadopago' && p.enLinea && entregaElegida && entregaElegida.costo === null);
+          %>
+          <label class="opcion-checkout<%= sinOpcion ? ' no-disponible' : '' %>" data-opcion-pago="<%= p.clave %>">
             <input type="radio" name="pago" value="<%= p.clave %>" data-pago<%= v('pago') === p.clave ? ' checked' : '' %> required>
             <span class="opcion-checkout-icono" aria-hidden="true"><%- icono(p.clave === 'transferencia' ? 'banco' : p.clave === 'efectivo' ? 'billete' : 'tarjeta', { tamano: 22 }) %></span>
             <span class="opcion-checkout-textos">
               <strong><%= p.titulo %><% if (p.descuento) { %> <span class="beneficio-off"><%= p.descuento %>% off</span><% } %></strong>
               <span><%= p.detalle %></span>
-              <% if (p.clave === 'efectivo') { %>
-                <span class="opcion-checkout-nota" data-sin-efectivo<%= sinEfectivo ? '' : ' hidden' %>>No disponible con la entrega que elegiste.</span>
+              <% if (p.clave === 'efectivo' || (p.clave === 'mercadopago' && p.enLinea)) { %>
+                <span class="opcion-checkout-nota" data-sin-opcion<%= sinOpcion ? '' : ' hidden' %>><%= p.clave === 'efectivo' ? 'No disponible con la entrega que elegiste.' : 'No disponible con la entrega que elegiste: su costo se coordina después.' %></span>
               <% } %>
             </span>
           </label>
@@ -187,7 +192,9 @@
         </div>
       </dl>
       <button class="boton boton-grande boton-bloque" type="submit" data-confirmar><%- icono('candado', { tamano: 18 }) %> Confirmar pedido</button>
-      <p class="resumen-nota">Al confirmar, reservamos los productos y te mostramos cómo pagar.</p>
+      <% const mpEnLinea = pagos.some((p) => p.clave === 'mercadopago' && p.enLinea && v('pago') === 'mercadopago') %>
+      <p class="resumen-nota" data-nota-comun<%= mpEnLinea ? ' hidden' : '' %>>Al confirmar, reservamos los productos y te mostramos cómo pagar.</p>
+      <p class="resumen-nota" data-nota-mp<%= mpEnLinea ? '' : ' hidden' %>>Al confirmar, reservamos los productos y te llevamos a Mercado Pago para que pagues en el momento.</p>
     </div>
   </aside>
 </form>

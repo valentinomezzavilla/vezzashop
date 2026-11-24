@@ -55,6 +55,7 @@
             <th scope="col">Entrega y pago</th>
             <th scope="col" class="numero">Total</th>
             <th scope="col">Estado</th>
+            <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
           </tr>
         </thead>
         <tbody>
@@ -74,6 +75,28 @@
             </td>
             <td class="numero precio-celda" data-etiqueta="Total"><%= formatearPrecio(p.total) %><% if (p.envio === null) { %><span class="ayuda celda-nota">+ envío</span><% } %></td>
             <td><span class="pastilla pastilla-<%= p.estado %>"><%= p.tituloEstado %></span></td>
+            <td class="celda-acciones-pedido">
+              <%# En una tabla ancha: menú de acciones. En una angosta (el celular), la fila es una tarjeta y alcanza con un botón "Ver". %>
+              <button class="boton boton-secundario boton-chico acciones-ancho" type="button" popovertarget="acciones-<%= p.id %>" aria-label="Acciones del pedido #<%= p.numero %>">Acciones <%- icono('abajo', { tamano: 14 }) %></button>
+              <%# Un popover: se dibuja arriba de todo, así la tabla (que tiene su propio scroll) no lo recorta. admin.js lo ubica al lado del botón. %>
+              <div class="menu-acciones-panel" id="acciones-<%= p.id %>" popover data-menu-acciones>
+                <a href="/admin/pedidos/<%= p.id %>"><%- icono('ojo', { tamano: 16 }) %> Ver pedido</a>
+                <% if (p.siguiente && p.siguiente.ancla) { %>
+                  <%# Un paso que pide cargar datos (la empresa y el número de seguimiento): lleva a la tarjeta del envío. %>
+                  <a href="/admin/pedidos/<%= p.id %>#<%= p.siguiente.ancla %>"><%- icono('camion', { tamano: 16 }) %> <%= p.siguiente.texto %></a>
+                <% } else if (p.siguiente) { %>
+                  <form method="post" action="/admin/pedidos/<%= p.id %>/<%= p.siguiente.envio ? 'envio' : 'estado' %>">
+                    <input type="hidden" name="_csrf" value="<%= csrf %>">
+                    <input type="hidden" name="estado" value="<%= p.siguiente.envio || p.siguiente.estado %>">
+                    <input type="hidden" name="volver" value="<%= volver %>">
+                    <button type="submit"><%- icono(p.siguiente.envio ? 'camion' : 'check', { tamano: 16 }) %> <%= p.siguiente.texto %></button>
+                  </form>
+                <% } %>
+                <a href="<%= p.whatsapp %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 16 }) %> Escribirle por WhatsApp</a>
+                <% if (p.cancelable) { %><a class="menu-acciones-peligro" href="/admin/pedidos/<%= p.id %>#cancelar"><%- icono('cerrar', { tamano: 16 }) %> Cancelar pedido…</a><% } %>
+              </div>
+              <a class="boton boton-secundario boton-chico acciones-angosto" href="/admin/pedidos/<%= p.id %>">Ver<span class="visualmente-oculto"> el pedido #<%= p.numero %></span></a>
+            </td>
           </tr>
         <% } %>
         </tbody>

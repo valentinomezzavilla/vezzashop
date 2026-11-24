@@ -6,7 +6,7 @@ import { abrirBase } from '../src/db.js';
 import { crearApp } from '../src/app.js';
 import { crearPlan, PLANES_SUGERIDOS, suspenderCliente } from '../src/plataforma.js';
 import { crearTienda } from '../src/tiendas.js';
-import { hoy, sumarDias } from '../src/util/fechas.js';
+import { formatearDiaLargo, hoy, sumarDias } from '../src/util/fechas.js';
 import { crearNavegador } from './ayudantes.js';
 import { TOKEN_MP, crearMpFalso, crearN8nFalso } from './mercadopago-falso.js';
 
@@ -160,8 +160,9 @@ test('cancelar da de baja el cobro automático y la tienda sigue abierta', async
   assert.equal(r.status, 302);
   assert.equal(mp.suscripciones.get('mp1abc').status, 'cancelled');
   const html = await pagina();
-  assert.match(html, /Cancelaste el débito automático/);
-  assert.match(html, /No se te cobran más meses/);
+  assert.match(html, /Cancelaste la suscripción: no se te cobran más meses/);
+  assert.match(html, new RegExp(`Tu tienda sigue activa hasta el ${formatearDiaLargo(sumarDias(hoy(), 2))}`), 'el aviso dice hasta cuándo');
+  assert.match(html, /Reactivar mi suscripción/, 'y se puede reactivar');
   assert.match(html, /Suscribirme a Esencial/, 'puede volver a suscribirse');
   const otra = await pago('cancelar');
   assert.equal(otra.status, 302);

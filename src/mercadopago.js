@@ -1,7 +1,7 @@
 // Cliente de Mercado Pago para cobrar las suscripciones a los planes (la plataforma como vendedora, no las tiendas de los clientes).
 // Todo lo que sabe cómo habla Mercado Pago está acá, así si su API cambia se toca un solo archivo.
 //  - Suscripciones: POST /preapproval (sin plan asociado, en estado "pending": devuelve un init_point al que se manda al cliente
-//    para que cargue su tarjeta), GET /preapproval/{id}, PUT /preapproval/{id} (cancelar).
+//    para que cargue su tarjeta), GET /preapproval/{id}, PUT /preapproval/{id} (cancelar y cambiar el monto).
 //  - Cobros: GET /authorized_payments/{id}, uno por cada mes que Mercado Pago le cobra al cliente.
 //  - Avisos (webhooks): llegan firmados; la firma se valida con verificarFirma y después se consulta la API, porque lo que
 //    trae el aviso no se usa para decidir nada.
@@ -26,15 +26,18 @@ const ESTADOS = { pending: 'pendiente', authorized: 'autorizada', paused: 'pausa
 const centavos = (pesos) => Math.round(Number(pesos) * 100);
 const dia = (iso) => (iso ? hoy(new Date(iso)) : null);
 
-export function crearClienteMp({ accessToken, apiUrl = API }) {
-  async function llamar(metodo, ruta, cuerpo) {
+// Una función para hablar con la API de Mercado Pago: llamar(metodo, ruta, cuerpo) devuelve los datos de la respuesta o tira ErrorDeMercadoPago.
+// Sin accessToken no manda autorización (el canje de códigos de OAuth se identifica con el cuerpo). La usan el cliente de las suscripciones
+// (acá abajo) y el de cada tienda (mercadopago-tiendas.js), cada uno con su propio token.
+export function crearLlamada({ accessToken, apiUrl = API, tiempoMaximoMs = TIEMPO_MAXIMO_MS }) {
+  return async function llamar(metodo, ruta, cuerpo) {
     let respuesta;
     try {
       respuesta = await fetch(`${apiUrl}${ruta}`, {
         method: metodo,
-        headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json', accept: 'application/json' },
+        headers: { ...(accessToken && { authorization: `Bearer ${accessToken}` }), 'content-type': 'application/json', accept: 'application/json' },
         body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
-        signal: AbortSignal.timeout(TIEMPO_MAXIMO_MS),
+        signal: AbortSignal.timeout(tiempoMaximoMs),
       });
     } catch (error) {
       throw new ErrorDeMercadoPago(`No se pudo conectar con Mercado Pago: ${error.message}`);
@@ -50,17 +53,29 @@ export function crearClienteMp({ accessToken, apiUrl = API }) {
       throw new ErrorDeMercadoPago(`Mercado Pago respondió ${respuesta.status}`, { status: respuesta.status, detalle: datos ?? texto.slice(0, 300) });
     }
     return datos;
-  }
+  };
+}
+
+export function crearClienteMp({ accessToken, apiUrl = API }) {
+  const llamar = crearLlamada({ accessToken, apiUrl });
 
   return {
     // Crea la suscripción sin medio de pago: el cliente lo elige en el checkout de Mercado Pago (initPoint).
     // monto en pesos (no centavos). referenciaExterna vuelve en cada consulta: es nuestro id.
-    async crearSuscripcion({ monto, motivo, emailPagador, referenciaExterna, urlVuelta }) {
+    // inicio ('2026-12-25', opcional): el día del primer cobro. Sin él, Mercado Pago cobra apenas el cliente autoriza; con él, el cobro
+    // cae ese día y después cada mes (sirve para reactivar una suscripción sin cobrar de más: ver reactivar en suscripciones.js).
+    async crearSuscripcion({ monto, motivo, emailPagador, referenciaExterna, urlVuelta, inicio = null }) {
       const datos = await llamar('POST', '/preapproval', {
         reason: motivo,
         external_reference: String(referenciaExterna),
         payer_email: emailPagador,
-        auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: monto, currency_id: 'ARS' },
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: 'months',
+          transaction_amount: monto,
+          currency_id: 'ARS',
+          ...(inicio && { start_date: `${inicio}T12:00:00.000-03:00` }),
+        },
         back_url: urlVuelta,
         status: 'pending',
       });
@@ -69,7 +84,7 @@ export function crearClienteMp({ accessToken, apiUrl = API }) {
     },
 
     // { id, estado ('pendiente' | 'autorizada' | 'pausada' | 'cancelada'), referenciaExterna, proximoCobro ('2026-12-31' o null),
-    //   initPoint (el link de pago, mientras siga pendiente) }
+    //   montoCentavos (lo que cobra por mes, o null si no lo informa), initPoint (el link de pago, mientras siga pendiente) }
     async leerSuscripcion(id) {
       const datos = await llamar('GET', `/preapproval/${encodeURIComponent(id)}`);
       return {
@@ -77,8 +92,20 @@ export function crearClienteMp({ accessToken, apiUrl = API }) {
         estado: ESTADOS[datos.status] ?? null,
         referenciaExterna: datos.external_reference ?? null,
         proximoCobro: dia(datos.next_payment_date),
+        montoCentavos: datos.auto_recurring?.transaction_amount == null ? null : centavos(datos.auto_recurring.transaction_amount),
         initPoint: datos.init_point ?? null,
       };
+    },
+
+    // Cambia lo que se cobra por mes (para los aumentos de precio de un plan). monto en pesos. Se aplica desde el próximo cobro.
+    // Si Mercado Pago contesta con otro monto, no lo aplicó: se avisa en vez de dar el cambio por hecho.
+    async actualizarMonto(id, monto) {
+      const datos = await llamar('PUT', `/preapproval/${encodeURIComponent(id)}`, { auto_recurring: { transaction_amount: monto, currency_id: 'ARS' } });
+      const devuelto = datos?.auto_recurring?.transaction_amount;
+      if (devuelto != null && centavos(devuelto) !== centavos(monto)) {
+        throw new ErrorDeMercadoPago('Mercado Pago no aplicó el monto nuevo', { detalle: datos });
+      }
+      return { montoCentavos: centavos(monto) };
     },
 
     // { id, suscripcionId (el id de Mercado Pago), aprobado, montoCentavos }

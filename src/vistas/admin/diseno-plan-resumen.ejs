@@ -1,0 +1,25 @@
+<%# Arriba de Diseño: qué nivel de diseño tiene el plan de la tienda y qué incluye cada nivel. Recibe: plan = { nivel, nombre, niveles }. %>
+<% const { nivel, niveles } = plan; %>
+<section class="tarjeta nivel-resumen" aria-labelledby="titulo-nivel">
+  <div class="nivel-resumen-cabecera">
+    <div>
+      <h2 id="titulo-nivel">Tu diseño: <%= niveles[nivel].titulo %></h2>
+      <p class="ayuda"><%= plan.nombre ? `Tu plan es ${plan.nombre}. ` : '' %><%= niveles[nivel].lema %>. Lo que tu plan no incluye aparece bloqueado más abajo.</p>
+    </div>
+    <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
+  </div>
+  <details class="nivel-detalle">
+    <summary>¿Qué incluye cada plan?</summary>
+    <div class="niveles-grilla">
+      <% for (const [clave, datos] of Object.entries(niveles)) { %>
+        <div class="nivel-columna<%= clave === nivel ? ' nivel-actual' : '' %>">
+          <h3><%= datos.titulo %><% if (clave === nivel) { %> <span class="pastilla pastilla-ok">Tu plan</span><% } %></h3>
+          <p class="ayuda"><%= datos.lema %></p>
+          <ul>
+            <% for (const item of datos.incluye) { %><li><%= item %></li><% } %>
+          </ul>
+        </div>
+      <% } %>
+    </div>
+  </details>
+</section>

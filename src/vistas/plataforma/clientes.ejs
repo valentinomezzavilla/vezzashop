@@ -83,6 +83,7 @@
                 <span class="celda-producto-textos">
                   <span class="celda-producto-nombre"><%= c.nombre %></span>
                   <span class="ayuda"><%= c.email ?? 'sin usuario' %> · <%= c.slug %></span>
+                  <% if (c.dominioPropio && c.dominioEstado !== 'activo') { %><span class="pastilla pastilla-ambar" title="Pidió <%= c.dominioPropio %>: falta verificarlo y activarlo">Dominio por activar</span><% } %>
                 </span>
               </a>
             </td>

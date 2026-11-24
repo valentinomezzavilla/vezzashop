@@ -34,6 +34,59 @@
   </form>
 </section>
 
+<section class="ajuste<%= dominio.disponible ? '' : ' ajuste-bloqueado' %>" id="dominio">
+  <div class="ajuste-intro">
+    <h2>Dominio propio <span class="pastilla pastilla-nivel">Plan A medida</span></h2>
+    <p class="texto-suave">Que tu tienda se vea en tu propio dominio, por ejemplo <strong>www.mitienda.com</strong>, en vez de en el link de la plataforma.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (!dominio.disponible) { %>
+      <div class="nivel-bloqueado" role="note">
+        <%- icono('candado', { tamano: 18 }) %>
+        <span>El dominio propio es parte del plan <strong>A medida</strong>.<%= locals.pagosActivos ? '' : (contactoPlataforma ? ` Para cambiar de plan, contactanos: ${contactoPlataforma}.` : ' Contactanos para cambiar de plan.') %></span>
+        <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
+      </div>
+    <% } else if (!dominio.actual) { %>
+      <form method="post" action="/admin/cuenta/dominio" class="formulario">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="campo">
+          <label for="dominio-nuevo">Tu dominio</label>
+          <input id="dominio-nuevo" type="text" name="dominio" placeholder="www.mitienda.com" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" aria-describedby="ayuda-dominio"<%- invalido('dominio') %>>
+          <span class="ayuda" id="ayuda-dominio">Tiene que ser un dominio que ya tengas comprado. Después te mostramos qué registro cargar en el proveedor donde lo compraste.</span>
+          <%- error('dominio') %>
+        </div>
+        <div><button class="boton" type="submit">Pedir mi dominio</button></div>
+      </form>
+    <% } else { %>
+      <p class="mp-estado">
+        <strong><%= dominio.actual.dominio %></strong>
+        <span class="pastilla <%= dominio.actual.estado === 'activo' ? 'pastilla-ok' : 'pastilla-ambar' %>"><%= dominio.estados[dominio.actual.estado].titulo %></span>
+      </p>
+      <p class="ayuda"><%= dominio.estados[dominio.actual.estado].ayuda %></p>
+      <% if (dominio.actual.estado !== 'activo') { %>
+        <div class="dominio-registros">
+          <p><strong>Cargá este registro en el DNS de tu dominio</strong> (en el proveedor donde lo compraste):</p>
+          <% for (const registro of dominio.registros) { %>
+            <dl class="datos-pedido">
+              <div><dt>Tipo</dt><dd><code><%= registro.tipo %></code></dd></div>
+              <div><dt>Nombre</dt><dd><code><%= registro.nombre %></code></dd></div>
+              <div><dt>Valor</dt><dd><% if (registro.valor) { %><code><%= registro.valor %></code><% } else { %>Escribinos y te pasamos la dirección a la que tiene que apuntar<% } %></dd></div>
+            </dl>
+          <% } %>
+          <p class="ayuda">Los cambios de DNS pueden tardar un rato en verse. Si usás Cloudflare, dejá el registro en "solo DNS" (nube gris). Cuando esté cargado, tocá "Verificar ahora": nosotros lo activamos y te avisamos.</p>
+        </div>
+        <div class="mp-acciones">
+          <form method="post" action="/admin/cuenta/dominio/verificar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton" type="submit"><%- icono('refrescar', { tamano: 16 }) %> Verificar ahora</button></form>
+          <form method="post" action="/admin/cuenta/dominio/quitar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton boton-peligro-suave" type="submit">Quitar este dominio</button></form>
+        </div>
+      <% } else { %>
+        <p><a class="boton boton-secundario" href="https://<%= dominio.actual.dominio %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Abrir mi tienda</a></p>
+        <p class="ayuda">Tu link de siempre redirige solo a este dominio. Para cambiarlo o quitarlo, contactanos.</p>
+      <% } %>
+    <% } %>
+  </div>
+</section>
+
 <section class="ajuste">
   <div class="ajuste-intro">
     <h2>Tu plan</h2>

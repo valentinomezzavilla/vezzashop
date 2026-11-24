@@ -78,18 +78,25 @@ export async function crearTienda(db, { nombre, email, planId = null, venceEn = 
 
 const SELECCION_TIENDA = `
   SELECT t.id, t.nombre, t.slug, t.estado, t.motivo_suspension AS "motivoSuspension", t.vence_en AS "venceEn",
-         (p.suspender_al_vencer = 1) AS "suspenderAlVencer", p.dias_prueba AS "diasPrueba"
+         (p.suspender_al_vencer = 1) AS "suspenderAlVencer", p.dias_prueba AS "diasPrueba",
+         t.dominio_propio AS "dominioPropio", t.dominio_estado AS "dominioEstado"
   FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id`;
 
 // `estado` es el que vale ahora: 'suspendida' si la suspendieron o si su plan la cierra al vencer y ya venció.
 function conEstado(fila) {
   if (!fila) return null;
   const { estado, motivo } = estadoEfectivo(fila);
-  return { id: fila.id, nombre: fila.nombre, slug: fila.slug, estado, motivoSuspension: motivo };
+  // dominioPropio / dominioEstado: el dominio propio de la tienda (plan a medida) y en qué paso está; solo con estado 'activo' se ve ahí (ver dominios-propios.js).
+  return { id: fila.id, nombre: fila.nombre, slug: fila.slug, estado, motivoSuspension: motivo, dominioPropio: fila.dominioPropio ?? null, dominioEstado: fila.dominioEstado ?? null };
 }
 
 export async function buscarTiendaPorSlug(db, slug) {
   return conEstado(await db.prepare(`${SELECCION_TIENDA} WHERE t.slug = ?`).get(slug));
+}
+
+// La tienda que se ve en este dominio (su dominio propio, ya activo), o null.
+export async function buscarTiendaPorDominio(db, dominio) {
+  return conEstado(await db.prepare(`${SELECCION_TIENDA} WHERE t.dominio_propio = ? AND t.dominio_estado = 'activo'`).get(dominio));
 }
 
 export async function buscarTienda(db, id) {
@@ -156,7 +163,7 @@ export async function renombrarTienda(db, tiendaId, nombre) {
   return null;
 }
 
-export const LARGO_MINIMO_CLAVE = 10;
+export const LARGO_MINIMO_CLAVE = 6;
 
 // Devuelve null si se cambió, o { campo, mensaje } con el problema.
 export async function cambiarClave(db, usuarioId, { actual, nueva, repetida }) {

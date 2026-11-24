@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { mkdir } from 'node:fs/promises';
 import { autenticar, buscarTienda } from '../tiendas.js';
-import { dominioDeTiendas, urlTienda } from '../util/dominios.js';
+import { urlPublicaDeTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
 import { rutasAdminPedidos } from './admin-pedidos.js';
 import { rutasAdminSuscripcion } from './admin-suscripcion.js';
@@ -33,7 +33,25 @@ import {
   FUENTES,
   ESQUINAS,
   TARJETAS,
+  SIN_STOCK,
+  CATEGORIAS_PORTADA,
 } from '../diseno.js';
+import {
+  NIVELES,
+  LOGO_POSICIONES,
+  PIE_ESTILOS,
+  TARJETA_ESTILOS,
+  TARJETA_FOTOS,
+  TARJETA_TEXTOS,
+  BANNERS_ANCHOS,
+  ANCHOS_PAGINA,
+  SECCIONES_PORTADA,
+  MAX_CSS_PROPIO,
+  datosDeNivel,
+  incluyeNivel,
+  seccionesDePortada,
+  validarAvanzados,
+} from '../diseno-por-plan.js';
 import { arbolCategoriasAdmin } from '../categorias.js';
 import { limitesDeTienda, ampliarPlan } from '../limites.js';
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN, PROPORCION_BANNER, leerRecorte } from '../imagenes.js';
@@ -66,7 +84,8 @@ const regenerarSesion = (req) =>
   new Promise((resolver, rechazar) => req.session.regenerate((error) => (error ? rechazar(error) : resolver())));
 
 // servicios: las suscripciones con Mercado Pago (ver suscripciones.js); null si no están configuradas.
-export function rutasAdmin({ db, config, servicios = null }) {
+// notificar: el aviso por mail a n8n (notificaciones.js), para los pedidos; sin N8N_WEBHOOK_URL no manda nada.
+export function rutasAdmin({ db, config, servicios = null, notificar = async () => false }) {
   const router = express.Router();
   // permitirLinksLocales solo lo activan los tests (el servidor de fotos de prueba está en 127.0.0.1).
   const descargar = crearDescargador({ permitirDireccion: config.permitirLinksLocales ? () => true : esDireccionPublica });
@@ -95,7 +114,27 @@ export function rutasAdmin({ db, config, servicios = null }) {
   async function mostrarDiseno(req, res, { valores = null, errores = {}, status = 200 } = {}) {
     const { tiendaId } = req.session.usuario;
     const ajustes = await leerAjustes(db, tiendaId);
+    // Lo que el plan permite personalizar (ver diseno-por-plan.js). Acá se muestran los ajustes guardados, aunque el plan no los incluya.
+    const { nivel, planNombre } = await datosDeNivel(db, tiendaId);
     res.status(status).render('admin/diseno', {
+      plan: {
+        nivel,
+        nombre: planNombre,
+        niveles: NIVELES,
+        puede: { acompanado: incluyeNivel(nivel, 'acompanado'), a_medida: incluyeNivel(nivel, 'a_medida') },
+        opciones: {
+          logoPosicion: LOGO_POSICIONES,
+          pieEstilo: PIE_ESTILOS,
+          tarjetaEstilo: TARJETA_ESTILOS,
+          tarjetaFoto: TARJETA_FOTOS,
+          tarjetaTexto: TARJETA_TEXTOS,
+          bannersAncho: BANNERS_ANCHOS,
+          anchoPagina: ANCHOS_PAGINA,
+          secciones: SECCIONES_PORTADA,
+          seccionesActuales: seccionesDePortada(ajustes.portadaSecciones),
+          maxCss: MAX_CSS_PROPIO,
+        },
+      },
       valores: valores ?? ajustes,
       errores,
       urlLogo: urlImagen(tiendaId, ajustes.logo),
@@ -105,6 +144,8 @@ export function rutasAdmin({ db, config, servicios = null }) {
       opcionesFuente: FUENTES,
       opcionesEsquinas: ESQUINAS,
       opcionesTarjetas: TARJETAS,
+      opcionesSinStock: SIN_STOCK,
+      opcionesCategoriasPortada: CATEGORIAS_PORTADA,
       // Categorías de primer nivel, para elegir cuáles van en el menú de arriba de la tienda.
       categoriasMenu: await arbolCategoriasAdmin(db, tiendaId),
       banners: (await listarBanners(db, tiendaId)).map((b) => ({ ...b, urlImagen: urlImagen(tiendaId, b.imagen) })),
@@ -118,7 +159,7 @@ export function rutasAdmin({ db, config, servicios = null }) {
     res.locals.csrf = tokenCsrf(req);
     res.locals.usuario = req.session.usuario ?? null;
     const tienda = req.session.usuario ? await buscarTienda(db, req.session.usuario.tiendaId) : null;
-    res.locals.urlMiTienda = tienda ? urlTienda(req, dominioDeTiendas(config), tienda.slug) : null;
+    res.locals.urlMiTienda = tienda ? urlPublicaDeTienda(req, config, tienda) : null;
     res.locals.nombreTienda = tienda?.nombre ?? null;
     // Una tienda suspendida puede entrar a mirar su panel, pero no cambiar nada (ver más abajo).
     res.locals.suspendida = tienda?.estado === 'suspendida';
@@ -173,8 +214,8 @@ export function rutasAdmin({ db, config, servicios = null }) {
   });
 
   router.get('/', (req, res) => res.redirect('/admin/inicio'));
-  router.use(rutasAdminTienda({ db, config }));
-  router.use(rutasAdminPedidos({ db, config }));
+  router.use(rutasAdminTienda({ db, config, servicios }));
+  router.use(rutasAdminPedidos({ db, config, notificar }));
   router.use(rutasAdminSuscripcion({ db, config, servicios }));
 
   router.get('/importar', (req, res) => res.render('admin/importar', { error: null }));
@@ -306,7 +347,12 @@ export function rutasAdmin({ db, config, servicios = null }) {
 
   router.post('/diseno', conImagenes(recibirImagenes.single('logo')), verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const { ajustes, errores } = validarAjustes(req.body);
+    const { ajustes: basicos, errores: erroresBasicos } = validarAjustes(req.body);
+    // Lo que depende del plan: lo que el nivel no incluye se ignora aunque llegue en el formulario.
+    const { nivel } = await datosDeNivel(db, tiendaId);
+    const { ajustes: avanzados, errores: erroresAvanzados } = validarAvanzados(req.body, nivel, await leerAjustes(db, tiendaId));
+    const ajustes = { ...basicos, ...avanzados };
+    const errores = { ...erroresBasicos, ...erroresAvanzados };
     if (Object.keys(errores).length > 0) {
       if (req.file) errores.logo = 'Revisá los otros campos y volvé a elegir el logo.';
       return mostrarDiseno(req, res, { valores: req.body, errores, status: 400 });

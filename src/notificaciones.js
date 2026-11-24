@@ -5,6 +5,12 @@
 //                    -> "Tu cuenta está lista", con el link para entrar a gestionarla. Nunca lleva la contraseña.
 //  - pago_recibido:  { evento, email, plan: { nombre, precio }, urlCuenta }
 //                    -> "Recibimos tu pago, creá tu cuenta", con el link al formulario (por si cerró la pestaña antes de completarlo).
+//  - plan_modificado: { evento, email, nombre, tienda: { nombre }, plan: { nombre }, cambios: [{ etiqueta, antes, despues, cuando }], urlPanel }
+//                    -> "Cambió tu plan": qué cambió (precio, topes...) y desde cuándo ("desde tu próximo cobro (10 de febrero de 2030)" o
+//                    "desde ya"). Va a cada cliente del plan al que le cambia algo; a quien conserva su precio no se le avisa del precio.
+//  - suscripcion_cancelada: { evento, email, nombre, apellido, tienda: { nombre }, plan: { nombre }, accesoHasta, accesoHastaTexto, vencida, urlReactivar }
+//                    -> "Cancelaste tu suscripción": la tienda sigue activa hasta `accesoHastaTexto` ("25 de noviembre de 2026"; si `vencida`
+//                    es true ya no tiene días pagos y esos campos vienen vacíos) y se puede reactivar cuando quiera desde `urlReactivar`.
 
 const TIEMPO_MAXIMO_MS = 8_000;
 

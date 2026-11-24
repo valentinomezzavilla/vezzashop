@@ -11,7 +11,7 @@ import { enTransaccion } from './db.js';
 import { crearTienda, validarLink, LARGO_MINIMO_CLAVE } from './tiendas.js';
 import { aplicarPago, esAutoservicio, leerPlan } from './plataforma.js';
 import { precioDe } from './landing.js';
-import { hoy, sumarDias } from './util/fechas.js';
+import { formatearDiaLargo, hoy, sumarDias } from './util/fechas.js';
 
 // Al crear la cuenta antes de que llegue el primer cobro (Mercado Pago lo hace un rato después de autorizar), la tienda
 // queda abierta este tiempo; el cobro, al llegar, suma su mes desde ahí.
@@ -116,9 +116,11 @@ export async function iniciarSuscripcion(servicios, { planId, email, tiendaId = 
   }
   if (!mp) return { error: 'Los pagos no están disponibles por ahora. Escribinos y te ayudamos.', campo: 'plan' };
 
+  // Reactivar una suscripción que se dio de baja antes de vencer: el primer cobro cae el día en que vence lo que ya pagó, así no se cobra dos veces.
+  const inicio = tiendaId !== null && reemplazaAId === null ? await inicioDeReactivacion(db, tiendaId) : null;
   const { rows } = await db
-    .prepare("INSERT INTO suscripciones (tienda_id, plan_id, estado, monto_centavos, email_pagador, reemplaza_a_id) VALUES (?, ?, 'pendiente', ?, ?, ?) RETURNING id")
-    .run(tiendaId, plan.id, plan.precioCentavos, correo, reemplazaAId);
+    .prepare("INSERT INTO suscripciones (tienda_id, plan_id, estado, monto_centavos, email_pagador, reemplaza_a_id, proximo_cobro) VALUES (?, ?, 'pendiente', ?, ?, ?, ?) RETURNING id")
+    .run(tiendaId, plan.id, plan.precioCentavos, correo, reemplazaAId, inicio);
   const id = rows[0].id;
   const token = tokenDeAlta(secreto, id);
   try {
@@ -128,13 +130,23 @@ export async function iniciarSuscripcion(servicios, { planId, email, tiendaId = 
       emailPagador: correo,
       referenciaExterna: id,
       urlVuelta: typeof urlVuelta === 'function' ? urlVuelta(token) : urlVuelta,
+      inicio,
     });
     await db.prepare('UPDATE suscripciones SET mp_id = ? WHERE id = ?').run(remota.id, id);
-    return { suscripcionId: id, token, initPoint: remota.initPoint };
+    return { suscripcionId: id, token, initPoint: remota.initPoint, inicio };
   } catch (error) {
     await db.prepare('DELETE FROM suscripciones WHERE id = ?').run(id); // no quedó nada en Mercado Pago: no dejamos una fila colgada
     throw error;
   }
+}
+
+// El día del primer cobro si la tienda vuelve a suscribirse después de haber dado de baja la suscripción y todavía tiene días pagos
+// (el vencimiento ya pago); null si no corresponde, y entonces Mercado Pago cobra apenas se autoriza.
+export async function inicioDeReactivacion(db, tiendaId, dia = hoy()) {
+  const { activa, cancelada } = await estadoDeSuscripcion(db, tiendaId);
+  if (activa || !cancelada) return null;
+  const fila = await db.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId);
+  return fila?.venceEn && fila.venceEn > dia ? fila.venceEn : null;
 }
 
 // ---------- Estado de la suscripción (viene de Mercado Pago) ----------
@@ -150,9 +162,14 @@ export async function sincronizarSuscripcion(servicios, mpId, { urlBase = null }
   // Los avisos pueden llegar desordenados: una suscripción que ya avanzó no vuelve a "pendiente".
   const nuevo = remota.estado === null || (remota.estado === 'pendiente' && suscripcion.estado !== 'pendiente') ? suscripcion.estado : remota.estado;
   const proximoCobro = remota.proximoCobro ?? suscripcion.proximoCobro;
-  await db.prepare('UPDATE suscripciones SET estado = ?, proximo_cobro = ?, actualizada_en = ahora() WHERE id = ?').run(nuevo, proximoCobro, suscripcion.id);
-  const actual = { ...suscripcion, estado: nuevo, proximoCobro };
+  // Lo que Mercado Pago cobra de verdad (por ejemplo, después de un aumento de precio o de un cambio hecho desde su panel).
+  const montoCentavos = remota.montoCentavos ?? suscripcion.montoCentavos;
+  await db.prepare('UPDATE suscripciones SET estado = ?, proximo_cobro = ?, monto_centavos = ?, actualizada_en = ahora() WHERE id = ?').run(nuevo, proximoCobro, montoCentavos, suscripcion.id);
+  const actual = { ...suscripcion, estado: nuevo, proximoCobro, montoCentavos };
   if (nuevo === 'autorizada') await alEstarAutorizada(servicios, actual, urlBase);
+  // Se dio de baja por fuera de nuestro panel (por ejemplo, desde su cuenta de Mercado Pago): también se le avisa hasta cuándo tiene la tienda.
+  // Las que nunca llegaron a autorizarse no cuentan: no hubo nada que cancelar.
+  if (nuevo === 'cancelada' && (suscripcion.estado === 'autorizada' || suscripcion.estado === 'pausada')) await avisarBaja(servicios, actual, { urlBase });
   return actual;
 }
 
@@ -161,7 +178,8 @@ async function alEstarAutorizada(servicios, suscripcion, urlBase) {
   const { db, mp, avisar } = servicios;
   if (suscripcion.tiendaId) {
     // Un cliente que ya existe: pasa al plan de esta suscripción y, si cambió de plan, se da de baja la anterior para no cobrar dos veces.
-    await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ? AND plan_id IS DISTINCT FROM ?').run(suscripcion.planId, suscripcion.tiendaId, suscripcion.planId);
+    // El precio fijo (si tenía) era del plan anterior: al cambiar, paga el del plan nuevo.
+    await db.prepare('UPDATE tiendas SET plan_id = ?, precio_fijo_centavos = NULL WHERE id = ? AND plan_id IS DISTINCT FROM ?').run(suscripcion.planId, suscripcion.tiendaId, suscripcion.planId);
     if (suscripcion.reemplazaAId) {
       const anterior = await leerSuscripcion(db, suscripcion.reemplazaAId);
       if (anterior?.mpId && anterior.estado !== 'cancelada') {
@@ -224,15 +242,46 @@ export async function retomarPago(servicios, tiendaId, { urlBase = null } = {}) 
   return { initPoint: remota.initPoint };
 }
 
-// Da de baja la suscripción de la tienda: no se cobran más meses. La tienda sigue abierta hasta el vencimiento ya pago.
-// Devuelve { error } o { suscripcion }.
-export async function cancelarSuscripcionDeTienda(servicios, tiendaId) {
+// Da de baja la suscripción de la tienda: no se cobran más meses. La tienda sigue abierta hasta el vencimiento ya pago, y se le avisa
+// por mail (una sola vez) hasta cuándo. `urlBase` ("https://dominio") arma el link para reactivarla.
+// Devuelve { error } o { suscripcion, venceEn } (venceEn: hasta cuándo está pago, o null).
+export async function cancelarSuscripcionDeTienda(servicios, tiendaId, { urlBase = null } = {}) {
   const { db, mp } = servicios;
   const suscripcion = await suscripcionActivaDeTienda(db, tiendaId);
   if (!suscripcion?.mpId) return { error: 'No hay una suscripción activa para cancelar.' };
   await mp.cancelarSuscripcion(suscripcion.mpId);
   await db.prepare("UPDATE suscripciones SET estado = 'cancelada', actualizada_en = ahora() WHERE id = ?").run(suscripcion.id);
-  return { suscripcion };
+  const { venceEn = null } = (await db.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId)) ?? {};
+  await avisarBaja(servicios, suscripcion, { urlBase });
+  return { suscripcion, venceEn };
+}
+
+// Le avisa por mail (n8n) a quien dio de baja la suscripción hasta cuándo sigue funcionando su tienda y que puede reactivarla cuando quiera.
+// Se manda una sola vez por suscripción, la haya cancelado el cliente, el administrador o Mercado Pago. Devuelve true si el aviso salió.
+async function avisarBaja(servicios, suscripcion, { urlBase }) {
+  const { db, avisar } = servicios;
+  if (!suscripcion.tiendaId || !urlBase) return false;
+  const { rows } = await db.prepare('UPDATE suscripciones SET aviso_baja_enviado_en = ahora() WHERE id = ? AND aviso_baja_enviado_en IS NULL RETURNING id').run(suscripcion.id);
+  if (rows.length === 0) return false;
+  const titular = await db
+    .prepare(
+      `SELECT u.email, u.nombre, u.apellido, t.nombre AS "tiendaNombre", t.vence_en AS "venceEn"
+       FROM tiendas t LEFT JOIN usuarios u ON u.tienda_id = t.id WHERE t.id = ? ORDER BY u.id LIMIT 1`,
+    )
+    .get(suscripcion.tiendaId);
+  const vigente = Boolean(titular?.venceEn) && titular.venceEn >= hoy();
+  return avisar('suscripcion_cancelada', {
+    email: titular?.email ?? suscripcion.emailPagador,
+    nombre: titular?.nombre ?? '',
+    apellido: titular?.apellido ?? '',
+    tienda: { nombre: titular?.tiendaNombre ?? '' },
+    plan: { nombre: suscripcion.planNombre },
+    // Hasta cuándo tiene la tienda: el vencimiento ya pago. Si ya pasó, se lo dice así.
+    accesoHasta: vigente ? titular.venceEn : null,
+    accesoHastaTexto: vigente ? formatearDiaLargo(titular.venceEn) : '',
+    vencida: !vigente,
+    urlReactivar: `${urlBase}/admin/suscripcion`,
+  });
 }
 
 // ---------- Paso 5: crear la cuenta ----------

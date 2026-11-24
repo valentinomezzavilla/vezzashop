@@ -1,5 +1,11 @@
 <%- include('../parciales/cabecera', { titulo: `Pedido #${pedido.numero}` }) %>
-<% const cerrado = pedido.estado === 'cancelado' %>
+<%
+  const cerrado = pedido.estado === 'cancelado';
+  const domicilio = pedido.entrega.tipo === 'domicilio';
+  const envioActual = pedido.despacho.estado;
+  const indiceEnvio = envioActual ? ['preparacion', 'despachado', 'en_camino', 'entregado'].indexOf(envioActual) : -1;
+  const errorEnvio = (campo) => include('../parciales/error-campo', { mensaje: envio && envio.errores[campo], id: `error-envio-${campo}` });
+%>
 <a class="volver" href="/admin/pedidos"><%- icono('izquierda', { tamano: 16 }) %> Pedidos</a>
 <header class="encabezado">
   <div>
@@ -7,6 +13,7 @@
     <p class="texto-suave"><%= fecha %> · <%= pedido.cliente.nombre %></p>
   </div>
   <div class="acciones">
+    <a class="boton boton-secundario" href="/admin/pedidos/<%= pedido.id %>/imprimir" target="_blank" rel="noopener"><%- icono('imprimir', { tamano: 16 }) %> Imprimir remito</a>
     <a class="boton boton-secundario" href="<%= urlCliente %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Lo que ve el cliente</a>
   </div>
 </header>
@@ -19,20 +26,103 @@
           <h2>¿Qué sigue?</h2>
           <p class="ayuda">
             <% if (pedido.estado === 'nuevo' && pedido.pago === 'transferencia') { %>Cuando te llegue la transferencia de <strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' más el envío' : '' %>, marcalo como pagado.
+            <% } else if (pedido.estado === 'nuevo' && pedido.pago === 'mercadopago' && mpConectado && pedido.envio !== null) { %>El cliente paga en Mercado Pago desde su pedido. Cuando se acredite, el pedido pasa a "Pagado" solo. Si ya pagó y no se actualizó, tocá "Verificar pago" más abajo.
             <% } else if (pedido.estado === 'nuevo' && pedido.pago === 'mercadopago') { %>Mandale al cliente el link de pago de Mercado Pago por <strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' más el envío' : '' %>. Cuando pague, marcalo como pagado.
-            <% } else if (pedido.estado === 'nuevo') { %>Paga en efectivo al <%= pedido.entrega.tipo === 'retiro' ? 'retirar' : 'recibir' %>. Prepará el pedido y avisale.
-            <% } else if (pedido.estado === 'pagado') { %>Ya está pago. Preparalo y <%= pedido.entrega.tipo === 'retiro' ? 'avisale que lo puede pasar a buscar' : 'mandalo' %>.
-            <% } else { %>Cuando el cliente lo tenga, marcalo como <%= pedido.entrega.tipo === 'retiro' ? 'retirado' : 'entregado' %>.<% } %>
+            <% } else if (domicilio && envioActual === 'preparacion') { %>Lo estás preparando. Cuando lo despaches, cargá abajo la empresa y el número de seguimiento.
+            <% } else if (domicilio && envioActual === 'despachado') { %>Ya salió. Cuando esté en camino (o llegue), actualizá el envío y el cliente se entera.
+            <% } else if (domicilio && envioActual === 'en_camino') { %>Está en camino. Cuando el cliente lo tenga, marcalo como entregado.
+            <% } else if (domicilio) { %><%= pedido.pago === 'efectivo' ? 'Paga en efectivo al recibir. ' : 'Ya está pago. ' %>Empezá a prepararlo: después cargás la empresa y el número de seguimiento.
+            <% } else if (pedido.estado === 'nuevo') { %>Paga en efectivo al retirar. Prepará el pedido y avisale.
+            <% } else if (pedido.estado === 'pagado') { %>Ya está pago. Preparalo y avisale que lo puede pasar a buscar.
+            <% } else { %>Cuando el cliente lo retire, marcalo como retirado.<% } %>
           </p>
         </div>
         <div class="acciones">
-          <form method="post" action="/admin/pedidos/<%= pedido.id %>/estado">
-            <input type="hidden" name="_csrf" value="<%= csrf %>">
-            <input type="hidden" name="estado" value="<%= siguiente.estado %>">
-            <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> <%= siguiente.texto %></button>
-          </form>
+          <% if (siguiente.ancla) { %>
+            <a class="boton" href="#<%= siguiente.ancla %>"><%- icono('camion', { tamano: 18 }) %> <%= siguiente.texto %></a>
+          <% } else { %>
+            <form method="post" action="/admin/pedidos/<%= pedido.id %>/<%= siguiente.envio ? 'envio' : 'estado' %>">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <input type="hidden" name="estado" value="<%= siguiente.envio || siguiente.estado %>">
+              <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> <%= siguiente.texto %></button>
+            </form>
+          <% } %>
           <a class="boton boton-secundario boton-whatsapp" href="<%= whatsappCliente %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 18 }) %> Escribirle</a>
         </div>
+      </section>
+    <% } %>
+
+    <% if (envio) { %>
+      <section class="tarjeta seccion-editor" id="envio">
+        <h2>Envío</h2>
+        <ol class="pasos-envio" aria-label="En qué paso está el envío">
+          <% envio.orden.forEach((clave, n) => { %>
+            <li class="paso-envio<%= n < indiceEnvio || (envioActual === 'entregado' && n === indiceEnvio) ? ' hecho' : n === indiceEnvio ? ' actual' : '' %>"<%- n === indiceEnvio ? ' aria-current="step"' : '' %>>
+              <span class="paso-envio-marca" aria-hidden="true"><% if (n < indiceEnvio || (envioActual === 'entregado' && n === indiceEnvio)) { %><%- icono('check', { tamano: 12 }) %><% } else { %><%= n + 1 %><% } %></span>
+              <span><%= envio.estados[clave].titulo %></span>
+            </li>
+          <% }) %>
+        </ol>
+        <p class="ayuda">Cada vez que lo actualizás, queda en el historial y el cliente lo ve en la página de su pedido. Si querés, también le llega por mail.</p>
+
+        <form method="post" action="/admin/pedidos/<%= pedido.id %>/envio" class="formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="completo" value="1">
+          <fieldset class="tipos-entrega tipos-varios">
+            <legend class="etiqueta">Paso del envío</legend>
+            <% for (const clave of envio.orden) { %>
+              <label class="opcion-tipo">
+                <input type="radio" name="estado" value="<%= clave %>"<%= envio.valores.estado === clave ? ' checked' : '' %>>
+                <span><strong><%= envio.estados[clave].titulo %></strong></span>
+              </label>
+            <% } %>
+            <%- errorEnvio('estado') %>
+          </fieldset>
+
+          <div class="ajuste-campos-dos">
+            <div class="campo">
+              <label for="envio-empresa">Empresa de envío <span class="opcional">(opcional)</span></label>
+              <select id="envio-empresa" name="empresa"<%- envio.errores.empresa ? ' aria-invalid="true"' : '' %>>
+                <option value="">Sin empresa</option>
+                <% for (const [clave, empresa] of Object.entries(envio.empresas)) { %>
+                  <option value="<%= clave %>"<%= envio.valores.empresa === clave ? ' selected' : '' %>><%= empresa.nombre %></option>
+                <% } %>
+                <option value="otra"<%= envio.valores.empresa === 'otra' ? ' selected' : '' %>>Otra</option>
+              </select>
+              <%- errorEnvio('empresa') %>
+            </div>
+            <div class="campo">
+              <label for="envio-otra">Si es otra, cuál <span class="opcional">(opcional)</span></label>
+              <input id="envio-otra" type="text" name="empresaOtra" value="<%= envio.valores.empresaOtra %>" maxlength="60" placeholder="Nombre de la empresa" autocomplete="off">
+            </div>
+            <div class="campo">
+              <label for="envio-seguimiento">N.º de seguimiento <span class="opcional">(opcional)</span></label>
+              <input id="envio-seguimiento" type="text" name="seguimiento" value="<%= envio.valores.seguimiento %>" maxlength="60" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="campo">
+              <label for="envio-detalle">Aclaración para el cliente <span class="opcional">(opcional)</span></label>
+              <input id="envio-detalle" type="text" name="detalle" value="<%= envio.valores.detalle %>" maxlength="150" placeholder="Llega entre el 12 y el 14" autocomplete="off">
+            </div>
+          </div>
+          <div class="campo">
+            <label for="envio-enlace">Link de seguimiento <span class="opcional">(opcional)</span></label>
+            <input id="envio-enlace" type="url" name="enlace" value="<%= envio.valores.enlace %>" maxlength="300" placeholder="https://" autocomplete="off"<%- envio.errores.enlace ? ' aria-invalid="true" aria-describedby="error-envio-enlace"' : ' aria-describedby="ayuda-envio-enlace"' %>>
+            <span class="ayuda" id="ayuda-envio-enlace">Si lo dejás vacío, el cliente ve el número y un acceso al sitio de la empresa para seguirlo.</span>
+            <%- errorEnvio('enlace') %>
+          </div>
+
+          <label class="casilla">
+            <input type="checkbox" name="avisarEmail" value="1"<%= envio.valores.avisarEmail ? ' checked' : '' %><%= puedeAvisarEmail ? '' : ' disabled' %>>
+            <span>Avisarle al cliente por mail<%= puedeAvisarEmail ? ` (${pedido.cliente.email})` : '' %></span>
+          </label>
+          <% if (!puedeAvisarEmail) { %><p class="ayuda">No dejó su email: avisale por WhatsApp.</p>
+          <% } else if (!correoActivo) { %><p class="ayuda">El envío de mails todavía no está activado en la plataforma.</p><% } %>
+
+          <div class="acciones">
+            <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar el envío</button>
+            <a class="boton boton-secundario boton-whatsapp" href="<%= whatsappCliente %>" target="_blank" rel="noopener"><%- icono('whatsapp', { tamano: 18 }) %> Avisar por WhatsApp</a>
+          </div>
+        </form>
       </section>
     <% } %>
 
@@ -69,6 +159,34 @@
         <p class="nota-cliente"><%= pedido.notas %></p>
       </section>
     <% } %>
+
+    <section class="tarjeta seccion-editor" id="historial">
+      <h2>Historial</h2>
+      <ol class="historial">
+        <% for (const e of eventos.toReversed()) { %>
+          <li class="historial-item<%= e.visible ? '' : ' historial-interno' %>">
+            <span class="historial-fecha"><%= e.fecha %></span>
+            <strong><%= e.titulo %></strong>
+            <% if (e.detalle) { %><span class="ayuda"><%= e.detalle %></span><% } %>
+            <% if (e.avisadoEmail || !e.visible) { %>
+              <span class="historial-etiquetas">
+                <% if (e.avisadoEmail) { %><span class="pastilla pastilla-ok">Mail enviado</span><% } %>
+                <% if (!e.visible) { %><span class="pastilla">Solo para vos</span><% } %>
+              </span>
+            <% } %>
+          </li>
+        <% } %>
+        <% if (eventos.length === 0) { %>
+          <li class="historial-item"><span class="historial-fecha"><%= fecha %></span><strong>Recibimos el pedido</strong></li>
+        <% } %>
+      </ol>
+      <% if (puedeAvisarEmail && correoActivo && !cerrado) { %>
+        <form method="post" action="/admin/pedidos/<%= pedido.id %>/avisar-email">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-secundario boton-chico" type="submit"><%- icono('mail', { tamano: 16 }) %> Volver a avisar por mail el estado de ahora</button>
+        </form>
+      <% } %>
+    </section>
   </div>
 
   <aside class="editor-lateral">
@@ -85,9 +203,19 @@
       <h2>Entrega</h2>
       <dl class="datos-pedido">
         <div><dt>Forma</dt><dd><%= pedido.entrega.nombre %></dd></div>
-        <% if (pedido.entrega.tipo === 'domicilio') { %>
+        <% if (domicilio) { %>
           <div><dt>Dirección</dt><dd><%= direccion %></dd></div>
           <% if (pedido.direccion.referencias) { %><div><dt>Referencias</dt><dd><%= pedido.direccion.referencias %></dd></div><% } %>
+          <% if (pedido.despacho.empresa) { %><div><dt>Empresa</dt><dd><%= pedido.despacho.empresa %></dd></div><% } %>
+          <% if (pedido.despacho.seguimiento) { %>
+            <div>
+              <dt>Seguimiento</dt>
+              <dd>
+                <code><%= pedido.despacho.seguimiento %></code>
+                <button class="boton boton-secundario boton-chico" type="button" data-copiar="<%= pedido.despacho.seguimiento %>" aria-label="Copiar el número de seguimiento"><%- icono('copiar', { tamano: 16 }) %> <span data-copiar-texto>Copiar</span></button>
+              </dd>
+            </div>
+          <% } %>
         <% } %>
       </dl>
     </section>
@@ -97,7 +225,32 @@
       <dl class="datos-pedido">
         <div><dt>Forma</dt><dd><%= pedido.tituloPago %></dd></div>
         <div><dt>Total</dt><dd><strong><%= formatearPrecio(pedido.total) %></strong><%= pedido.envio === null ? ' + envío' : '' %></dd></div>
+        <% if (pedido.pago === 'mercadopago' && (pedido.mp.pagoId || mpConectado)) { %>
+          <div><dt>Pago en Mercado Pago</dt><dd><%= tituloPagoMp(pedido.mp.pagoEstado) %><%= pedido.mp.pagoId ? ` (N.º ${pedido.mp.pagoId})` : '' %></dd></div>
+          <% if (pedido.mp.neto !== null) { %>
+            <div><dt>Mercado Pago se quedó</dt><dd>−<%= formatearPrecio(pedido.mp.comision) %> <span class="ayuda">(comisión e impuestos)</span></dd></div>
+            <div><dt>Te llegan</dt><dd><strong><%= formatearPrecio(pedido.mp.neto) %></strong></dd></div>
+            <% if (pedido.mp.acreditacion) { %><div><dt>Se acredita</dt><dd><%= formatearDia(pedido.mp.acreditacion) %></dd></div><% } %>
+          <% } %>
+        <% } %>
       </dl>
+      <% if (pedido.pago === 'mercadopago' && mpConectado && !cerrado) { %>
+        <form method="post" action="/admin/pedidos/<%= pedido.id %>/verificar-mp">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-secundario boton-chico" type="submit"><%- icono('refrescar', { tamano: 16 }) %> Verificar pago</button>
+        </form>
+        <p class="ayuda">Cuando el cliente paga, Mercado Pago avisa y el pedido pasa a "Pagado" solo. Si pagó y todavía no se actualizó, tocá "Verificar pago".</p>
+      <% } %>
+    </section>
+
+    <section class="tarjeta seccion-editor" id="nota">
+      <h2>Nota interna</h2>
+      <form method="post" action="/admin/pedidos/<%= pedido.id %>/nota" class="formulario">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="visualmente-oculto" for="nota-interna">Nota interna del pedido</label>
+        <textarea id="nota-interna" name="nota" rows="3" maxlength="1000" placeholder="Algo para acordarte (el cliente no la ve)"><%= pedido.notaInterna %></textarea>
+        <div><button class="boton boton-secundario boton-chico" type="submit">Guardar nota</button></div>
+      </form>
     </section>
 
     <% if (!cerrado) { %>
@@ -115,7 +268,7 @@
       </section>
 
       <% if (pedido.estado !== 'entregado') { %>
-        <section class="tarjeta seccion-editor zona-peligro">
+        <section class="tarjeta seccion-editor zona-peligro" id="cancelar">
           <h2>Cancelar pedido</h2>
           <p class="ayuda">Los productos vuelven al stock. No se puede deshacer.</p>
           <details class="confirmar">

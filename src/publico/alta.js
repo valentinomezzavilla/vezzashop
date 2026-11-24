@@ -11,8 +11,10 @@
   var medidor = document.querySelector('[data-fuerza]');
   var texto = document.querySelector('[data-fuerza-texto]');
   if (clave && medidor) {
-    var minimo = parseInt(clave.getAttribute('minlength') || '10', 10);
-    var FRASES = ['', 'Muy corta', 'Se puede mejorar', 'Buena', 'Muy buena'];
+    var minimo = parseInt(clave.getAttribute('minlength') || '6', 10);
+    var FRASES = ['', 'Muy corta', 'Aceptable', 'Buena', 'Muy buena'];
+    // Con un mínimo de 6, lo que hace más fuerte a una clave es el largo y mezclar tipos de caracteres:
+    // aceptable apenas llega al mínimo, buena desde 8 con dos tipos, muy buena desde 12 con tres.
     var evaluar = function () {
       var v = clave.value;
       var nivel = 0;
@@ -20,8 +22,8 @@
         nivel = 1;
         if (v.length >= minimo) nivel = 2;
         var variedad = (/[a-z]/.test(v) ? 1 : 0) + (/[A-Z]/.test(v) ? 1 : 0) + (/\d/.test(v) ? 1 : 0) + (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
-        if (v.length >= minimo && variedad >= 3) nivel = 3;
-        if (v.length >= minimo + 4 && variedad >= 3) nivel = 4;
+        if (v.length >= Math.max(minimo, 8) && variedad >= 2) nivel = 3;
+        if (v.length >= Math.max(minimo, 12) && variedad >= 3) nivel = 4;
       }
       medidor.setAttribute('data-nivel', String(nivel));
       medidor.style.setProperty('--f', (nivel / 4).toFixed(2));

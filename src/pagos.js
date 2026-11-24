@@ -3,6 +3,7 @@ import { entero } from './diseno.js';
 import { enTransaccion } from './db.js';
 import { parsearPrecio, ErrorDeValor } from './importacion/valores.js';
 import { precioParaEditar } from './productos.js';
+import { leerConexion } from './tienda-mercadopago.js';
 import { formatearPrecio } from './util/formato.js';
 
 export const MAX_METODOS_ENTREGA = 10;
@@ -22,6 +23,8 @@ export const esFormaDePago = (valor) => typeof valor === 'string' && Object.hasO
 
 const INSTRUCCIONES_MERCADOPAGO =
   'Te mandamos el link de pago por WhatsApp para que pagues con tarjeta de crédito, débito o dinero en cuenta.';
+// Cuando la tienda conectó su cuenta no hay link por WhatsApp: se paga en el momento, en Mercado Pago.
+export const DETALLE_MERCADOPAGO_EN_LINEA = 'Pagás en el momento en Mercado Pago, con tarjeta de crédito, débito o dinero en cuenta.';
 
 // Modelos para cargar rápido las formas de entrega más comunes. Se abren en el formulario para revisar
 // el costo antes de guardar: no se guarda nada sin que la tienda lo vea.
@@ -277,9 +280,12 @@ export function moverMetodoEntrega(db, tiendaId, id, direccion) {
 
 // La tienda vende desde su vidriera si ofrece al menos una forma de entrega y una de pago que se puedan combinar
 // (el efectivo solo sirve con entregas que lo aceptan).
+// En `pagos`, Mercado Pago lleva enLinea: true si la tienda conectó su cuenta (el comprador paga ahí mismo, al confirmar el pedido) y false si
+// no (se sigue con el link de pago que la tienda manda a mano).
 export async function estadoCheckout(db, tiendaId, ajustes) {
   const entregas = await listarMetodosEntrega(db, tiendaId, { soloActivos: true });
-  const pagos = formasDePagoActivas(ajustes);
+  const conectada = ajustes.pagoMercadopago ? Boolean(await leerConexion(db, tiendaId)) : false;
+  const pagos = formasDePagoActivas(ajustes).map((forma) => (forma.clave === 'mercadopago' ? { ...forma, enLinea: conectada } : forma));
   const combinable = entregas.some((entrega) => pagos.some((pago) => pago.clave !== 'efectivo' || entrega.aceptaEfectivo));
   return { entregas, pagos, activo: combinable };
 }

@@ -251,17 +251,28 @@ function checkout(panel) {
 
   function actualizar() {
     const entrega = datos.entregas.find((e) => e.id === elegido('entrega'));
-    // El efectivo solo con las entregas que lo aceptan.
-    const efectivo = $('[data-opcion-pago="efectivo"]', formulario);
-    if (efectivo) {
-      const noDisponible = Boolean(entrega && !entrega.aceptaEfectivo);
-      const radio = $('input', efectivo);
+    // Hay formas de pago que no se pueden usar con la entrega elegida: el efectivo, con las que no lo aceptan; y Mercado Pago (cobra en el
+    // momento, en línea), con las que tienen el costo a coordinar, porque todavía no hay un monto final.
+    const mercadoPagoEnLinea = datos.pagos.some((p) => p.clave === 'mercadopago' && p.enLinea);
+    const noDisponibles = {
+      efectivo: Boolean(entrega && !entrega.aceptaEfectivo),
+      mercadopago: Boolean(entrega && entrega.costo === null && mercadoPagoEnLinea),
+    };
+    for (const [clave, noDisponible] of Object.entries(noDisponibles)) {
+      const opcion = $(`[data-opcion-pago="${clave}"]`, formulario);
+      if (!opcion) continue;
+      const radio = $('input', opcion);
       radio.disabled = noDisponible;
       if (noDisponible) radio.checked = false;
-      efectivo.classList.toggle('no-disponible', noDisponible);
-      $('[data-sin-efectivo]', efectivo).hidden = !noDisponible;
+      opcion.classList.toggle('no-disponible', noDisponible);
+      const nota = $('[data-sin-opcion]', opcion);
+      if (nota) nota.hidden = !noDisponible;
     }
     const pago = datos.pagos.find((p) => p.clave === elegido('pago'));
+    // Con Mercado Pago en línea se avisa que se va a pagar en el momento.
+    const enMercadoPago = Boolean(pago?.clave === 'mercadopago' && pago.enLinea);
+    $('[data-nota-mp]', formulario).hidden = !enMercadoPago;
+    $('[data-nota-comun]', formulario).hidden = enMercadoPago;
 
     // La dirección solo cuando hay que mandarlo. Deshabilitada no se valida ni se envía.
     const conDireccion = entrega ? entrega.tipo === 'domicilio' : datos.entregas.some((e) => e.tipo === 'domicilio');

@@ -1,7 +1,11 @@
 // Datos del tablero de Inicio del panel: qué le falta a la tienda, números y alertas de stock.
 import { leerAjustes, listarBanners } from './diseno.js';
 import { estadoCheckout } from './pagos.js';
-import { contarPedidosPorFiltro } from './pedidos.js';
+import { contarPedidosPorFiltro, listarPedidos, tituloEstado } from './pedidos.js';
+import { formatearFecha } from './util/formato.js';
+
+// Cuántos pedidos se muestran en el Inicio cuando la tienda ya está completa.
+const PEDIDOS_EN_INICIO = 6;
 
 const POCAS_UNIDADES = 3;
 const COLOR_POR_DEFECTO = '#1a1a1a';
@@ -50,6 +54,21 @@ export async function resumenTienda(db, tiendaId) {
     },
   ];
   const pedidos = await contarPedidosPorFiltro(db, tiendaId);
+  const completa = pasos.every((p) => p.hecho);
+  // Con todos los pasos hechos, la lista de "Completá tu tienda" ya no tiene nada que decir: en su lugar van los pedidos.
+  const pedidosRecientes = completa
+    ? (await listarPedidos(db, tiendaId, { filtro: 'todos', limite: PEDIDOS_EN_INICIO })).map((p) => ({
+        id: p.id,
+        numero: p.numero,
+        cliente: p.cliente.nombre,
+        total: p.total,
+        envio: p.envio,
+        unidades: p.unidades,
+        estado: p.estado,
+        tituloEstado: tituloEstado(p.estado, p.entrega.tipo),
+        fecha: formatearFecha(p.creadoEn),
+      }))
+    : [];
 
   const sinStock = await db
     .prepare(
@@ -67,5 +86,5 @@ export async function resumenTienda(db, tiendaId) {
     .all(tiendaId, POCAS_UNIDADES))
     .map((v) => ({ ...v, valores: [v.valor1, v.valor2, v.valor3].filter((x) => x !== null).join(' / ') }));
 
-  return { numeros, pasos, hechos: pasos.filter((p) => p.hecho).length, sinStock, pocasUnidades, pedidos };
+  return { numeros, pasos, hechos: pasos.filter((p) => p.hecho).length, completa, sinStock, pocasUnidades, pedidos, pedidosRecientes };
 }

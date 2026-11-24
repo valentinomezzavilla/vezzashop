@@ -1,0 +1,27 @@
+<%# Sección de la portada: los banners de bienvenida (se ordena y se muestra desde Diseño, plan Acompañado). %>
+<% if (banners.length) { %>
+  <section class="carrusel" aria-roledescription="carrusel" aria-label="Novedades" data-carrusel>
+    <div class="carrusel-pista" data-pista>
+      <% banners.forEach((banner, n) => { %>
+        <div class="carrusel-diapositiva" role="group" aria-roledescription="diapositiva" aria-label="<%= n + 1 %> de <%= banners.length %>">
+          <% if (banner.enlace) { %><a href="<%= banner.enlace %>"><% } %>
+          <picture>
+            <% if (banner.urlImagenMovil) { %><source media="(max-width: 640px)" srcset="<%= banner.urlImagenMovil %>"<%- banner.medidasMovil ? ` width="${banner.medidasMovil.ancho}" height="${banner.medidasMovil.alto}"` : '' %>><% } %>
+            <%# Width y height reservan el alto del banner antes de que cargue. El primero es la imagen principal de la portada: sin lazy y con prioridad. %>
+            <img src="<%= banner.urlImagen %>" alt="<%= banner.textoAlternativo %>"<%- banner.medidas ? ` width="${banner.medidas.ancho}" height="${banner.medidas.alto}"` : '' %> decoding="async"<%- n > 0 ? ' loading="lazy"' : ' fetchpriority="high"' %>>
+          </picture>
+          <% if (banner.enlace) { %></a><% } %>
+        </div>
+      <% }) %>
+    </div>
+    <% if (banners.length > 1) { %>
+      <button class="carrusel-flecha carrusel-anterior" type="button" data-anterior aria-label="Banner anterior"><%- icono('izquierda', { tamano: 22 }) %></button>
+      <button class="carrusel-flecha carrusel-siguiente" type="button" data-siguiente aria-label="Banner siguiente"><%- icono('derecha', { tamano: 22 }) %></button>
+      <div class="carrusel-puntos" data-puntos>
+        <% banners.forEach((_, n) => { %>
+          <button type="button" class="carrusel-punto" data-punto="<%= n %>" aria-label="Ir al banner <%= n + 1 %>"<%- n === 0 ? ' aria-current="true"' : '' %>></button>
+        <% }) %>
+      </div>
+    <% } %>
+  </section>
+<% } %>

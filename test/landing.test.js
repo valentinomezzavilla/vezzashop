@@ -77,12 +77,12 @@ test('armarPlanes: precio, topes y botón de cada tarjeta, del más barato al m�
 
   assert.equal(prueba.precio, 'Gratis');
   assert.equal(prueba.unidad, '7 días');
-  assert.deepEqual(prueba.items, ['Hasta 20 productos', '3 fotos por producto', '1 banner de bienvenida', 'Al terminar, la tienda se pausa hasta que elijas un plan']);
+  assert.deepEqual(prueba.items, ['Hasta 20 productos', '3 fotos por producto', '1 banner de bienvenida', 'Al terminar, la tienda se pausa hasta que elijas un plan', 'Diseño de tu tienda: Esencial']);
   assert.equal(prueba.boton.texto, 'Empezar prueba');
 
   assert.match(esencial.precio.replace(/\s/g, ' '), /^\$ 12\.900$/);
   assert.equal(esencial.unidad, '/ mes');
-  assert.deepEqual(esencial.items, ['Hasta 150 productos', '4 fotos por producto', '2 banners de bienvenida', 'Todo lo del panel y la tienda']);
+  assert.deepEqual(esencial.items, ['Hasta 150 productos', '4 fotos por producto', '2 banners de bienvenida', 'Diseño de tu tienda: Esencial', 'Todo lo del panel y la tienda']);
   assert.equal(esencial.boton.texto, 'Elegir Esencial');
   assert.equal(esencial.boton.mensaje, 'Hola, quiero contratar el plan Esencial de VEZZA Shop.');
 

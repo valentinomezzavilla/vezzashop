@@ -1,5 +1,14 @@
 <%- include('../parciales/cabecera', { titulo: 'Productos' }) %>
-<% const volver = `/admin/productos?filtro=${filtro}${busqueda ? `&q=${encodeURIComponent(busqueda)}` : ''}` %>
+<%
+  // La misma lista con otro filtro (o con el de ahora): conserva la búsqueda, el orden y la categoría elegidos.
+  const parametrosLista = (nuevoFiltro) => [
+    `filtro=${nuevoFiltro}`,
+    busqueda && `q=${encodeURIComponent(busqueda)}`,
+    orden !== 'nombre' && `orden=${orden}`,
+    categoria !== null && `categoria=${categoria}`,
+  ].filter(Boolean).join('&');
+  const volver = `/admin/productos?${parametrosLista(filtro)}`;
+%>
 <header class="encabezado">
   <div>
     <h1>Productos</h1>
@@ -25,17 +34,59 @@
   <div class="barra-herramientas">
     <nav class="pestanias" aria-label="Filtrar productos">
       <% for (const [clave, opcion] of Object.entries(filtros)) { %>
-        <a href="/admin/productos?filtro=<%= clave %><%= busqueda ? `&q=${encodeURIComponent(busqueda)}` : '' %>"<%- clave === filtro ? ' class="activa" aria-current="page"' : '' %>>
+        <a href="/admin/productos?<%= parametrosLista(clave) %>"<%- clave === filtro ? ' class="activa" aria-current="page"' : '' %>>
           <%= opcion.titulo %> <span class="pestania-cuenta"><%= cuentas[clave] %></span>
         </a>
       <% } %>
     </nav>
     <form class="buscador" method="get" action="/admin/productos" role="search">
       <input type="hidden" name="filtro" value="<%= filtro %>">
+      <% if (orden !== 'nombre') { %><input type="hidden" name="orden" value="<%= orden %>"><% } %>
+      <% if (categoria !== null) { %><input type="hidden" name="categoria" value="<%= categoria %>"><% } %>
       <label class="visualmente-oculto" for="q">Buscar productos</label>
       <%- icono('lupa', { tamano: 18 }) %>
       <input id="q" type="search" name="q" value="<%= busqueda %>" placeholder="Buscar producto o SKU">
     </form>
+  </div>
+
+  <%# Orden y categoría: se aplican al elegirlos (con JavaScript); sin él, con el botón. %>
+  <div class="filtros-lista">
+    <form method="get" action="/admin/productos" class="filtros-lista-campos">
+      <input type="hidden" name="filtro" value="<%= filtro %>">
+      <% if (busqueda) { %><input type="hidden" name="q" value="<%= busqueda %>"><% } %>
+      <div class="campo-inline">
+        <label for="orden-productos">Ordenar por</label>
+        <select id="orden-productos" name="orden" data-autoenviar>
+          <% for (const [clave, opcion] of Object.entries(ordenes)) { %>
+            <option value="<%= clave %>"<%= clave === orden ? ' selected' : '' %>><%= opcion.titulo %></option>
+          <% } %>
+        </select>
+      </div>
+      <% if (categoriasLista.length) { %>
+        <div class="campo-inline">
+          <label for="categoria-productos">Categoría</label>
+          <select id="categoria-productos" name="categoria" data-autoenviar>
+            <option value="">Todas</option>
+            <option value="sin"<%= categoria === 'sin' ? ' selected' : '' %>>Sin categoría</option>
+            <% for (const c of categoriasLista) { %>
+              <option value="<%= c.id %>"<%= categoria === c.id ? ' selected' : '' %>><%= '  '.repeat(c.nivel) %><%= c.nombre %></option>
+            <% } %>
+          </select>
+        </div>
+      <% } %>
+      <button class="boton boton-secundario boton-chico" type="submit" data-sin-js>Aplicar</button>
+    </form>
+    <% if (sinStockVisibles > 0) { %>
+      <details class="confirmar confirmar-neutro filtros-lista-accion">
+        <summary class="boton boton-secundario boton-chico"><%- icono('ojo-tachado', { tamano: 16 }) %> <%= sinStockVisibles === 1 ? 'Ocultar el que no tiene stock' : `Ocultar los ${sinStockVisibles} sin stock` %></summary>
+        <form method="post" action="/admin/productos/ocultar-sin-stock" class="confirmar-cuerpo">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="volver" value="<%= volver %>">
+          <p><%= sinStockVisibles === 1 ? 'Se oculta de la tienda el producto visible que no tiene stock.' : `Se ocultan de la tienda los ${sinStockVisibles} productos visibles que no tienen stock.` %> Cuando vuelva a haber, lo mostrás de nuevo desde acá.</p>
+          <button class="boton boton-chico" type="submit">Sí, ocultarlos</button>
+        </form>
+      </details>
+    <% } %>
   </div>
 
   <% if (productos.length === 0) { %>
@@ -47,12 +98,20 @@
     </section>
   <% } else { %>
     <%# Las casillas de cada fila se asocian a este formulario con el atributo form: las filas ya tienen sus propios formularios. %>
-    <form id="borrar-varios" class="barra-seleccion" method="post" action="/admin/productos/borrar-varios" data-barra-seleccion>
+    <form id="borrar-varios" class="barra-seleccion" method="post" action="/admin/productos/acciones-varias" data-barra-seleccion>
       <input type="hidden" name="_csrf" value="<%= csrf %>">
       <input type="hidden" name="volver" value="<%= volver %>">
-      <button class="boton boton-peligro-suave boton-chico" type="submit">
-        <%- icono('basura', { tamano: 16 }) %> <span>Borrar seleccionados (<span data-cuenta-seleccion>0</span>)</span>
-      </button>
+      <span class="barra-seleccion-cuenta"><strong data-cuenta-seleccion>0</strong> seleccionados</span>
+      <label class="visualmente-oculto" for="accion-varios">Qué hacer con los productos seleccionados</label>
+      <select id="accion-varios" name="accion" required>
+        <option value="">Elegí una acción…</option>
+        <option value="mostrar">Mostrar en la tienda</option>
+        <option value="ocultar">Ocultar de la tienda</option>
+        <option value="destacar">Destacar en la portada</option>
+        <option value="quitar-destacado">Quitar de destacados</option>
+        <option value="borrar">Borrar…</option>
+      </select>
+      <button class="boton boton-chico" type="submit">Aplicar</button>
     </form>
     <%# Fuera de la tabla: en el celular el encabezado de la tabla se oculta. Sin JavaScript no sirve, así que lo muestra admin.js. %>
     <label class="seleccionar-todos" hidden data-control-seleccion>
