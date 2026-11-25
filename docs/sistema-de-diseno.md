@@ -33,9 +33,12 @@ Estilo de producto profesional: superficies neutras, un solo color de marca, bor
   tiene contraste suficiente sobre la superficie; `--primario` no). Para varias series se usan en este orden `--primario-texto`,
   `--ok-solido`, `--ambar-solido`, `--violeta`, `--texto-tenue` y `--error-solido` (`.dc-1` a `.dc-6`), y los estados de un pedido
   usan los mismos colores que sus pastillas (`.dc-nuevo`, `.dc-pagado`...). **El color nunca va solo**: cada serie tiene su leyenda con
-  texto y cada columna su detalle (al pasar el mouse o tocarla, y en una tabla aparte). La card es un *container* (`.dashboard`): los
-  números se acomodan según su ancho real, y nada puede ensanchar la página (`overflow-x: clip`, y las grillas con `minmax(0, 1fr)`).
-  Los gráficos se arman en `src/util/grafico.js`; los parciales están en `src/vistas/parciales/dashboard/`.
+  texto y cada columna su detalle (al pasar el mouse o tocarla, y en una tabla aparte). El contenido de la pestaña es un *container*
+  (`.dashboard-contenido`): los números se acomodan según su ancho real, y nada puede ensanchar la página (`overflow-x: clip`, y las
+  grillas con `minmax(0, 1fr)`). Los números y los bloques son tarjetas sobre el fondo de la página (`--superficie`, `--borde-tarjeta`).
+  Los gráficos se arman en `src/util/grafico.js`; los parciales están en `src/vistas/parciales/dashboard/` y la página, en `admin/dashboard.ejs`.
+- **Card que lleva a otra pantalla** (`.dashboard-acceso`, la del Dashboard en el Inicio): el título es el único link y se estira con `::after`
+  para que toda la card sea clickeable (sin links anidados); el foco se ve en la card entera (`:has(a:focus-visible)`).
 
 ## Vidriera (`src/publico/tienda.css`)
 

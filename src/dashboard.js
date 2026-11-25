@@ -136,7 +136,7 @@ export function resolverPeriodo(entrada = {}, { hoy, primerDia = null }) {
   };
 }
 
-// La URL de un panel y período dentro del Inicio (con el ancla a la card, para no perder el lugar).
+// La URL de un panel y período de la pestaña Dashboard. Lo de siempre (resumen y 30 días) no se repite en la URL.
 export function urlDashboard({ periodo = PERIODO_INICIAL, panel = PANEL_INICIAL, desde = '', hasta = '' } = {}) {
   const consulta = new URLSearchParams();
   if (panel !== PANEL_INICIAL) consulta.set('panel', panel);
@@ -146,7 +146,7 @@ export function urlDashboard({ periodo = PERIODO_INICIAL, panel = PANEL_INICIAL,
     consulta.set('hasta', hasta);
   }
   const cadena = consulta.toString();
-  return `/admin/inicio${cadena ? `?${cadena}` : ''}#dashboard`;
+  return `/admin/dashboard${cadena ? `?${cadena}` : ''}`;
 }
 
 // ---------- Cuentas chicas ----------
@@ -627,6 +627,16 @@ export async function inventario(db, tiendaId, ahora = new Date()) {
     masStock,
     pocasUnidades: POCAS_UNIDADES,
   };
+}
+
+// ---------- Para el Inicio ----------
+
+// El vistazo de la card del Inicio: los últimos 30 días y cuánto cambiaron las ventas respecto de los 30 anteriores.
+export async function vistazoParaInicio(db, tiendaId, { hoy = hoyEnArgentina() } = {}) {
+  const periodo = resolverPeriodo({ periodo: '30d' }, { hoy });
+  const totales = await totalesDelPeriodo(db, tiendaId, periodo);
+  const anteriores = await totalesDelPeriodo(db, tiendaId, periodo.anterior);
+  return { periodo, totales, cambio: variacion(totales.ventas, anteriores.ventas) };
 }
 
 // ---------- Todo junto ----------

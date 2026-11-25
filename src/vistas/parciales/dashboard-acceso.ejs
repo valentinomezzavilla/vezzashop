@@ -1,0 +1,33 @@
+<%# La card del Dashboard en el Inicio: un vistazo de los últimos 30 días y el acceso a la pestaña con todas las estadísticas.
+    El título es el link y se estira (ver .dashboard-acceso-enlace) para que toda la card lleve ahí. Datos: vistazo (de vistazoParaInicio()). %>
+<% const { totales: t, cambio } = vistazo %>
+<section class="tarjeta dashboard-acceso" aria-labelledby="dashboard-acceso-titulo">
+  <div class="dashboard-acceso-texto">
+    <span class="dashboard-acceso-icono" aria-hidden="true"><%- icono('grafico', { tamano: 22 }) %></span>
+    <div>
+      <h2 id="dashboard-acceso-titulo"><a class="dashboard-acceso-enlace" href="/admin/dashboard">Dashboard</a></h2>
+      <p class="texto-suave">Las estadísticas de tu negocio: ventas, pedidos, clientes, productos y stock.</p>
+    </div>
+  </div>
+  <% if (t.recibidos === 0) { %>
+    <p class="dashboard-acceso-vacio ayuda">Todavía no llegaron pedidos en los últimos 30 días. Cuando lleguen, acá vas a ver cómo viene tu negocio.</p>
+  <% } else { %>
+    <dl class="dashboard-acceso-numeros">
+      <div>
+        <dt>Ventas · 30 días</dt>
+        <dd>
+          <%= formatearPesos(t.ventas) %>
+          <% if (cambio && (cambio.tipo === 'sube' || cambio.tipo === 'baja')) { %>
+            <span class="dash-cambio dash-cambio-<%= cambio.tipo %>">
+              <%- icono(cambio.tipo === 'sube' ? 'arriba' : 'abajo', { tamano: 14 }) %><%= cambio.tipo === 'sube' ? '+' : '−' %><%= formatearNumero(Math.round(Math.abs(cambio.porcentaje) * 100)) %>%
+              <span class="visualmente-oculto"> respecto de los 30 días anteriores</span>
+            </span>
+          <% } %>
+        </dd>
+      </div>
+      <div><dt>Pedidos · 30 días</dt><dd><%= formatearNumero(t.pedidos) %></dd></div>
+      <div><dt>Ticket promedio</dt><dd><%= formatearPesos(t.ticket) %></dd></div>
+    </dl>
+  <% } %>
+  <span class="dashboard-acceso-ir" aria-hidden="true">Ver el dashboard <%- icono('derecha', { tamano: 16 }) %></span>
+</section>

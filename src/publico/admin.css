@@ -1222,19 +1222,39 @@ a.numero-tarjeta:hover { border-color: var(--borde-fuerte); box-shadow: var(--so
 .lista-alertas a:hover { background: var(--superficie-hover); }
 .lista-alertas a .icono { color: var(--texto-tenue); }
 
-/* ---------- Dashboard (la card de Inicio) ---------- */
+/* ---------- Dashboard: la pestaña con las estadísticas y su card en el Inicio ---------- */
 /* Todo con los colores de :root, así sigue al tema claro y al oscuro. Los gráficos son HTML y CSS: el texto se lee igual en el celular. */
 
-.dashboard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; margin-bottom: 1rem; scroll-margin-top: calc(var(--alto-barra-superior) + .75rem); }
-@media (min-width: 861px) { .dashboard { scroll-margin-top: 1rem; } }
-.dashboard-encabezado { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem 1.5rem; flex-wrap: wrap; }
-.dashboard-encabezado > div { display: grid; gap: .15rem; min-width: 0; }
-.dashboard-encabezado .texto-suave { color: var(--texto-tenue); font-size: .875rem; }
-/* La card tiene dos controles segmentados y la transición entre páginas solo puede seguir un elemento por nombre. */
-.dashboard .pestanias a.activa { view-transition-name: none; }
-.dashboard-paneles { justify-self: start; }
+/* La card del Inicio que lleva a la pestaña. El título es el link y se estira (::after) para que toda la card sea clickeable. */
+.dashboard-acceso { position: relative; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 2fr) auto; gap: 1rem 1.75rem; align-items: center; margin-bottom: 1rem; transition: border-color var(--rapido), box-shadow var(--rapido); }
+.dashboard-acceso:hover { border-color: var(--borde-fuerte); box-shadow: var(--sombra-alta); }
+.dashboard-acceso:has(.dashboard-acceso-enlace:focus-visible) { outline: 2px solid var(--anillo); outline-offset: 2px; }
+.dashboard-acceso-texto { display: flex; gap: .9rem; align-items: flex-start; min-width: 0; }
+.dashboard-acceso-texto > div { display: grid; gap: .2rem; min-width: 0; }
+.dashboard-acceso-texto .texto-suave { color: var(--texto-tenue); font-size: .875rem; }
+.dashboard-acceso-icono { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: var(--primario-suave); color: var(--primario-texto); }
+.dashboard-acceso-enlace { color: var(--texto); text-decoration: none; }
+.dashboard-acceso-enlace::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.dashboard-acceso-enlace:focus-visible { outline: none; }
+.dashboard-acceso-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem 1.25rem; margin: 0; }
+.dashboard-acceso-numeros dt { color: var(--texto-tenue); font-size: .75rem; font-weight: 500; line-height: 1.35; }
+.dashboard-acceso-numeros dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .5rem; margin: .15rem 0 0; font-size: 1.25rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.dashboard-acceso-vacio { margin: 0; }
+.dashboard-acceso-ir { display: inline-flex; align-items: center; gap: .3rem; color: var(--primario-texto); font-size: .875rem; font-weight: 500; white-space: nowrap; }
+@media (max-width: 1080px) {
+  .dashboard-acceso { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-acceso-ir { justify-self: start; }
+}
+@media (max-width: 480px) {
+  .dashboard-acceso-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-acceso-numeros > div:first-child { grid-column: 1 / -1; }
+}
 
-.dashboard-rango { margin-top: -.5rem; }
+/* La pestaña. Hay dos controles segmentados y la transición entre páginas solo puede seguir un elemento por nombre:
+   se la dejamos a los paneles y el de períodos no la necesita. */
+.dashboard-periodos a.activa { view-transition-name: none; }
+
+.dashboard-rango { margin: -.35rem 0 1rem; }
 .dashboard-rango summary { display: inline-flex; gap: .4rem; align-items: center; min-height: 28px; color: var(--primario-texto); font-size: .8125rem; font-weight: 500; cursor: pointer; list-style: none; }
 .dashboard-rango summary::-webkit-details-marker { display: none; }
 .dashboard-rango summary:hover { text-decoration: underline; }
@@ -1243,18 +1263,18 @@ a.numero-tarjeta:hover { border-color: var(--borde-fuerte); box-shadow: var(--so
 .dashboard-rango-form .campo { display: grid; gap: .3rem; }
 .dashboard-rango .error-campo { margin-top: .5rem; }
 
-.dashboard .aviso { margin-bottom: 0; }
+.dashboard-contenido { container-type: inline-size; overflow-x: clip; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.dashboard-contenido .aviso { margin-bottom: 0; }
 .dash-lista-aviso { margin: .25rem 0 0; padding-left: 1.1rem; display: grid; gap: .15rem; }
+.dashboard-nota { max-width: 80ch; }
 
-.dashboard { container-type: inline-size; overflow-x: clip; }
-.dashboard-contenido { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: .7rem; }
 /* Con cuatro números van los cuatro en una fila; con cinco o seis, en dos filas parejas. */
 @container (min-width: 760px) {
   .dash-kpis:has(> :nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .dash-kpis:has(> :nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-.dash-kpi { display: grid; grid-template-columns: minmax(0, 1fr); gap: .2rem; align-content: start; min-width: 0; padding: .9rem 1rem; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--superficie-suave); }
+.dash-kpi { display: grid; grid-template-columns: minmax(0, 1fr); gap: .2rem; align-content: start; min-width: 0; padding: .9rem 1rem; border: 1px solid var(--borde-tarjeta); border-radius: var(--radio); background: var(--superficie); box-shadow: var(--sombra); }
 .dash-kpi-etiqueta { color: var(--texto-tenue); font-size: .8125rem; font-weight: 500; line-height: 1.35; }
 .dash-kpi-valor { font-size: 1.5rem; line-height: 1.15; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .dash-kpi .ayuda { font-size: .75rem; }
@@ -1269,7 +1289,7 @@ a.numero-tarjeta:hover { border-color: var(--borde-fuerte); box-shadow: var(--so
 }
 
 .dash-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: .8rem; }
-.dash-bloque { display: grid; grid-template-columns: minmax(0, 1fr); gap: .85rem; align-content: start; min-width: 0; padding: 1rem 1.1rem 1.1rem; border: 1px solid var(--borde); border-radius: var(--radio); }
+.dash-bloque { display: grid; grid-template-columns: minmax(0, 1fr); gap: .85rem; align-content: start; min-width: 0; padding: 1rem 1.1rem 1.1rem; border: 1px solid var(--borde-tarjeta); border-radius: var(--radio); background: var(--superficie); box-shadow: var(--sombra); }
 .dash-bloque-ancho { grid-column: 1 / -1; }
 .dash-bloque-titulo { display: flex; justify-content: space-between; align-items: baseline; gap: .25rem .75rem; flex-wrap: wrap; }
 .dash-bloque-titulo .ayuda { font-size: .75rem; }
@@ -1370,7 +1390,6 @@ a.numero-tarjeta:hover { border-color: var(--borde-fuerte); box-shadow: var(--so
 .dash-tabla thead th { border-top: 0; color: var(--texto-tenue); font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .dash-tabla tbody th { font-weight: 500; white-space: normal; }
 .dash-tabla .num, .dash-tabla .acciones-tabla { text-align: right; }
-.dashboard-nota { padding-top: .85rem; border-top: 1px solid var(--borde); }
 
 /* ---------- Listados: barra de herramientas, filtros y búsqueda ---------- */
 

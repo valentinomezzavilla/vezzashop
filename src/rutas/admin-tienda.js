@@ -3,7 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import { verificarCsrf } from '../csrf.js';
 import { resumenTienda } from '../inicio.js';
-import { datosDashboard } from '../dashboard.js';
+import { datosDashboard, vistazoParaInicio } from '../dashboard.js';
 import { prepararVista } from '../dashboard-vista.js';
 import {
   FILTROS,
@@ -60,21 +60,35 @@ export function rutasAdminTienda({ db, config, servicios = null }) {
   // ---------- Inicio ----------
 
   router.get('/inicio', async (req, res) => {
+    // El Dashboard estuvo un tiempo adentro del Inicio: los links de entonces (?panel=ventas&periodo=7d) siguen llevando al mismo lugar.
+    if (req.query.panel !== undefined || req.query.periodo !== undefined) {
+      const consulta = new URLSearchParams(Object.entries(req.query).filter(([, valor]) => typeof valor === 'string')).toString();
+      return res.redirect(`/admin/dashboard${consulta ? `?${consulta}` : ''}`);
+    }
     const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
-    const [resumen, limites, datos] = await Promise.all([
+    const [resumen, limites, vistazo] = await Promise.all([
       resumenTienda(db, tienda.id),
       limitesDeTienda(db, tienda.id),
-      // La card "Dashboard": el panel y el período salen de la URL (?panel=ventas&periodo=7d), y solo se calcula ese panel.
-      datosDashboard(db, tienda.id, req.query),
+      // La card "Dashboard": un vistazo de los últimos 30 días, con el acceso a la pestaña que tiene todas las estadísticas.
+      vistazoParaInicio(db, tienda.id),
     ]);
     res.render('admin/inicio', {
       resumen,
       tienda,
       limites,
-      dashboard: prepararVista(datos),
+      vistazo,
       // Para avisar, mientras dura el acceso, que la suscripción está cancelada (y no "acordate de abonarlo").
       suscripcion: servicios ? await estadoDeSuscripcion(db, tienda.id) : null,
     });
+  });
+
+  // ---------- Dashboard ----------
+
+  // Las estadísticas del negocio. El panel y el período salen de la URL (?panel=ventas&periodo=7d) y solo se calcula lo que ese panel muestra.
+  router.get('/dashboard', async (req, res) => {
+    const { tiendaId } = req.session.usuario;
+    const [datos, limites] = await Promise.all([datosDashboard(db, tiendaId, req.query), limitesDeTienda(db, tiendaId)]);
+    res.render('admin/dashboard', { dashboard: prepararVista(datos), limites });
   });
 
   // ---------- Productos ----------

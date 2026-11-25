@@ -13,7 +13,8 @@ tarjeta sigue siendo manual (link de pago que manda la tienda; ver [Mercado Pago
 
 | Sección | Qué hace el cliente |
 |---|---|
-| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), el **Dashboard** con las estadísticas del negocio (ver más abajo), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. Cuando ya está hecho el último paso, la lista desaparece y en su lugar se ven los últimos pedidos. |
+| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), una card que lleva al **Dashboard** con un vistazo de los últimos 30 días (ventas con su variación, pedidos y ticket promedio), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. Cuando ya está hecho el último paso, la lista desaparece y en su lugar se ven los últimos pedidos. |
+| **Dashboard** | Las estadísticas del negocio, en su propia pestaña del menú (ver más abajo). |
 | **Pedidos** | Ve los pedidos que llegan desde la tienda (por atender, nuevos, pagados, enviados, entregados, cancelados), busca por número, nombre, teléfono o email, y en cada uno: productos, datos del cliente, entrega, pago, el próximo paso con un botón ("Marcar como pagado", "Enviado" / "Listo para retirar", "Entregado"), WhatsApp al cliente y cancelar (devuelve el stock). Cada fila de la lista tiene un menú **Acciones** (ver el pedido, el paso siguiente, escribirle por WhatsApp, cancelar); en el celular, donde la fila es una tarjeta, hay un botón **Ver**. |
 | **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, con stock, pocas unidades, sin stock, en oferta, sin foto) y por categoría (con sus subcategorías, o sin categoría); ordena por nombre, precio, stock o antigüedad; oculta o destaca con un clic; crea, edita y borra productos. Con varios marcados en la lista: mostrar, ocultar, destacar, quitar de destacados o borrar (se confirma viendo cuáles). **"Ocultar los sin stock"** saca de la tienda, de una vez, todo lo visible que no tiene stock. |
 | **Editor de producto** | Nombre, descripción, marca, visible, destacado, categorías y variantes (hasta 3 tipos, por ejemplo Talle y Color) con SKU, precio, oferta y stock. Crea todas las combinaciones de una vez y aplica un precio o stock a todas las variantes. Hasta 10 fotos por producto, ordenables; la primera es la principal. |
@@ -28,11 +29,13 @@ que se escribe; `admin.js` lo agrega solo y la clave vuelve a ocultarse al envia
 
 Los productos **destacados** aparecen en una sección propia arriba de la portada (hasta 8).
 
-### Dashboard (en Inicio)
+### Dashboard
 
-Una card con las estadísticas del negocio, con un período a elegir (hoy, 7, 30 o 90 días, este mes, mes pasado, este año, todo, o fechas
-a elección) y seis paneles. Los links son comunes (`/admin/inicio?panel=ventas&periodo=7d#dashboard`), sin JavaScript, y cada panel calcula solo
-lo suyo. Casi todos los números se comparan con el período anterior (los mismos días de antes, el mismo tramo del mes o del año anterior).
+Una pestaña del menú (`/admin/dashboard`, justo después de Inicio) con las estadísticas del negocio, con un período a elegir (hoy, 7, 30 o 90 días,
+este mes, mes pasado, este año, todo, o fechas a elección) y seis paneles. Los links son comunes (`/admin/dashboard?panel=ventas&periodo=7d`), sin
+JavaScript, y cada panel calcula solo lo suyo. Casi todos los números se comparan con el período anterior (los mismos días de antes, el mismo tramo
+del mes o del año anterior). En el Inicio queda una card con el título como link (toda la card lleva a la pestaña) y tres números de los últimos 30 días;
+los links de cuando el Dashboard estaba adentro del Inicio (`/admin/inicio?panel=...`) redirigen a la pestaña.
 
 | Panel | Qué muestra |
 |---|---|
@@ -687,7 +690,7 @@ src/
     fotos.js             fotos de cada fila y de cada producto, huellas
     pendiente.js         carpeta de la importación que espera confirmación
   rutas/admin.js         panel /admin: login, carga masiva y diseño
-  rutas/admin-tienda.js  panel /admin: inicio, productos, fotos, categorías y cuenta
+  rutas/admin-tienda.js  panel /admin: inicio, dashboard, productos, fotos, categorías y cuenta
   rutas/admin-pedidos.js panel /admin: pedidos, y envíos y pagos
   rutas/tienda.js        vidriera (catálogo, destacados, categorías, ficha, checkout y pedido)
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma

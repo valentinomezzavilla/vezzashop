@@ -35,6 +35,7 @@ import {
   inventario,
   pedidosDemorados,
   datosDashboard,
+  vistazoParaInicio,
   compararTotales,
 } from '../src/dashboard.js';
 import { prepararVista } from '../src/dashboard-vista.js';
@@ -212,11 +213,11 @@ test('un día argentino va de las 03:00 UTC a las 03:00 UTC del siguiente', () =
   assert.deepEqual(limitesUtc({ desde: '2026-12-31', hasta: '2027-01-02' }), { desdeUtc: '2026-12-31 03:00:00', hastaUtc: '2027-01-03 03:00:00' });
 });
 
-test('la URL de cada panel y período lleva el ancla a la card y no repite lo de siempre', () => {
-  assert.equal(urlDashboard(), '/admin/inicio#dashboard');
-  assert.equal(urlDashboard({ panel: 'ventas' }), '/admin/inicio?panel=ventas#dashboard');
-  assert.equal(urlDashboard({ periodo: '7d', panel: 'stock' }), '/admin/inicio?panel=stock&periodo=7d#dashboard');
-  assert.equal(urlDashboard({ periodo: 'rango', desde: '2026-11-01', hasta: '2026-11-10' }), '/admin/inicio?periodo=rango&desde=2026-11-01&hasta=2026-11-10#dashboard');
+test('la URL de cada panel y período es la de la pestaña Dashboard y no repite lo de siempre', () => {
+  assert.equal(urlDashboard(), '/admin/dashboard');
+  assert.equal(urlDashboard({ panel: 'ventas' }), '/admin/dashboard?panel=ventas');
+  assert.equal(urlDashboard({ periodo: '7d', panel: 'stock' }), '/admin/dashboard?panel=stock&periodo=7d');
+  assert.equal(urlDashboard({ periodo: 'rango', desde: '2026-11-01', hasta: '2026-11-10' }), '/admin/dashboard?periodo=rango&desde=2026-11-01&hasta=2026-11-10');
 });
 
 test('cuánto cambió un número respecto del período anterior', () => {
@@ -603,9 +604,16 @@ test('una base con pedidos en los límites de la zona horaria: el primer día de
 
 // ---------- La card en el panel ----------
 
+// Cuántas sesiones guardadas son de esta tienda.
+const sesionesDe = async (tiendaId) => (await db.prepare('SELECT count(*) AS n FROM sesiones WHERE datos ~ ?').get(`"tiendaId":${tiendaId}[,}]`)).n;
+
 async function panelDe(tiendaId, email, clave) {
   const nav = crearNavegador(`http://127.0.0.1:${puerto}`);
+  const antes = await sesionesDe(tiendaId);
   assert.equal((await nav.enviar('/admin/ingresar', { email, clave })).status, 302);
+  // express-session manda el redirect antes de terminar de guardar la sesión, y un pedido que llegue en el medio recibe una sesión nueva
+  // (y se queda sin ingresar). Con PGlite no se nota; con un PostgreSQL de verdad sí. Se espera a que la sesión esté guardada.
+  for (let intento = 0; intento < 200 && (await sesionesDe(tiendaId)) <= antes; intento++) await new Promise((listo) => setTimeout(listo, 10));
   return nav;
 }
 
@@ -621,17 +629,19 @@ async function sembrarTiendaDelPanel() {
   await pedido(H.tiendaId, { items: [['GOR', 1]], cliente: 'Clienta Visible', telefono: '351 700 7000', estado: 'pagado', creado: `${ayer} 16:00:00` });
 }
 
-test('el Inicio trae la card Dashboard con el resumen de los últimos 30 días', async () => {
+test('la pestaña Dashboard: está en el menú, con el resumen de los últimos 30 días', async () => {
   const nav = await panelDe(H.tiendaId, H.email, H.clave);
-  const respuesta = await nav.pedir('/admin/inicio');
+  const respuesta = await nav.pedir('/admin/dashboard');
   assert.equal(respuesta.status, 200);
   const html = await respuesta.text();
-  assert.match(html, /<section class="tarjeta dashboard" id="dashboard" aria-labelledby="dashboard-titulo">/);
-  assert.match(html, /<h2 id="dashboard-titulo">Dashboard<\/h2>/);
-  assert.match(html, /<a href="\/admin\/inicio#dashboard" class="activa" aria-current="page">Resumen<\/a>/);
-  assert.match(html, /<a href="\/admin\/inicio\?periodo=7d#dashboard">7 días<\/a>/);
+  assert.match(html, /<title>Dashboard · Panel<\/title>/);
+  assert.match(html, /<h1>Dashboard<\/h1>/);
+  assert.match(html, /<a href="\/admin\/dashboard" class="menu-dashboard activo" aria-current="page">/, 'el menú la marca como la sección actual');
+  assert.match(html, /<a href="\/admin\/dashboard" class="activa" aria-current="page">Resumen<\/a>/);
+  assert.match(html, /<a href="\/admin\/dashboard\?periodo=7d">7 días<\/a>/);
   assert.match(html, /class="activa" aria-current="true">30 días<\/a>/);
-  assert.match(html, /<a href="\/admin\/inicio\?panel=stock#dashboard">Stock<\/a>/);
+  assert.match(html, /<a href="\/admin\/dashboard\?panel=stock">Stock<\/a>/);
+  assert.match(html, /action="\/admin\/dashboard"/, 'el formulario de fechas vuelve a la pestaña');
   assert.match(html, /Ventas por día/);
   // Tres pedidos concretados: dos de ayer (21.000 y 7.500) y uno de hace tres días (23.750) = 52.250.
   assert.match(html, /<span class="dash-kpi-etiqueta">Pedidos<\/span>\s*<strong class="dash-kpi-valor">3<\/strong>/);
@@ -640,16 +650,81 @@ test('el Inicio trae la card Dashboard con el resumen de los últimos 30 días',
   assert.match(html, /Productos más vendidos/);
 });
 
-test('la card sigue estando después de los números y antes de los pasos', async () => {
+test('el menú tiene Dashboard justo después de Inicio, en todas las pantallas del panel', async () => {
   const nav = await panelDe(H.tiendaId, H.email, H.clave);
-  const html = await (await nav.pedir('/admin/inicio')).text();
-  assert.ok(html.indexOf('class="numeros"') < html.indexOf('id="dashboard"'));
-  assert.ok(html.indexOf('id="dashboard"') < html.indexOf('class="inicio-columnas"'));
+  for (const ruta of ['/admin/inicio', '/admin/pedidos', '/admin/productos']) {
+    const html = await (await nav.pedir(ruta)).text();
+    const menu = [...html.matchAll(/<a href="\/admin\/([a-z]+)" class="menu-/g)].map((m) => m[1]);
+    assert.deepEqual(menu.slice(0, 3), ['inicio', 'dashboard', 'pedidos'], `orden del menú en ${ruta}`);
+    assert.doesNotMatch(html, /class="menu-dashboard activo"/, 'solo está marcado en su propia pantalla');
+  }
+});
+
+test('el Inicio trae una card que lleva al Dashboard, con un vistazo de los últimos 30 días', async () => {
+  const nav = await panelDe(H.tiendaId, H.email, H.clave);
+  const respuesta = await nav.pedir('/admin/inicio');
+  assert.equal(respuesta.status, 200);
+  const html = await respuesta.text();
+  assert.match(html, /<section class="tarjeta dashboard-acceso" aria-labelledby="dashboard-acceso-titulo">/);
+  assert.match(html, /<h2 id="dashboard-acceso-titulo"><a class="dashboard-acceso-enlace" href="\/admin\/dashboard">Dashboard<\/a><\/h2>/);
+  assert.match(html, /<dt>Ventas · 30 días<\/dt>\s*<dd>\s*\$\s52\.250/);
+  assert.match(html, /<dt>Pedidos · 30 días<\/dt><dd>3<\/dd>/);
+  assert.match(html, /<dt>Ticket promedio<\/dt><dd>\$\s17\.417<\/dd>/);
+  assert.doesNotMatch(html, /dash-cambio/, 'sin ventas en los 30 días anteriores no hay con qué comparar');
+  // Es solo la puerta: las estadísticas completas viven en la pestaña.
+  assert.doesNotMatch(html, /class="dashboard-contenido"|Ventas por día|Productos más vendidos/);
+  // Después de los números y antes de los pasos.
+  assert.ok(html.indexOf('class="numeros"') < html.indexOf('class="tarjeta dashboard-acceso"'));
+  assert.ok(html.indexOf('class="tarjeta dashboard-acceso"') < html.indexOf('class="inicio-columnas"'));
+});
+
+test('la card del Inicio muestra cuánto cambiaron las ventas contra los 30 días anteriores', async () => {
+  const hoyDia = hoy();
+  const reciente = `${sumarDias(hoyDia, -2)} 15:00:00`;
+  const anterior = `${sumarDias(hoyDia, -40)} 15:00:00`; // dentro de los 30 días anteriores a los últimos 30
+  // 2 remeras ahora (21.000) contra 1 antes (12.000): subieron 75%.
+  const sube = await tiendaConCatalogo('tienda-vistazo-sube');
+  await pedido(sube.tiendaId, { items: [['REM-S', 2]], estado: 'pagado', creado: reciente });
+  await pedido(sube.tiendaId, { items: [['REM-S', 1]], estado: 'pagado', creado: anterior });
+  let html = await (await (await panelDe(sube.tiendaId, sube.email, sube.clave)).pedir('/admin/inicio')).text();
+  assert.match(html, /<span class="dash-cambio dash-cambio-sube">\s*<svg[^>]*>.*?<\/svg>\+75%/s);
+  assert.match(html, /respecto de los 30 días anteriores/);
+  // 1 remera ahora contra 2 antes: bajaron 43%.
+  const baja = await tiendaConCatalogo('tienda-vistazo-baja');
+  await pedido(baja.tiendaId, { items: [['REM-S', 1]], estado: 'pagado', creado: reciente });
+  await pedido(baja.tiendaId, { items: [['REM-S', 2]], estado: 'pagado', creado: anterior });
+  html = await (await (await panelDe(baja.tiendaId, baja.email, baja.clave)).pedir('/admin/inicio')).text();
+  assert.match(html, /<span class="dash-cambio dash-cambio-baja">\s*<svg[^>]*>.*?<\/svg>−43%/s);
+});
+
+test('vistazoParaInicio: los últimos 30 días y la variación de las ventas', async () => {
+  const v = await vistazoParaInicio(db, A.tiendaId, { hoy: HOY });
+  assert.equal(v.periodo.clave, '30d');
+  assert.deepEqual([v.totales.pedidos, v.totales.ventas, v.totales.ticket], [4, 7_150_000, 1_787_500]);
+  assert.equal(v.cambio.tipo, 'sube');
+  assert.ok(Math.abs(v.cambio.porcentaje - (7_150_000 - 1_200_000) / 1_200_000) < 1e-9);
+  const sinPedidos = await vistazoParaInicio(db, A.tiendaId, { hoy: '2027-06-01' });
+  assert.deepEqual([sinPedidos.totales.recibidos, sinPedidos.cambio.tipo], [0, 'igual']);
+});
+
+test('los links viejos del Dashboard dentro del Inicio llevan a la pestaña nueva', async () => {
+  const nav = await panelDe(H.tiendaId, H.email, H.clave);
+  const ir = async (ruta) => {
+    const r = await nav.pedir(ruta);
+    assert.equal(r.status, 302, ruta);
+    return r.headers.get('location');
+  };
+  assert.equal(await ir('/admin/inicio?panel=ventas&periodo=7d'), '/admin/dashboard?panel=ventas&periodo=7d');
+  assert.equal(await ir('/admin/inicio?periodo=rango&desde=2026-11-01&hasta=2026-11-10'), '/admin/dashboard?periodo=rango&desde=2026-11-01&hasta=2026-11-10');
+  assert.equal(await ir('/admin/inicio?panel=stock'), '/admin/dashboard?panel=stock');
+  assert.equal(await ir('/admin/inicio?panel=ventas&panel=stock'), '/admin/dashboard', 'un parámetro repetido se descarta');
+  const inicio = await nav.pedir('/admin/inicio');
+  assert.equal(inicio.status, 200, 'sin esos parámetros, el Inicio es el Inicio');
 });
 
 test('cada panel se pide por la URL y muestra lo suyo', async () => {
   const nav = await panelDe(H.tiendaId, H.email, H.clave);
-  const pedir = async (consulta) => (await (await nav.pedir(`/admin/inicio?${consulta}`)).text());
+  const pedir = async (consulta) => (await (await nav.pedir(`/admin/dashboard?${consulta}`)).text());
 
   const ventas = await pedir('panel=ventas&periodo=7d');
   assert.match(ventas, /aria-current="page">Ventas<\/a>/);
@@ -684,50 +759,51 @@ test('cada panel se pide por la URL y muestra lo suyo', async () => {
   assert.match(stock, /<h3>Sin stock<\/h3>/);
   assert.match(stock, /El stock de hoy/);
   assert.doesNotMatch(stock, /aria-label="Período"/, 'el stock no depende del período');
-  assert.match(stock, /<a href="\/admin\/inicio\?panel=ventas#dashboard">Ventas<\/a>/);
+  assert.match(stock, /<a href="\/admin\/dashboard\?panel=ventas">Ventas<\/a>/);
 });
 
 test('la URL con algo raro vuelve al resumen de 30 días, y las fechas elegidas se validan', async () => {
   const nav = await panelDe(H.tiendaId, H.email, H.clave);
-  const html = await (await nav.pedir('/admin/inicio?panel=hackeo&periodo=1000d')).text();
+  const html = await (await nav.pedir('/admin/dashboard?panel=hackeo&periodo=1000d')).text();
   assert.match(html, /aria-current="page">Resumen<\/a>/);
   assert.match(html, /class="activa" aria-current="true">30 días<\/a>/);
 
-  const repetido = await nav.pedir('/admin/inicio?panel=ventas&panel=stock&periodo=7d&periodo=hoy');
+  const repetido = await nav.pedir('/admin/dashboard?panel=ventas&panel=stock&periodo=7d&periodo=hoy');
   assert.equal(repetido.status, 200, 'un parámetro repetido no rompe nada');
 
-  const bueno = await (await nav.pedir(`/admin/inicio?panel=ventas&periodo=rango&desde=${sumarDias(hoy(), -5)}&hasta=${hoy()}`)).text();
+  const bueno = await (await nav.pedir(`/admin/dashboard?panel=ventas&periodo=rango&desde=${sumarDias(hoy(), -5)}&hasta=${hoy()}`)).text();
   assert.match(bueno, /<details class="dashboard-rango" open>/);
   assert.match(bueno, /Del \d+\/\d+\/\d{4} al \d+\/\d+\/\d{4}/);
   assert.doesNotMatch(bueno, /class="error-campo"/);
 
-  const malo = await (await nav.pedir('/admin/inicio?panel=ventas&periodo=rango&desde=2026-11-10&hasta=2026-11-01')).text();
+  const malo = await (await nav.pedir('/admin/dashboard?panel=ventas&periodo=rango&desde=2026-11-10&hasta=2026-11-01')).text();
   assert.match(malo, /<p class="error-campo" role="alert">Elegí dos fechas válidas/);
   assert.match(malo, /class="activa" aria-current="true">30 días<\/a>/, 'con fechas inválidas se usa el período de siempre');
 
-  const inyeccion = await (await nav.pedir('/admin/inicio?panel=ventas&periodo=rango&desde=%22%3E%3Cscript%3Ealert(1)%3C/script%3E&hasta=x')).text();
+  const inyeccion = await (await nav.pedir('/admin/dashboard?panel=ventas&periodo=rango&desde=%22%3E%3Cscript%3Ealert(1)%3C/script%3E&hasta=x')).text();
   assert.doesNotMatch(inyeccion, /<script>alert\(1\)<\/script>/);
 });
 
 test('lo que escribió el cliente de la tienda se muestra escapado', async () => {
   const nav = await panelDe(H.tiendaId, H.email, H.clave);
-  const html = await (await nav.pedir('/admin/inicio?panel=productos')).text();
+  const html = await (await nav.pedir('/admin/dashboard?panel=productos')).text();
   assert.doesNotMatch(html, /<img src=x onerror=alert\(1\)>/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
-  const resumen = await (await nav.pedir('/admin/inicio')).text();
+  const resumen = await (await nav.pedir('/admin/dashboard')).text();
   assert.doesNotMatch(resumen, /<img src=x onerror/);
+  assert.match(resumen, /&lt;img src=x onerror=alert\(1\)&gt;/, 'el resumen también lista los más vendidos');
 });
 
 test('el Dashboard muestra solo los números de la tienda que ingresó', async () => {
   const nav = await panelDe(A.tiendaId, A.email, A.clave);
-  const html = await (await nav.pedir('/admin/inicio?panel=clientes&periodo=todo')).text();
+  const html = await (await nav.pedir('/admin/dashboard?panel=clientes&periodo=todo')).text();
   assert.match(html, /\bBeto\b/);
   assert.doesNotMatch(html, /Clienta Visible|Otro Cliente|Otra Persona/);
-  const productosA = await (await nav.pedir('/admin/inicio?panel=productos&periodo=todo')).text();
+  const productosA = await (await nav.pedir('/admin/dashboard?panel=productos&periodo=todo')).text();
   assert.match(productosA, /Ventas por marca/);
   assert.match(productosA, /ranking-nombre">\s*Norte\s*</);
   const otra = await panelDe(H.tiendaId, H.email, H.clave);
-  const htmlH = await (await otra.pedir('/admin/inicio?panel=clientes&periodo=todo')).text();
+  const htmlH = await (await otra.pedir('/admin/dashboard?panel=clientes&periodo=todo')).text();
   assert.match(htmlH, /Clienta Visible/);
   const ajeno = htmlH.match(/\b(Beto|Ana|Eli)\b/);
   assert.equal(ajeno, null, ajeno && `se coló un cliente de otra tienda: ...${htmlH.slice(ajeno.index - 100, ajeno.index + 100)}...`);
@@ -739,31 +815,35 @@ test('el panel de productos muestra cuánto del plan se usó, si el plan tiene t
   const { productos } = interpretarHoja([['SKU', 'Nombre', 'Precio', 'Stock'], ['A', 'Uno', 100, 1], ['B', 'Dos', 100, 1]]);
   await aplicarImportacion(db, tienda.id, productos);
   const nav = await panelDe(tienda.id, 'conplan@ejemplo.com', clave);
-  const html = await (await nav.pedir('/admin/inicio?panel=productos')).text();
+  const html = await (await nav.pedir('/admin/dashboard?panel=productos')).text();
   assert.match(html, /Tu plan \(Plan Chico\)/);
   assert.match(html, /2 de 10 productos/);
   const sinPlan = await panelDe(H.tiendaId, H.email, H.clave);
-  assert.doesNotMatch(await (await sinPlan.pedir('/admin/inicio?panel=productos')).text(), /Tu plan/, 'sin topes no hay nada que mostrar');
+  assert.doesNotMatch(await (await sinPlan.pedir('/admin/dashboard?panel=productos')).text(), /Tu plan/, 'sin topes no hay nada que mostrar');
 });
 
 test('sin ingresar no se ve nada del Dashboard', async () => {
   const nav = crearNavegador(`http://127.0.0.1:${puerto}`);
-  const respuesta = await nav.pedir('/admin/inicio?panel=ventas');
+  const respuesta = await nav.pedir('/admin/dashboard?panel=ventas');
   assert.equal(respuesta.status, 302);
   assert.equal(respuesta.headers.get('location'), '/admin/ingresar');
 });
 
-test('una tienda nueva, sin pedidos, ve la card con avisos en vez de gráficos vacíos', async () => {
+test('una tienda nueva, sin pedidos, ve avisos en vez de gráficos vacíos', async () => {
   const N = await tiendaConCatalogo('tienda-nueva', [['SKU', 'Nombre', 'Precio', 'Stock'], ['X', 'Cosa', 100, 5]]);
   const nav = await panelDe(N.tiendaId, N.email, N.clave);
-  const html = await (await nav.pedir('/admin/inicio')).text();
+  const inicio = await (await nav.pedir('/admin/inicio')).text();
+  assert.match(inicio, /Todavía no llegaron pedidos en los últimos 30 días/);
+  assert.doesNotMatch(inicio, /dashboard-acceso-numeros/, 'sin pedidos no hay números que mostrar');
+  assert.match(inicio, /href="\/admin\/dashboard">Dashboard<\/a>/, 'pero la puerta al Dashboard sigue estando');
+  const html = await (await nav.pedir('/admin/dashboard')).text();
   assert.match(html, /Todavía no hay ventas en este período/);
   assert.match(html, /No llegaron pedidos en este período/);
   assert.doesNotMatch(html, /<div class="grafico"/);
   for (const panel of ['ventas', 'pedidos', 'clientes', 'productos', 'stock']) {
-    const r = await nav.pedir(`/admin/inicio?panel=${panel}&periodo=todo`);
+    const r = await nav.pedir(`/admin/dashboard?panel=${panel}&periodo=todo`);
     assert.equal(r.status, 200, `el panel ${panel} anda sin pedidos`);
   }
-  const productos = await (await nav.pedir('/admin/inicio?panel=productos')).text();
+  const productos = await (await nav.pedir('/admin/dashboard?panel=productos')).text();
   assert.doesNotMatch(productos, /Ventas por marca/, 'sin marcas cargadas no hay nada que mostrar');
 });
