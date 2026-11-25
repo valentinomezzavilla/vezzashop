@@ -7,7 +7,7 @@
   <div>
     <a class="volver" href="/plataforma/planes"><%- icono('izquierda', { tamano: 16 }) %> Planes</a>
     <h1><%= plan ? plan.nombre : 'Nuevo plan' %></h1>
-    <p class="texto-suave">Dejá un tope vacío para no limitarlo.</p>
+    <p class="texto-suave">Dejá un tope vacío para no limitarlo. <%= plan && Number(plan.clientes) > 0 ? 'Si cambiás el precio o los topes, antes de guardar vas a ver a qué clientes les toca y podés sacar a alguno de un aumento.' : '' %></p>
   </div>
 </header>
 
@@ -43,6 +43,16 @@
       <input id="maxBanners" type="text" name="maxBanners" value="<%= valores.maxBanners %>" inputmode="numeric" placeholder="Hasta 6"<%- invalido('maxBanners') %>>
       <%- error('maxBanners') %>
     </div>
+  </div>
+  <div class="campo">
+    <label for="nivelDiseno">Diseño de la tienda</label>
+    <select id="nivelDiseno" name="nivelDiseno" aria-describedby="ayuda-nivelDiseno"<%- invalido('nivelDiseno') %>>
+      <% for (const [clave, nivel] of Object.entries(niveles)) { %>
+        <option value="<%= clave %>"<%= valores.nivelDiseno === clave ? ' selected' : '' %>><%= nivel.titulo %> · <%= nivel.lema %></option>
+      <% } %>
+    </select>
+    <span class="ayuda" id="ayuda-nivelDiseno">Cuánto puede personalizar de su vidriera quien tiene este plan. <strong>Esencial</strong>: identidad, tipografía, cabecera y banners. <strong>Acompañado</strong>: suma colores, logo, portada y tarjetas. <strong>A medida</strong>: todo, con CSS propio y dominio propio. Si un cliente baja de nivel, lo que había elegido de más queda guardado pero no se ve.</span>
+    <%- error('nivelDiseno') %>
   </div>
   <div class="campo">
     <label for="diasPrueba">Días de prueba <span class="opcional">(opcional)</span></label>

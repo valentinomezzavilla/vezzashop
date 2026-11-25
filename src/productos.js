@@ -7,22 +7,49 @@ import { ErrorDeValor, parsearPrecio, parsearEntero } from './importacion/valore
 export const MAX_ATRIBUTOS = 3;
 export const MAX_FOTOS = 10;
 
+// "Pocas unidades": alguna variante con 1 a 3 en stock (es lo mismo que avisa el Inicio del panel).
+export const POCAS_UNIDADES = 3;
+
 export const FILTROS = {
   todos: { titulo: 'Todos', sql: '' },
   visibles: { titulo: 'Visibles', sql: 'AND p.visible = 1' },
   ocultos: { titulo: 'Ocultos', sql: 'AND p.visible = 0' },
   destacados: { titulo: 'Destacados', sql: 'AND p.destacado = 1' },
+  'con-stock': { titulo: 'Con stock', sql: 'AND exists (SELECT 1 FROM variantes s WHERE s.producto_id = p.id AND s.stock > 0)' },
+  'pocas-unidades': { titulo: 'Pocas unidades', sql: `AND exists (SELECT 1 FROM variantes s WHERE s.producto_id = p.id AND s.stock BETWEEN 1 AND ${POCAS_UNIDADES})` },
   'sin-stock': { titulo: 'Sin stock', sql: 'AND NOT exists (SELECT 1 FROM variantes s WHERE s.producto_id = p.id AND s.stock > 0)' },
+  'en-oferta': { titulo: 'En oferta', sql: 'AND exists (SELECT 1 FROM variantes s WHERE s.producto_id = p.id AND s.precio_promocional_centavos IS NOT NULL)' },
   'sin-foto': { titulo: 'Sin foto', sql: 'AND NOT exists (SELECT 1 FROM producto_fotos f WHERE f.producto_id = p.id)' },
 };
 export const esFiltro = (valor) => typeof valor === 'string' && Object.hasOwn(FILTROS, valor);
+
+// Cómo se ordena el listado del panel. El SQL sale de acá, nunca de lo que manda el navegador.
+// El precio es el de lista de la variante más barata (o más cara) de cada producto, el mismo que muestra la tabla.
+export const ORDENES_ADMIN = {
+  nombre: { titulo: 'Nombre (A-Z)', sql: 'lower(p.nombre), p.id' },
+  'nombre-desc': { titulo: 'Nombre (Z-A)', sql: 'lower(p.nombre) DESC, p.id DESC' },
+  'precio-menor': { titulo: 'Precio: menor a mayor', sql: '"precioMinimo" NULLS LAST, lower(p.nombre), p.id' },
+  'precio-mayor': { titulo: 'Precio: mayor a menor', sql: '"precioMaximo" DESC NULLS LAST, lower(p.nombre), p.id' },
+  'stock-menor': { titulo: 'Stock: menos unidades primero', sql: 'stock, lower(p.nombre), p.id' },
+  'stock-mayor': { titulo: 'Stock: más unidades primero', sql: 'stock DESC, lower(p.nombre), p.id' },
+  nuevos: { titulo: 'Más nuevos primero', sql: 'p.id DESC' },
+  viejos: { titulo: 'Más viejos primero', sql: 'p.id' },
+};
+export const esOrdenAdmin = (valor) => typeof valor === 'string' && Object.hasOwn(ORDENES_ADMIN, valor);
+
+// De la URL (?categoria=12 o ?categoria=sin) a lo que entiende el listado: un id, 'sin' (sin categoría) o null (todas).
+export function categoriaDeFiltro(valor) {
+  if (valor === 'sin') return 'sin';
+  return /^\d{1,9}$/.test(String(valor ?? '')) ? Number(valor) : null;
+}
 
 // "50%_off" -> "50\%\_off" para buscarlo literal con LIKE ... ESCAPE '\'.
 const escaparLike = (texto) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 const PRIMERA_FOTO = '(SELECT archivo FROM producto_fotos f WHERE f.producto_id = p.id ORDER BY f.orden, f.id LIMIT 1)';
 
-export function listarProductosAdmin(db, tiendaId, { busqueda = '', filtro = 'todos' } = {}) {
+// categoria: el id de una categoría (incluye sus subcategorías), 'sin' (productos sin categoría) o null (todas).
+export function listarProductosAdmin(db, tiendaId, { busqueda = '', filtro = 'todos', orden = 'nombre', categoria = null } = {}) {
   const texto = busqueda.trim();
   const parametros = [tiendaId];
   let condicionBusqueda = '';
@@ -33,6 +60,15 @@ export function listarProductosAdmin(db, tiendaId, { busqueda = '', filtro = 'to
     const patron = `%${escaparLike(texto)}%`;
     parametros.push(patron, patron, patron);
   }
+  let condicionCategoria = '';
+  if (categoria === 'sin') {
+    condicionCategoria = 'AND NOT exists (SELECT 1 FROM producto_categorias pc WHERE pc.producto_id = p.id)';
+  } else if (Number.isInteger(categoria)) {
+    condicionCategoria = `AND p.id IN (
+      WITH RECURSIVE arbol(id) AS (SELECT CAST(? AS INTEGER) UNION ALL SELECT c.id FROM categorias c JOIN arbol a ON c.padre_id = a.id)
+      SELECT producto_id FROM producto_categorias WHERE categoria_id IN (SELECT id FROM arbol))`;
+    parametros.push(categoria);
+  }
   return db
     .prepare(
       `SELECT p.id, p.slug, p.nombre, p.marca, p.visible, p.destacado, ${PRIMERA_FOTO} AS foto,
@@ -40,9 +76,9 @@ export function listarProductosAdmin(db, tiendaId, { busqueda = '', filtro = 'to
               coalesce(sum(CASE WHEN v.stock = 0 THEN 1 ELSE 0 END), 0) AS "variantesSinStock",
               min(v.precio_centavos) AS "precioMinimo", max(v.precio_centavos) AS "precioMaximo"
        FROM productos p LEFT JOIN variantes v ON v.producto_id = p.id
-       WHERE p.tienda_id = ? ${(esFiltro(filtro) ? FILTROS[filtro] : FILTROS.todos).sql} ${condicionBusqueda}
+       WHERE p.tienda_id = ? ${(esFiltro(filtro) ? FILTROS[filtro] : FILTROS.todos).sql} ${condicionBusqueda} ${condicionCategoria}
        GROUP BY p.id
-       ORDER BY lower(p.nombre), p.id`,
+       ORDER BY ${ORDENES_ADMIN[esOrdenAdmin(orden) ? orden : 'nombre'].sql}`,
     )
     .all(...parametros);
 }
@@ -53,6 +89,18 @@ export async function contarPorFiltro(db, tiendaId) {
     cuentas[clave] = (await db.prepare(`SELECT count(*) AS n FROM productos p WHERE p.tienda_id = ? ${filtro.sql}`).get(tiendaId)).n;
   }
   return cuentas;
+}
+
+// Cuántos productos están visibles en la tienda y no tienen stock en ninguna variante (los que "Ocultar sin stock" saca de la vidriera).
+export async function contarSinStockVisibles(db, tiendaId) {
+  return (
+    await db
+      .prepare(
+        `SELECT count(*) AS n FROM productos p
+         WHERE p.tienda_id = ? AND p.visible = 1 ${FILTROS['sin-stock'].sql}`,
+      )
+      .get(tiendaId)
+  ).n;
 }
 
 // 1250000 -> "12.500"; 1250050 -> "12.500,50". Es lo que acepta parsearPrecio de vuelta.
@@ -373,6 +421,29 @@ export function borrarProductos(db, tiendaId, ids) {
 export async function cambiarMarca(db, tiendaId, id, campo, valor) {
   if (campo !== 'visible' && campo !== 'destacado') throw new Error(`Campo inválido: ${campo}`);
   return (await db.prepare(`UPDATE productos SET ${campo} = ? WHERE id = ? AND tienda_id = ?`).run(Number(valor), id, tiendaId)).changes > 0;
+}
+
+// Cambia visible o destacado de varios productos a la vez. Devuelve cuántos cambió (los que ya estaban así o no son de la tienda no cuentan).
+export async function cambiarMarcaVarios(db, tiendaId, ids, campo, valor) {
+  if (campo !== 'visible' && campo !== 'destacado') throw new Error(`Campo inválido: ${campo}`);
+  if (ids.length === 0) return 0;
+  const { rows } = await db
+    .prepare(`UPDATE productos SET ${campo} = ? WHERE tienda_id = ? AND id = ANY(?) AND ${campo} <> ? RETURNING id`)
+    .run(Number(valor), tiendaId, ids, Number(valor));
+  return rows.length;
+}
+
+// Oculta de la tienda todos los productos visibles que no tienen stock en ninguna variante. Devuelve cuántos ocultó.
+export async function ocultarSinStock(db, tiendaId) {
+  const { rows } = await db
+    .prepare(
+      `UPDATE productos SET visible = 0
+       WHERE tienda_id = ? AND visible = 1
+         AND NOT exists (SELECT 1 FROM variantes v WHERE v.producto_id = productos.id AND v.stock > 0)
+       RETURNING id`,
+    )
+    .run(tiendaId);
+  return rows.length;
 }
 
 export function listarFotos(db, tiendaId, productoId) {

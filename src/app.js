@@ -7,12 +7,18 @@ import { AlmacenSesiones } from './almacen-sesiones.js';
 import { rutasAdmin } from './rutas/admin.js';
 import { rutasTienda } from './rutas/tienda.js';
 import { rutasPlataforma } from './rutas/plataforma.js';
-import { buscarTiendaPorSlug, enlaceActualDeAnterior } from './tiendas.js';
+import { rutasWebhooks } from './rutas/webhooks.js';
+import { rutasSuscribirse } from './rutas/suscribirse.js';
+import { buscarTiendaPorDominio, buscarTiendaPorSlug, enlaceActualDeAnterior } from './tiendas.js';
 import { formatearPrecio, formatearPesos, formatearNumero, formatearPorcentaje, formatearDuracion, formatearFecha, plural } from './util/formato.js';
 import { telefonoParaWhatsapp } from './pedidos.js';
-import { formatearDia } from './util/fechas.js';
+import { formatearDia, formatearDiaLargo } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { vezza } from './util/vezza.js';
+import { datosLanding } from './landing.js';
+import { crearClienteMp } from './mercadopago.js';
+import { crearNotificador } from './notificaciones.js';
+import { isIP } from 'node:net';
 import { dominioDeTiendas, slugDeHost, urlPanel, urlTienda } from './util/dominios.js';
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
@@ -35,6 +41,7 @@ export function crearApp({ db, config }) {
     plural,
     telefonoParaWhatsapp,
     formatearDia,
+    formatearDiaLargo,
     icono,
     vezza,
     usuario: null,
@@ -78,12 +85,30 @@ export function crearApp({ db, config }) {
     next();
   });
 
+  // El aviso por mail a n8n (alta de cuentas, cambios de plan, pedidos): sin N8N_WEBHOOK_URL no manda nada, pero siempre existe.
+  const notificar = crearNotificador(config.n8n);
+
   // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:
   // la vidriera no las usa y así las visitas no crean sesiones.
-  const vidriera = rutasTienda({ db, config });
+  const vidriera = rutasTienda({ db, config, notificar });
+  // Responde la vidriera de `req.tienda`, salvo que la hayan suspendido.
+  const servirTienda = (req, res, next) => {
+    // Tienda suspendida por quien administra la plataforma: los compradores ven un aviso (y los buscadores, que es temporal).
+    if (req.tienda.estado === 'suspendida') {
+      res.set('Cache-Control', 'no-store').set('Retry-After', '86400');
+      return res.status(503).render('tienda/suspendida', { nombre: req.tienda.nombre });
+    }
+    vidriera(req, res, next);
+  };
+  // Los hosts de la plataforma (el panel, el dominio de las tiendas, localhost y las IP) nunca son un dominio propio: no hace falta buscarlos.
+  const esHostDePlataforma = (host) => host === config.dominio || host === dominioDeTiendas(config) || host === 'localhost' || isIP(host) !== 0;
   app.use(async (req, res, next) => {
     const slug = slugDeHost(req.hostname, dominioDeTiendas(config), config.dominio);
-    if (slug === null) return next();
+    if (slug === null) {
+      // ¿Es el dominio propio de una tienda (plan a medida, ya activo)? Si no, sigue como panel, landing o webhooks.
+      req.tienda = esHostDePlataforma(req.hostname) ? null : await buscarTiendaPorDominio(db, req.hostname);
+      return req.tienda ? servirTienda(req, res, next) : next();
+    }
     req.tienda = await buscarTiendaPorSlug(db, slug);
     if (!req.tienda) {
       // Un link que la tienda usó antes redirige al actual, con el mismo camino y las mismas búsquedas. Sin caché: si el link
@@ -96,13 +121,23 @@ export function crearApp({ db, config }) {
       }
     }
     if (!req.tienda) return res.status(404).render('tienda/no-existe', { urlPanel: urlPanel(req, config.dominio) });
-    // Tienda suspendida por quien administra la plataforma: los compradores ven un aviso (y los buscadores, que es temporal).
-    if (req.tienda.estado === 'suspendida') {
-      res.set('Cache-Control', 'no-store').set('Retry-After', '86400');
-      return res.status(503).render('tienda/suspendida', { nombre: req.tienda.nombre });
+    // Con dominio propio activo, el subdominio de siempre manda al dominio propio (con el mismo camino y las mismas búsquedas).
+    if (req.tienda.dominioPropio && req.tienda.dominioEstado === 'activo') {
+      const soloLee = req.method === 'GET' || req.method === 'HEAD';
+      res.set('Cache-Control', 'no-store');
+      return res.redirect(soloLee ? 301 : 308, `${req.protocol}://${req.tienda.dominioPropio}${req.originalUrl}`);
     }
-    vidriera(req, res, next);
+    servirTienda(req, res, next);
   });
+
+  // Suscripciones a los planes (Mercado Pago): sin MP_ACCESS_TOKEN quedan apagadas y la landing sigue mandando por WhatsApp.
+  // Un servicio es lo que necesita src/suscripciones.js: la base, Mercado Pago, el aviso a n8n y el secreto que firma los links.
+  const servicios = config.mercadopago
+    ? { db, mp: crearClienteMp(config.mercadopago), avisar: notificar, secreto: config.secretoSesion }
+    : null;
+  // Los avisos de Mercado Pago no son de ninguna tienda ni de ninguna sesión: van antes de todo eso. Los de las suscripciones a los planes
+  // necesitan `servicios`; los de pago de cada tienda solo la base y el aviso por mail.
+  app.use('/webhooks', rutasWebhooks({ servicios, config, db, notificar }));
 
   // Más campos que los 1000 de fábrica: al borrar varios productos, cada uno marcado es un campo "ids".
   app.use(express.urlencoded({ extended: false, parameterLimit: 10_000, limit: '200kb' }));
@@ -123,10 +158,15 @@ export function crearApp({ db, config }) {
     });
 
   // Tiendas: 8 horas desde que ingresan.
-  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config }));
+  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config, servicios, notificar }));
+  // Alta de cuentas nuevas desde la landing. Usa la misma sesión que /admin: al completar el formulario, el cliente queda adentro del panel.
+  if (servicios) app.use('/suscribirse', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasSuscribirse({ servicios, config }));
+  else app.use('/suscribirse', (req, res) => res.redirect('/'));
   // Plataforma: 15 días, y cada uso los renueva: mientras se use, no hay que volver a ingresar.
-  app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config }));
-  app.get('/', (req, res) => res.redirect('/admin'));
+  app.use('/plataforma', sesion({ name: 'sesion-plataforma', path: '/plataforma', maxAge: QUINCE_DIAS_MS, rolling: true }), rutasPlataforma({ db, config, servicios, notificar }));
+  // El dominio principal muestra la página de presentación de la plataforma (vistas/landing.ejs, con los planes de la base); el panel
+  // sigue en /admin. Sin sesión ni cookies.
+  app.get('/', async (req, res) => res.render('landing', await datosLanding(db, { pagos: Boolean(servicios) })));
 
   app.use((req, res) => {
     res.status(404).render('error', { titulo: 'No encontrado', mensaje: 'Esta página no existe.' });

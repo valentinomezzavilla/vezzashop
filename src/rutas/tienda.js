@@ -11,12 +11,25 @@ import {
   ORDENES,
   esOrden,
 } from '../vidriera.js';
-import { leerAjustes, listarBanners, colorDeTextoSobre, estiloDeTienda, precioConDescuento, valorCuota, TAMANOS_LOGO } from '../diseno.js';
+import {
+  leerAjustes,
+  listarBanners,
+  colorDeTextoSobre,
+  estiloDeTienda,
+  precioConDescuento,
+  valorCuota,
+  TAMANOS_LOGO,
+  CATEGORIAS_EN_PORTADA,
+  CATEGORIAS_EN_PIE,
+} from '../diseno.js';
+import { aplicarNivel, nivelDeTienda, seccionesDePortada } from '../diseno-por-plan.js';
 import { dimensionesDe, urlImagen, urlMiniatura } from '../imagenes.js';
-import { formatearPrecio } from '../util/formato.js';
+import { formatearFecha, formatearPrecio } from '../util/formato.js';
+import { leerEventos, armarSeguimiento, tituloParaCliente } from '../envios.js';
 import { urlPanel } from '../util/dominios.js';
 import { crearLimite } from '../util/limite.js';
-import { estadoCheckout, textoCosto, instruccionesMercadopago } from '../pagos.js';
+import { estadoCheckout, textoCosto, costoParaProvincia, dependeDeProvincia, instruccionesMercadopago, DETALLE_MERCADOPAGO_EN_LINEA } from '../pagos.js';
+import { iniciarCobro, sincronizarPedido } from '../cobros-mp.js';
 import {
   leerItems,
   lineasDelCarrito,
@@ -27,7 +40,6 @@ import {
   crearPedido,
   ErrorDeStock,
   leerPedidoPorToken,
-  tituloEstado,
   direccionEnUnaLinea,
   resumenEnTexto,
   PROVINCIAS,
@@ -68,6 +80,8 @@ function preciosExtra(centavos, ajustes) {
 
 // Pedidos que se pueden hacer desde una misma IP por hora (frena a quien quiera reservar todo el stock).
 const PEDIDOS_POR_HORA = 10;
+// Cada vuelta de Mercado Pago o clic en "Pagar" le cuesta una llamada a Mercado Pago a la tienda: un tope por IP.
+const COBROS_MP_POR_HORA = 30;
 
 // "-20%" de un precio promocional sobre el de lista (null si no hay promoción).
 export const porcentajeOff = (precioLista, precioFinal) =>
@@ -128,13 +142,19 @@ function conParametros(req, cambios) {
 }
 
 // Vidriera de una tienda. Se monta solo cuando el host es el subdominio de una tienda (req.tienda).
-export function rutasTienda({ db, config }) {
+export function rutasTienda({ db, config, notificar = async () => false }) {
   const router = express.Router();
   const limitePedidos = crearLimite({ maximo: PEDIDOS_POR_HORA, ventanaMs: 60 * 60 * 1000 });
+  const limiteCobrosMp = crearLimite({ maximo: COBROS_MP_POR_HORA, ventanaMs: 60 * 60 * 1000 });
 
   router.use(async (req, res, next) => {
-    const arbol = await arbolCategorias(db, req.tienda.id);
-    const ajustes = await leerAjustes(db, req.tienda.id);
+    // Lo que la tienda eligió, limitado a lo que incluye el nivel de diseño de su plan (lo de más queda guardado pero no se ve).
+    const nivel = await nivelDeTienda(db, req.tienda.id);
+    const ajustes = aplicarNivel(await leerAjustes(db, req.tienda.id), nivel);
+    // El código de seguimiento (píxeles, analítica) lo carga quien administra la plataforma; solo se usa con el plan a medida.
+    const codigos = nivel === 'a_medida' ? await db.prepare('SELECT codigo_cabecera AS cabecera, codigo_pie AS pie FROM tiendas WHERE id = ?').get(req.tienda.id) : null;
+    // Con "ocultar los sin stock", una categoría que solo tiene de esos tampoco se muestra.
+    const arbol = await arbolCategorias(db, req.tienda.id, { sinStock: ajustes.sinStock });
     const checkout = await estadoCheckout(db, req.tienda.id, ajustes);
     const origen = `${req.protocol}://${req.host}`;
     Object.assign(res.locals, {
@@ -150,7 +170,12 @@ export function rutasTienda({ db, config }) {
       colorTexto: colorDeTextoSobre(ajustes.colorPrincipal),
       // Tipografía, esquinas, tarjetas y color de la franja que eligió la tienda (ver estiloDeTienda en diseno.js).
       estilo: estiloDeTienda(ajustes),
+      codigoCabecera: codigos?.cabecera ?? '',
+      codigoPie: codigos?.pie ?? '',
       urlCategoria,
+      // Cuántas categorías se ven de entrada como botones en la portada y en el pie; el resto queda en "Ver todas".
+      limiteCategoriasPortada: ajustes.categoriasPortada === 'todas' ? Infinity : CATEGORIAS_EN_PORTADA,
+      limiteCategoriasPie: ajustes.categoriasPortada === 'todas' ? Infinity : CATEGORIAS_EN_PIE,
       estadoStock,
       porcentajeOff,
       preciosExtra: (centavos) => preciosExtra(centavos, ajustes),
@@ -177,7 +202,7 @@ export function rutasTienda({ db, config }) {
     const tiendaId = req.tienda.id;
     const orden = ordenElegido(req, req.ajustes);
     const filtros = filtrosDe(req.query);
-    const opciones = { ...base, ...filtros };
+    const opciones = { ...base, ...filtros, sinStock: req.ajustes.sinStock };
     const total = await contarVisibles(db, tiendaId, opciones);
     const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
     const pagina = Math.min(paginas, Math.max(1, Number.parseInt(req.query.pagina, 10) || 1));
@@ -213,7 +238,9 @@ export function rutasTienda({ db, config }) {
     const datos = await listado(req, {});
     // Los destacados y los banners van arriba solo en la primera vista de la portada, sin filtros ni orden elegido.
     const portada = !req.query.orden && !datos.hayFiltros && datos.pagina === 1;
-    const banners = portada
+    // Qué secciones van arriba y en qué orden (Diseño, plan Acompañado): por defecto, los banners y los destacados, como siempre.
+    const seccionesPortada = portada ? seccionesDePortada(req.ajustes.portadaSecciones) : [];
+    const banners = seccionesPortada.includes('banners')
       ? await Promise.all(
           (await listarBanners(db, req.tienda.id)).map(async (b) => ({
             ...b,
@@ -224,16 +251,23 @@ export function rutasTienda({ db, config }) {
           })),
         )
       : [];
-    const destacados = portada
-      ? await productosVisibles(db, req.tienda.id, { soloDestacados: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS })
+    const destacados = seccionesPortada.includes('destacados')
+      ? await productosVisibles(db, req.tienda.id, { soloDestacados: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS, sinStock: req.ajustes.sinStock })
+      : [];
+    // Ofertas: los productos con precio promocional (los mismos que muestra el filtro "Solo en oferta").
+    const ofertas = seccionesPortada.includes('ofertas')
+      ? await productosVisibles(db, req.tienda.id, { enOferta: true, orden: req.ajustes.ordenCatalogo, limite: MAX_DESTACADOS, sinStock: req.ajustes.sinStock })
       : [];
     res.locals.meta.imagen = banners[0]?.urlImagen ?? res.locals.urlLogo;
     res.render('tienda/catalogo', {
       titulo: req.tienda.nombre,
       migas: [],
-      subcategorias: req.arbol,
+      // En la portada, "ninguna" saca los botones de categorías (siguen en el menú y en el pie).
+      subcategorias: req.ajustes.categoriasPortada === 'ninguna' ? [] : req.arbol,
+      seccionesPortada,
       banners,
       destacados: conFotos(req.tienda.id, destacados),
+      ofertas: conFotos(req.tienda.id, ofertas),
       ...datos,
     });
   });
@@ -274,7 +308,7 @@ export function rutasTienda({ db, config }) {
   router.get('/api/buscar', async (req, res) => {
     const busqueda = String(req.query.q ?? '').trim().slice(0, 80);
     if (busqueda.length < 2) return res.json({ total: 0, productos: [] });
-    const opciones = { busqueda };
+    const opciones = { busqueda, sinStock: req.ajustes.sinStock };
     const productos = await productosVisibles(db, req.tienda.id, { ...opciones, orden: 'nombre', limite: MAX_SUGERENCIAS });
     res.json({
       total: await contarVisibles(db, req.tienda.id, opciones),
@@ -360,16 +394,18 @@ export function rutasTienda({ db, config }) {
   // a calcular acá con los precios y el stock de la base: lo que manda el navegador es solo qué y cuánto.
 
   // Las opciones de entrega y pago listas para mostrar, con lo que necesita el script para recalcular el total.
-  function opcionesCheckout(req, subtotal) {
+  // `provincia`: la que eligió el comprador ('' si todavía no): las entregas con precio por provincia cobran según ella.
+  function opcionesCheckout(req, subtotal, provincia = '') {
     const { entregas, pagos } = req.checkout;
     return {
       entregas: entregas.map((e) => {
-        const envio = costoEnvio(e, subtotal);
+        const envio = costoEnvio(e, subtotal, provincia);
         return {
           ...e,
-          textoCosto: envio === 0 && e.costo > 0 ? 'Gratis' : textoCosto(e),
+          textoCosto: envio === 0 && costoParaProvincia(e, provincia) > 0 ? 'Gratis' : textoCosto(e, provincia),
           // "Gratis desde $X" solo si todavía no se llegó.
-          textoGratis: e.gratisDesde !== null && envio !== 0 ? `Gratis desde ${formatearPrecio(e.gratisDesde)}` : null,
+          // Se mira el subtotal y no el envío: con precios por provincia y sin provincia elegida el envío todavía es desconocido (null).
+          textoGratis: e.gratisDesde !== null && subtotal < e.gratisDesde ? `Gratis desde ${formatearPrecio(e.gratisDesde)}` : null,
         };
       }),
       pagos: pagos.map((p) => ({
@@ -377,7 +413,7 @@ export function rutasTienda({ db, config }) {
         detalle:
           p.clave === 'transferencia' ? 'Te mostramos los datos de la cuenta al confirmar el pedido.'
           : p.clave === 'efectivo' ? 'Pagás cuando retirás o recibís el pedido.'
-          : `Tarjeta de crédito, débito o dinero en cuenta.${req.ajustes.cuotasSinInteres ? ` Hasta ${req.ajustes.cuotasSinInteres} cuotas sin interés.` : ''}`,
+          : `${p.enLinea ? DETALLE_MERCADOPAGO_EN_LINEA : 'Tarjeta de crédito, débito o dinero en cuenta.'}${req.ajustes.cuotasSinInteres ? ` Hasta ${req.ajustes.cuotasSinInteres} cuotas sin interés.` : ''}`,
       })),
     };
   }
@@ -385,7 +421,8 @@ export function rutasTienda({ db, config }) {
   // sinItems: se entró a /checkout sin productos en la URL (el script usa el carrito guardado en el navegador).
   function mostrarCheckout(req, res, { lineas, cambios = [], valores = {}, errores = {}, status = 200, sinItems = false }) {
     const subtotal = subtotalDe(lineas);
-    const { entregas, pagos } = opcionesCheckout(req, subtotal);
+    const provincia = valores.provincia ?? '';
+    const { entregas, pagos } = opcionesCheckout(req, subtotal, provincia);
     // Si hay una sola opción, ya viene elegida.
     const elegida = {
       entrega: valores.entrega ?? (entregas.length === 1 ? String(entregas[0].id) : ''),
@@ -405,12 +442,15 @@ export function rutasTienda({ db, config }) {
       entregas,
       pagos,
       entregaElegida: entrega,
-      totales: calcularTotales(subtotal, entrega, pago),
+      // El costo de la entrega elegida para la provincia elegida (null: se coordina después; undefined: no hay entrega elegida).
+      costoEntregaElegida: entrega ? costoParaProvincia(entrega, provincia) : undefined,
+      entregaPorProvincia: Boolean(entrega && dependeDeProvincia(entrega)),
+      totales: calcularTotales(subtotal, entrega, pago, provincia),
       provincias: PROVINCIAS,
       datosCheckout: jsonEnScript({
         subtotal,
-        entregas: entregas.map(({ id, tipo, costo, gratisDesde, aceptaEfectivo }) => ({ id: String(id), tipo, costo, gratisDesde, aceptaEfectivo })),
-        pagos: pagos.map(({ clave, descuento }) => ({ clave, descuento })),
+        entregas: entregas.map(({ id, tipo, costo, gratisDesde, aceptaEfectivo, preciosProvincia }) => ({ id: String(id), tipo, costo, gratisDesde, aceptaEfectivo, preciosProvincia })),
+        pagos: pagos.map(({ clave, descuento, enLinea }) => ({ clave, descuento, enLinea: Boolean(enLinea) })),
         carrito: lineas.map(({ sku, cantidad }) => ({ sku, cantidad })),
         sinItems,
       }),
@@ -453,34 +493,90 @@ export function rutasTienda({ db, config }) {
       return volver({ lineas: actual.lineas, cambios: error.problemas });
     }
     limitePedidos.registrar(req.ip);
+    // Con la cuenta de Mercado Pago de la tienda conectada, el comprador paga en el momento: se lo lleva a Mercado Pago sin pasos de más.
+    // Si algo falla, el pedido igual quedó hecho: se le muestra con el botón para intentar de nuevo.
+    if (datos.pago.clave === 'mercadopago' && datos.pago.enLinea) {
+      const cobro = await armarCobro(req, res, await leerPedidoPorToken(db, req.tienda.id, pedido.token));
+      return res.redirect(303, cobro ? cobro.initPoint : `/pedido/${pedido.token}?nuevo=1&mp=error`);
+    }
     res.redirect(303, `/pedido/${pedido.token}?nuevo=1`);
   });
 
+  // El link de pago de Mercado Pago de un pedido ({ initPoint }), o null si no se pudo (ver iniciarCobro en cobros-mp.js).
+  // El aviso de pago va al dominio del panel: las tiendas se ven en sus subdominios, pero /webhooks solo existe en el panel.
+  function armarCobro(req, res, pedido) {
+    return iniciarCobro({
+      db,
+      config,
+      tienda: req.tienda,
+      pedido,
+      urlPedido: `${res.locals.origen}/pedido/${pedido.token}`,
+      urlAviso: `${urlPanel(req, config.dominio)}/webhooks/mercadopago/tienda/${req.tienda.id}`,
+    });
+  }
+
   // El pedido, para el cliente: qué compró, cómo pagar y en qué estado está. El link no se puede adivinar.
   router.get('/pedido/:token', async (req, res, next) => {
-    const pedido = await leerPedidoPorToken(db, req.tienda.id, req.params.token);
+    let pedido = await leerPedidoPorToken(db, req.tienda.id, req.params.token);
     if (!pedido) return next();
     const { ajustes } = req;
     const urlPedido = `${res.locals.origen}/pedido/${pedido.token}`;
+    const mp = ['ok', 'pendiente', 'error'].includes(req.query.mp) ? req.query.mp : null;
+    // Si vuelve de Mercado Pago (o el pedido sigue esperando el pago), se le pregunta a Mercado Pago cómo salió, sin esperar al aviso aparte:
+    // así el comprador ve su pedido como pagado apenas vuelve. Lo que trae la URL (payment_id) solo dice qué pago mirar. Si falla, la página se ve igual.
+    const pagoEnLinea = req.checkout.pagos.some((p) => p.clave === 'mercadopago' && p.enLinea);
+    if (mp && pedido.pago === 'mercadopago' && pedido.estado === 'nuevo' && pagoEnLinea && limiteCobrosMp.puede(req.ip)) {
+      limiteCobrosMp.registrar(req.ip);
+      try {
+        const pagoId = /^\d{1,20}$/.test(String(req.query.payment_id ?? '')) ? String(req.query.payment_id) : null;
+        const resultado = await sincronizarPedido({ db, config, notificar, tienda: req.tienda, pedido, urlBaseTienda: res.locals.origen, pagoId });
+        if (resultado.estadoPago) pedido = await leerPedidoPorToken(db, req.tienda.id, req.params.token);
+      } catch (error) {
+        console.error(`Mercado Pago: no se pudo verificar el pago del pedido ${pedido.id} al volver el comprador:`, error.status ?? '', error.message);
+      }
+    }
     const whatsapp = ajustes.whatsapp
       ? `https://wa.me/${ajustes.whatsapp}?text=${encodeURIComponent(resumenEnTexto(pedido, { tienda: req.tienda.nombre, urlPedido }))}`
       : null;
     const comprobante = ajustes.whatsapp
       ? `https://wa.me/${ajustes.whatsapp}?text=${encodeURIComponent(`¡Hola ${req.tienda.nombre}! Te mando el comprobante de la transferencia del pedido #${pedido.numero} por ${formatearPrecio(pedido.total)}.`)}`
       : null;
+    // La línea de tiempo del pedido (solo con lo que es para el comprador: las correcciones internas no salen).
+    const seguimiento = pedido.estado === 'cancelado' ? null : armarSeguimiento(pedido, await leerEventos(db, pedido.id, { soloCliente: true }));
+    if (seguimiento) for (const paso of seguimiento.pasos) paso.fecha = paso.fecha ? formatearFecha(paso.fecha) : null;
     res.locals.noIndexar = true;
     res.set('Cache-Control', 'private, no-store');
     res.render('tienda/pedido', {
       titulo: `Pedido #${pedido.numero}`,
       pedido,
       nuevo: req.query.nuevo === '1',
-      estado: tituloEstado(pedido.estado, pedido.entrega.tipo, { paraCliente: true }),
+      estado: tituloParaCliente(pedido),
+      seguimiento,
       direccion: direccionEnUnaLinea(pedido.direccion),
       instruccionesMercadopago: instruccionesMercadopago(ajustes),
+      // Mercado Pago en línea: el comprador paga desde el botón de su pedido (si el envío ya tiene costo). `retornoMp` es cómo volvió de Mercado Pago.
+      pagoEnLinea: pagoEnLinea && pedido.envio !== null,
+      pagoPendiente: ['pending', 'in_process', 'authorized'].includes(pedido.mp.pagoEstado) || mp === 'pendiente',
+      retornoMp: mp,
       whatsapp,
       comprobante,
       urlPedido,
     });
+  });
+
+  // "Pagar con Mercado Pago" desde la página del pedido: arma el pago (o reutiliza el que ya estaba armado) y manda al comprador a Mercado Pago.
+  // Es un POST (con el mismo control de origen que el checkout) porque arma un pago: un link que se abre solo, o que lo abre un buscador, no debería.
+  router.post('/pedido/:token/pagar', express.urlencoded({ extended: false, limit: '4kb' }), async (req, res, next) => {
+    const origen = req.get('origin');
+    if (origen && origen !== res.locals.origen) return res.status(403).render('tienda/no-encontrado', { titulo: 'No encontrado' });
+    const pedido = await leerPedidoPorToken(db, req.tienda.id, req.params.token);
+    if (!pedido) return next();
+    const volver = `/pedido/${pedido.token}`;
+    if (pedido.pago !== 'mercadopago' || pedido.estado !== 'nuevo') return res.redirect(303, volver);
+    if (!limiteCobrosMp.puede(req.ip)) return res.redirect(303, `${volver}?mp=error`);
+    limiteCobrosMp.registrar(req.ip);
+    const cobro = await armarCobro(req, res, pedido);
+    res.redirect(303, cobro ? cobro.initPoint : `${volver}?mp=error`);
   });
 
   router.use((req, res) => {

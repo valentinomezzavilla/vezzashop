@@ -1,0 +1,220 @@
+/* ==========================================================================
+   VEZZA Shop · capa de movimiento de la landing
+   Se carga después del CSS de la página y solo agrega: no cambia colores, textos ni la grilla.
+   - Todo el movimiento vive dentro de (prefers-reduced-motion: no-preference): con "reducir movimiento" la página queda quieta y completa.
+   - Se anima transform, translate, rotate, scale y opacity (nada que haga recalcular la grilla).
+   - Lo moderno es opcional: cada técnica está detrás de @supports o de @property, y los navegadores que no la tienen ven la versión de siempre.
+   ========================================================================== */
+
+/* Giro del borde de colores del plan recomendado (se anima como número, no como imagen). */
+@property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+:root {
+  /* Resorte: arranca rápido, pasa un poco de largo y se asienta. Sin soporte de linear(), vale la curva de siempre. */
+  --spring: var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+  --coral: #FF8A5B;
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%, 1.077 22.4%, 1.121 25.7%, 1.149 29.2%, 1.159 33.1%, 1.155 36.2%, 1.122 42%, 1.062 48.5%, 1.012 55.5%, 0.998 59.2%, 0.994 64.3%, 0.999 76.5%, 1);
+  }
+}
+
+/* Para que el contador de las cifras no "baile" mientras cuenta. */
+.stat b { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: no-preference) {
+
+  /* ---------- Entre páginas: la landing y el alta se funden, y la tarjeta del plan viaja de una a otra ---------- */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .4s; animation-timing-function: var(--ease); }
+
+  /* ---------- Barra de avance de lectura ---------- */
+  .progreso {
+    position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 60; pointer-events: none;
+    background: linear-gradient(90deg, var(--accent), #8F86FF 55%, var(--coral));
+    transform-origin: 0 50%; transform: scaleX(var(--p, 0));
+  }
+  @supports (animation-timeline: scroll()) {
+    .progreso { transform: scaleX(0); animation: progreso linear both; animation-timeline: scroll(root block); }
+    @keyframes progreso { to { transform: scaleX(1); } }
+  }
+
+  /* ---------- Hero: fondo vivo (puntos + aurora) ---------- */
+  .hero { position: relative; isolation: isolate; }
+  .hero::before, .hero::after { content: ""; position: absolute; z-index: -1; pointer-events: none; }
+  .hero::before {
+    inset: 0;
+    background: radial-gradient(circle at 1px 1px, rgba(21, 19, 28, .16) 1px, transparent 0) 0 0 / 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 62% 40%, #000, transparent 75%);
+            mask-image: radial-gradient(ellipse 70% 60% at 62% 40%, #000, transparent 75%);
+    opacity: .55;
+  }
+  .hero::after {
+    inset: -20% -10% -10% -10%;
+    background:
+      radial-gradient(38rem 30rem at 18% 28%, rgba(61, 47, 224, .24), transparent 70%),
+      radial-gradient(34rem 28rem at 82% 70%, rgba(255, 138, 91, .22), transparent 70%),
+      radial-gradient(26rem 22rem at 60% 8%, rgba(143, 134, 255, .22), transparent 70%);
+    animation: aurora 24s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  @keyframes aurora {
+    from { transform: translate3d(-2%, -1%, 0) rotate(-2deg) scale(1); }
+    to   { transform: translate3d(3%, 2%, 0) rotate(3deg) scale(1.08); }
+  }
+
+  /* ---------- Hero: titular palabra por palabra (el JS parte el texto) ---------- */
+  [data-split]:not(.is-split) { visibility: hidden; animation: mostrar 0s 1.4s forwards; } /* red de seguridad si el JS no llega */
+  @keyframes mostrar { to { visibility: visible; } }
+  .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .04em .16em; margin: 0 -.04em -.16em; }
+  .w__i { display: inline-block; will-change: transform; }
+  .hero h1.is-split .w__i { transform: translateY(112%) rotate(5deg); transform-origin: 0 100%; animation: palabra 1s var(--spring) both; animation-delay: calc(var(--i) * 70ms + 160ms); }
+  @keyframes palabra { from { transform: translateY(112%) rotate(5deg); } to { transform: none; } }
+
+  /* Titulares de sección: las palabras suben cuando entra el bloque */
+  .js .head .w__i { transform: translateY(108%) rotate(3deg); transform-origin: 0 100%; }
+  .js .head.in .w__i { transform: none; transition: transform 1s var(--spring); transition-delay: calc(var(--i) * 45ms + 120ms); }
+
+  /* ---------- Hero: el resto entra escalonado ---------- */
+  .hero__tag, .hero .lead, .hero__cta, .hero__checks { animation: sube .9s var(--ease) both; }
+  .hero__tag { animation-delay: .05s; }
+  .hero .lead { animation-delay: .55s; }
+  .hero__cta { animation-delay: .7s; }
+  .hero__checks { animation-delay: .85s; }
+  @keyframes sube { from { opacity: 0; translate: 0 22px; } to { opacity: 1; translate: 0 0; } }
+  .hero__tag i { animation: latido 2.4s ease-out infinite; }
+  @keyframes latido { 0% { box-shadow: 0 0 0 0 rgba(23, 120, 74, .45); } 70%, 100% { box-shadow: 0 0 0 10px rgba(23, 120, 74, 0); } }
+
+  /* ---------- Hero: escena 3D que sigue al mouse ---------- */
+  .stage { perspective: 1500px; --d: 0; }
+  .stage .win {
+    transform: rotateX(calc(var(--py, 0) * -5deg)) rotateY(calc(var(--px, 0) * 7deg)) rotate(-1.4deg);
+    transform-style: preserve-3d;
+    animation: escena-entra 1.1s var(--spring) .2s backwards;
+  }
+  .stage .phone, .stage .chip {
+    translate: calc(var(--px, 0) * var(--d) * 1px) calc(var(--py, 0) * var(--d) * 1px);
+  }
+  .stage .phone { --d: 20; animation: escena-entra 1.1s var(--spring) .45s backwards; }
+  .chip--a { --d: 34; }
+  .chip--b { --d: 28; }
+  .stage .chip--a { animation: float 6s ease-in-out infinite, chip-entra .8s var(--spring) .9s backwards; }
+  .stage .chip--b { animation: float 7s -2s ease-in-out infinite, chip-entra .8s var(--spring) 1.05s backwards; }
+  @keyframes escena-entra { from { opacity: 0; translate: 70px 30px; scale: .94; } }
+  @keyframes chip-entra { from { opacity: 0; scale: .6; } }
+
+  /* ---------- Botones: imán suave y barrido de brillo ---------- */
+  .btn {
+    position: relative; isolation: isolate; overflow: hidden;
+    translate: var(--mx, 0px) var(--my, 0px);
+    transition: background-color .2s var(--ease), color .2s var(--ease), transform .2s var(--ease), border-color .2s var(--ease), translate .3s var(--ease);
+  }
+  .btn::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, .38) 50%, transparent 68%);
+    transform: translateX(-130%);
+  }
+  .btn:hover::after { transform: translateX(130%); transition: transform .8s var(--ease); }
+  .btn--primary:active, .btn--ghost:active { transform: translateY(0) scale(.97); }
+
+  /* ---------- Tarjetas: luz que sigue al cursor ---------- */
+  [data-glow] { position: relative; isolation: isolate; }
+  [data-glow]::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; opacity: 0; transition: opacity .4s var(--ease);
+    background: radial-gradient(380px circle at var(--gx, 50%) var(--gy, 50%), rgba(61, 47, 224, .13), transparent 58%);
+  }
+  [data-glow]:hover::before { opacity: 1; }
+  .inv [data-glow]::before, .plan--hl::before { background: radial-gradient(380px circle at var(--gx, 50%) var(--gy, 50%), rgba(169, 163, 255, .2), transparent 58%); }
+
+  /* ---------- Aparición al hacer scroll (versión con resorte y escalonada) ---------- */
+  .js .reveal { opacity: 0; transform: translateY(30px) scale(.985); transition: opacity .8s var(--ease), transform 1.1s var(--spring); }
+  .js .reveal.in { opacity: 1; transform: none; transition-delay: calc(var(--i, 0) * 80ms); }
+
+  /* ---------- Capturas: derivan con el scroll y se enderezan al llegar al centro ---------- */
+  @supports (animation-timeline: view()) {
+    .split .win, .shopstage .win, .showcase .win {
+      animation: captura linear both; animation-timeline: view(); animation-range: entry 0% exit 100%;
+    }
+    @keyframes captura {
+      0%   { translate: 0 52px; rotate: 1.8deg; }
+      50%  { translate: 0 0;    rotate: 0deg; }
+      100% { translate: 0 -52px; rotate: -1.4deg; }
+    }
+    .shopstage .phone { animation: celular linear both; animation-timeline: view(); animation-range: entry 0% exit 100%; }
+    @keyframes celular { from { translate: 0 90px; } to { translate: 0 -40px; } }
+
+    /* Los números de los pasos se rellenan a medida que se leen */
+    .step__n { -webkit-text-stroke: 1.5px var(--accent); color: transparent; animation: rellena linear both; animation-timeline: view(); animation-range: entry 25% cover 50%; }
+    @keyframes rellena { to { color: var(--accent); } }
+
+    /* Cada paso dibuja su línea de arriba */
+    .step { position: relative; }
+    .step::before { content: ""; position: absolute; left: 0; top: -1.5px; height: 3px; width: 100%; background: var(--accent); transform-origin: 0 50%; animation: linea linear both; animation-timeline: view(); animation-range: entry 10% cover 40%; }
+    @keyframes linea { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  }
+
+  /* ---------- Slogans: el sesgo responde a la velocidad del scroll (lo mueve el JS) ---------- */
+  .marquee__item { transform: skewX(var(--sesgo, 0deg)); }
+
+  /* ---------- Menú: el link de la sección que estás leyendo ---------- */
+  .nav__link.is-active { color: var(--ink); }
+  .nav__link.is-active::after { transform: scaleX(1); }
+
+  /* ---------- Pestañas: píldora que se desliza ---------- */
+  .tabs { position: relative; }
+  .tabs__pill {
+    position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; border-radius: 999px; background: var(--inv-fg);
+    transition: transform .55s var(--spring), width .55s var(--spring), height .55s var(--spring);
+  }
+  .tabs__pill:not(.is-ready) { transition: none; }
+  .tabs--pill .tab { position: relative; z-index: 1; transition: color .25s var(--ease), background-color .2s; }
+  .inv .tabs--pill .tab[aria-selected="true"] { background: transparent; border-color: transparent; color: var(--ink); }
+  .inv .tabs--pill .tab[aria-selected="true"]:hover { background: transparent; }
+
+  /* Al cambiar de panel, el texto entra línea por línea */
+  .tabpanel.is-in .tabpanel__text > h3, .tabpanel.is-in .tabpanel__text > p, .tabpanel.is-in .ticks li { animation: texto-entra .65s var(--ease) both; animation-delay: calc(var(--k, 0) * 70ms + 90ms); }
+  .tabpanel__text > h3 { --k: 0; } .tabpanel__text > p { --k: 1; }
+  .ticks li:nth-child(1) { --k: 2; } .ticks li:nth-child(2) { --k: 3; } .ticks li:nth-child(3) { --k: 4; } .ticks li:nth-child(4) { --k: 5; } .ticks li:nth-child(5) { --k: 6; }
+  @keyframes texto-entra { from { opacity: 0; translate: -18px 0; } to { opacity: 1; translate: 0 0; } }
+
+  /* ---------- Plan recomendado: borde de colores que gira ---------- */
+  .plan--hl::after {
+    content: ""; position: absolute; inset: -3px; padding: 3px; border-radius: calc(var(--radius) + 3px); pointer-events: none;
+    background: conic-gradient(from var(--ang), var(--accent), #A9A3FF, var(--coral), #A9A3FF, var(--accent));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+    animation: gira 5s linear infinite;
+  }
+  @keyframes gira { to { --ang: 360deg; } }
+  .plan__badge { z-index: 2; } /* por encima del borde que gira */
+
+  /* ---------- Preguntas: se abren con animación ---------- */
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+  }
+  @supports selector(::details-content) {
+    .faq details::details-content { block-size: 0; opacity: 0; overflow: clip; transition: block-size .45s var(--ease), opacity .35s var(--ease), content-visibility .45s allow-discrete; }
+    .faq details[open]::details-content { block-size: auto; opacity: 1; }
+  }
+
+  /* ---------- Cierre: el acento brilla ---------- */
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .cta h2 .accent {
+      background: linear-gradient(100deg, #A9A3FF 20%, #fff 45%, var(--coral) 55%, #A9A3FF 80%) 0 0 / 220% 100%;
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+      animation: brillo 6s linear infinite;
+    }
+    @keyframes brillo { to { background-position: -220% 0; } }
+  }
+  .cta { position: relative; overflow: clip; isolation: isolate; }
+  .cta::before, .cta::after { content: ""; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none; will-change: transform; }
+  .cta::before { width: 34rem; height: 34rem; right: -8rem; top: -10rem; background: radial-gradient(closest-side, rgba(61, 47, 224, .5), transparent); animation: deriva 16s ease-in-out infinite alternate; }
+  .cta::after { width: 28rem; height: 28rem; left: -6rem; bottom: -12rem; background: radial-gradient(closest-side, rgba(255, 138, 91, .28), transparent); animation: deriva 20s -6s ease-in-out infinite alternate-reverse; }
+  @keyframes deriva { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(-4rem, 3rem, 0) scale(1.15); } }
+}
+
+/* Sin mouse (celulares y tablets): nada de imán, luz ni escena 3D. */
+@media (hover: none) {
+  [data-glow]::before { display: none; }
+}

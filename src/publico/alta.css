@@ -1,0 +1,132 @@
+/* ==========================================================================
+   Alta de cuentas (/suscribirse) y pantalla de suscripción: detalles de movimiento
+   Se suma al CSS del panel (admin.css) en las pantallas que lo piden; usa sus colores, así que sigue el tema claro y el oscuro.
+   Todo el movimiento está dentro de (prefers-reduced-motion: no-preference).
+   ========================================================================== */
+
+@property --giro { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+:root {
+  --alta-spring: var(--suave, cubic-bezier(0.22, 1, 0.36, 1));
+  --alta-coral: 255, 138, 91;
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --alta-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%, 1.077 22.4%, 1.121 25.7%, 1.149 29.2%, 1.159 33.1%, 1.155 36.2%, 1.122 42%, 1.062 48.5%, 1.012 55.5%, 0.998 59.2%, 0.994 64.3%, 0.999 76.5%, 1);
+  }
+}
+
+/* ---------- Cosas que van siempre (sin movimiento) ---------- */
+
+/* Medidor de fuerza de la clave */
+.alta-fuerza { display: block; height: 4px; margin-top: .5rem; border-radius: 999px; background: var(--borde, rgba(127, 127, 127, .25)); overflow: hidden; }
+.alta-fuerza i { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--error, #d64545); transform-origin: 0 50%; transform: scaleX(var(--f, 0)); }
+.alta-fuerza[data-nivel="2"] i { background: var(--ambar, #d98a00); }
+.alta-fuerza[data-nivel="3"] i { background: var(--ok, #17784a); }
+.alta-fuerza[data-nivel="4"] i { background: var(--ok, #17784a); }
+.alta-fuerza-texto { display: block; min-height: 1.25em; margin-top: .3rem; font-size: .8125rem; color: var(--texto-suave, inherit); }
+
+/* La tilde del "Pago confirmado" (reemplaza al puntito de la pastilla) */
+.alta-pago::before { display: none; }
+.alta-orbita-caja { display: grid; justify-items: center; padding-block: .5rem; }
+.alta-check { width: 1em; height: 1em; margin-right: .35em; vertical-align: -.12em; flex: none; }
+.alta-check path { fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Pantalla "estamos confirmando tu pago": órbita y barra hasta la próxima mirada */
+.alta-orbita { position: relative; width: 64px; height: 64px; margin: 0 auto; }
+.alta-orbita::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--primario-borde, rgba(61, 47, 224, .3)); }
+.alta-orbita i { position: absolute; inset: 0; display: block; }
+.alta-orbita i::before { content: ""; position: absolute; top: -5px; left: calc(50% - 5px); width: 10px; height: 10px; border-radius: 50%; background: var(--primario, #3d2fe0); }
+.alta-barra { margin-top: .85rem; height: 4px; border-radius: 999px; overflow: hidden; background: var(--borde, rgba(127, 127, 127, .25)); }
+.alta-barra span { display: block; height: 100%; border-radius: inherit; background: var(--primario, #3d2fe0); transform-origin: 0 50%; transform: scaleX(1); }
+
+/* Confeti */
+.alta-confeti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 80; }
+
+@media (prefers-reduced-motion: no-preference) {
+
+  /* Entre páginas: se funde con la landing, y la tarjeta del plan viaja de una a otra */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .4s; }
+
+  /* ---------- Fondo vivo ---------- */
+  body:has(.ingreso)::before {
+    content: ""; position: fixed; inset: -12%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(34rem 28rem at 14% 18%, var(--primario-suave, rgba(61, 47, 224, .14)), transparent 70%),
+      radial-gradient(30rem 26rem at 88% 82%, rgba(var(--alta-coral), .13), transparent 70%);
+    animation: alta-aurora 22s ease-in-out infinite alternate;
+  }
+  @keyframes alta-aurora { from { transform: translate3d(-2%, -1%, 0) scale(1); } to { transform: translate3d(3%, 2%, 0) scale(1.1); } }
+
+  /* ---------- La tarjeta entra con resorte, y lo de adentro, uno detrás del otro ---------- */
+  .ingreso { animation: alta-entra 1s var(--alta-spring) both; }
+  @keyframes alta-entra { from { opacity: 0; translate: 0 34px; scale: .95; } }
+  .ingreso > :not(.ingreso-icono) { animation: alta-sube .7s var(--suave, ease) both; animation-delay: calc(var(--n, 0) * 65ms + 160ms); }
+  .ingreso > :nth-child(1) { --n: 0; } .ingreso > :nth-child(2) { --n: 1; } .ingreso > :nth-child(3) { --n: 2; } .ingreso > :nth-child(4) { --n: 3; }
+  .ingreso > :nth-child(5) { --n: 4; } .ingreso > :nth-child(6) { --n: 5; } .ingreso > :nth-child(7) { --n: 6; } .ingreso > :nth-child(8) { --n: 7; }
+  .ingreso > :nth-child(n+9) { --n: 8; }
+  @keyframes alta-sube { from { opacity: 0; translate: 0 16px; } }
+  .ingreso .formulario > .campo, .ingreso .formulario > .ajuste-campos-dos, .ingreso .formulario > button { animation: alta-sube .6s var(--suave, ease) both; animation-delay: calc(var(--m, 0) * 55ms + 420ms); }
+  .ingreso .formulario > :nth-child(1) { --m: 0; } .ingreso .formulario > :nth-child(2) { --m: 1; } .ingreso .formulario > :nth-child(3) { --m: 2; }
+  .ingreso .formulario > :nth-child(4) { --m: 3; } .ingreso .formulario > :nth-child(5) { --m: 4; } .ingreso .formulario > :nth-child(6) { --m: 5; }
+  .ingreso .formulario > :nth-child(7) { --m: 6; } .ingreso .formulario > :nth-child(n+8) { --m: 7; }
+
+  /* El ícono respira */
+  .ingreso-icono { animation: alta-respira 3.6s ease-in-out infinite; }
+  @keyframes alta-respira { 50% { translate: 0 -4px; scale: 1.06; } }
+
+  /* ---------- Tarjeta con inclinación y brillo que siguen al cursor (solo donde hay mouse y no se escribe) ---------- */
+  .ingreso[data-tilt] {
+    transform: perspective(1200px) rotateX(calc(var(--py, 0) * -3deg)) rotateY(calc(var(--px, 0) * 4deg));
+    transition: transform .25s ease-out;
+  }
+  .ingreso[data-tilt]:focus-within { --px: 0 !important; --py: 0 !important; }
+  .ingreso[data-tilt]::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--brillo, 0); transition: opacity .3s;
+    background: radial-gradient(320px circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, .28), transparent 60%);
+  }
+  .ingreso { position: relative; }
+
+  /* ---------- La tilde se dibuja ---------- */
+  .alta-check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: alta-trazo .6s .55s var(--suave, ease) forwards; }
+  @keyframes alta-trazo { to { stroke-dashoffset: 0; } }
+  .pastilla-ok.alta-pago { animation: alta-pop .7s .35s var(--alta-spring) both; }
+  @keyframes alta-pop { from { opacity: 0; scale: .6; } }
+
+  /* ---------- Plan elegido: borde de colores que gira ---------- */
+  .alta-plan { position: relative; isolation: isolate; }
+  .alta-plan::before {
+    content: ""; position: absolute; inset: -2px; padding: 2px; border-radius: calc(var(--radio, 12px) + 2px); pointer-events: none; z-index: -1;
+    background: conic-gradient(from var(--giro), var(--primario, #3d2fe0), #a9a3ff, rgb(var(--alta-coral)), #a9a3ff, var(--primario, #3d2fe0));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+    animation: alta-gira 6s linear infinite;
+  }
+  @keyframes alta-gira { to { --giro: 360deg; } }
+
+  .alta-fuerza i { transition: transform .45s var(--alta-spring), background-color .3s; }
+
+  /* ---------- Botón grande: brillo que lo cruza ---------- */
+  .ingreso .boton-grande { position: relative; overflow: hidden; isolation: isolate; }
+  .ingreso .boton-grande::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; transform: translateX(-130%);
+    background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, .35) 50%, transparent 68%);
+  }
+  .ingreso .boton-grande:hover::after { transform: translateX(130%); transition: transform .8s var(--suave, ease); }
+  .ingreso .boton-grande:active { scale: .98; }
+
+  /* ---------- Orbita de espera ---------- */
+  .alta-orbita i { animation: alta-orbita 1.6s linear infinite; }
+  .alta-orbita i:nth-child(2) { animation-duration: 2.4s; animation-direction: reverse; opacity: .6; }
+  .alta-orbita i:nth-child(3) { animation-duration: 3.4s; opacity: .35; }
+  @keyframes alta-orbita { to { transform: rotate(360deg); } }
+  .alta-barra span { animation: alta-barra 4s linear forwards; }
+  @keyframes alta-barra { from { transform: scaleX(0); } }
+
+  /* ---------- Pantalla de suscripción del panel: las secciones entran escalonadas ---------- */
+  .ajuste { animation: alta-sube .7s var(--suave, ease) both; animation-delay: calc(var(--n, 0) * 90ms); }
+  .ajuste:nth-of-type(1) { --n: 0; } .ajuste:nth-of-type(2) { --n: 1; } .ajuste:nth-of-type(3) { --n: 2; } .ajuste:nth-of-type(n+4) { --n: 3; }
+  .ajuste .tarjeta { transition: translate .3s var(--suave, ease), box-shadow .3s var(--suave, ease); }
+  .ajuste form.tarjeta:hover { translate: 0 -3px; box-shadow: var(--sombra-alta, 0 12px 30px rgba(0, 0, 0, .12)); }
+}

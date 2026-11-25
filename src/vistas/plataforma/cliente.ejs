@@ -15,7 +15,7 @@
   <div>
     <a class="volver" href="/plataforma/clientes"><%- icono('izquierda', { tamano: 16 }) %> Clientes</a>
     <h1><%= cliente.nombre %> <span class="pastilla <%= cliente.estado === 'activa' ? 'pastilla-ok' : 'pastilla-cancelado' %>"><%= cliente.estado === 'activa' ? 'Activa' : (cliente.cerradaAlVencer ? 'Cerrada: venció' : 'Suspendida') %></span></h1>
-    <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
+    <p class="texto-suave"><%= cliente.email ?? 'Sin usuario' %><% if (cliente.titularNombre) { %> · <%= cliente.titularNombre %> <%= cliente.titularApellido %><% } %> · cliente desde el <%= formatearFecha(cliente.creadaEn).split(',')[0] %></p>
   </div>
   <div class="acciones">
     <a class="boton boton-secundario" href="<%= urlTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver su tienda</a>
@@ -66,6 +66,49 @@
   </div>
 </section>
 
+<%
+  // Lo que Mercado Pago le cobra puede no coincidir con lo que le corresponde (un aumento que no se pudo aplicar, o un precio fijo recién cargado).
+  const montoMp = suscripcion && suscripcion.activa ? suscripcion.activa.montoCentavos : null;
+  const desfasado = montoMp !== null && cliente.precioEfectivoCentavos !== null && montoMp !== cliente.precioEfectivoCentavos;
+%>
+<section class="ajuste" id="precio">
+  <div class="ajuste-intro">
+    <h2>Precio</h2>
+    <p class="texto-suave">Lo que paga por mes. Con un precio fijo, los cambios de precio de su plan no lo alcanzan.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <dl class="datos-pedido">
+      <div><dt>Precio de su plan</dt><dd><%= cliente.precioCentavos ? `${formatearPrecio(cliente.precioCentavos)} por mes` : 'Gratis' %></dd></div>
+      <div>
+        <dt>Paga</dt>
+        <dd><strong><%= cliente.precioEfectivoCentavos ? formatearPrecio(cliente.precioEfectivoCentavos) : '—' %></strong> por mes<% if (cliente.precioFijoCentavos !== null) { %> <span class="pastilla pastilla-ambar">Precio fijo</span><% } %></dd>
+      </div>
+      <% if (montoMp !== null) { %><div><dt>Mercado Pago le cobra</dt><dd><%= formatearPrecio(montoMp) %> por mes</dd></div><% } %>
+    </dl>
+    <% if (desfasado) { %>
+      <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suscripcion/actualizar-monto" class="formulario">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>Mercado Pago le cobra <strong><%= formatearPrecio(montoMp) %></strong> y le corresponde <strong><%= formatearPrecio(cliente.precioEfectivoCentavos) %></strong>. Actualizalo para que el próximo cobro salga bien.</span></p>
+        <label class="casilla"><input type="checkbox" name="avisarPorMail" value="1"<%= cliente.precioEfectivoCentavos > montoMp ? ' checked' : '' %>> Avisarle por mail del cambio de precio</label>
+        <div><button class="boton" type="submit">Actualizar el cobro a <%= formatearPrecio(cliente.precioEfectivoCentavos) %></button></div>
+      </form>
+    <% } %>
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/precio" class="cambiar-estado">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="precioFijo">Precio fijo <span class="opcional">(opcional)</span></label>
+        <div class="campo-con-prefijo campo-con-sufijo">
+          <span class="sufijo">$</span>
+          <input id="precioFijo" type="text" name="precioFijo" value="<%= valores.precioFijo ?? (cliente.precioFijoCentavos !== null ? precioParaEditar(cliente.precioFijoCentavos) : '') %>" inputmode="decimal" autocomplete="off" placeholder="El del plan"<%- invalido('precio') %>>
+        </div>
+        <span class="ayuda">Vacío: paga el precio de su plan. Si lo completás, ni los aumentos ni las bajas del plan lo tocan hasta que lo cambies acá o lo pases de plan.</span>
+        <%- error('precio') %>
+      </div>
+      <button class="boton boton-secundario" type="submit">Guardar precio</button>
+    </form>
+  </div>
+</section>
+
 <section class="ajuste" id="enlace">
   <div class="ajuste-intro">
     <h2>Link de la tienda</h2>
@@ -110,10 +153,123 @@
   </div>
 </section>
 
+<section class="ajuste" id="dominio">
+  <div class="ajuste-intro">
+    <h2>Dominio propio</h2>
+    <p class="texto-suave">Solo con el plan A medida. El cliente lo pide desde su panel (Cuenta); vos lo activás cuando ya lo agregaste en Coolify. Este cliente tiene el diseño <strong><%= diseno.nivelTitulo %></strong>.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (!diseno.aMedida) { %>
+      <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>El plan de este cliente no incluye dominio propio. Si le das el plan A medida, puede pedirlo.</span></p>
+    <% } %>
+    <% if (diseno.dominio) { %>
+      <p class="mp-estado">
+        <strong><%= diseno.dominio.dominio %></strong>
+        <span class="pastilla <%= diseno.dominio.estado === 'activo' ? 'pastilla-ok' : 'pastilla-ambar' %>"><%= diseno.estadosDominio[diseno.dominio.estado].titulo %></span>
+      </p>
+      <p class="ayuda"><%= diseno.estadosDominio[diseno.dominio.estado].ayuda %> Registro que tiene que cargar: <% for (const registro of diseno.registros) { %><code><%= registro.tipo %> <%= registro.nombre %> → <%= registro.valor ?? '(la IP del servidor)' %></code> <% } %></p>
+      <% if (diseno.dominio.estado !== 'activo') { %>
+        <ol class="ayuda mp-pasos">
+          <li>Tocá <strong>Verificar DNS</strong>: tiene que apuntar a <code><%= diseno.panel %></code>.</li>
+          <li>En <strong>Coolify</strong>, abrí la aplicación → <em>Configuration</em> → <em>Domains</em> y agregá <code>https://<%= diseno.dominio.dominio %></code> (separado por coma de los que ya hay). Guardá y hacé <em>Redeploy</em>.</li>
+          <li>Abrí <code>https://<%= diseno.dominio.dominio %></code> y comprobá que carga con el candado. Recién ahí tocá <strong>Activar</strong>.</li>
+        </ol>
+      <% } %>
+      <div class="mp-acciones">
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/dominio/verificar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton boton-secundario" type="submit"><%- icono('refrescar', { tamano: 16 }) %> Verificar DNS</button></form>
+        <% if (diseno.dominio.estado !== 'activo') { %>
+          <form method="post" action="/plataforma/clientes/<%= cliente.id %>/dominio/activar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton" type="submit"><%- icono('check', { tamano: 16 }) %> Activar</button></form>
+        <% } else { %>
+          <form method="post" action="/plataforma/clientes/<%= cliente.id %>/dominio/desactivar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton boton-secundario" type="submit">Desactivar</button></form>
+        <% } %>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/dominio/quitar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="boton boton-peligro-suave" type="submit">Quitar</button></form>
+      </div>
+    <% } %>
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/dominio" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="dominio-cliente"><%= diseno.dominio ? 'Cambiar el dominio' : 'Cargar un dominio' %></label>
+        <input id="dominio-cliente" type="text" name="dominio" placeholder="www.mitienda.com" autocapitalize="off" autocomplete="off" spellcheck="false">
+        <span class="ayuda">Vuelve al primer paso (solicitado). Si el dominio actual está activo, desactivalo antes de cambiarlo.</span>
+      </div>
+      <div><button class="boton boton-secundario" type="submit"><%= diseno.dominio ? 'Cambiar dominio' : 'Cargar dominio' %></button></div>
+    </form>
+  </div>
+</section>
+
+<section class="ajuste" id="codigos">
+  <div class="ajuste-intro">
+    <h2>Códigos de seguimiento</h2>
+    <p class="texto-suave">HTML (píxel de Meta, Google Analytics...) que va en la cabecera y al pie de la tienda. Solo lo cargás vos, y la tienda lo usa solo con el plan A medida (este cliente: <%= diseno.nivelTitulo %>).</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <form method="post" action="/plataforma/clientes/<%= cliente.id %>/codigos" class="formulario">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="campo">
+        <label for="codigoCabecera">Código para la cabecera (dentro de &lt;head&gt;)</label>
+        <textarea id="codigoCabecera" class="codigo-css" name="codigoCabecera" rows="6" maxlength="<%= diseno.maxCodigo %>" spellcheck="false" autocapitalize="off"><%= diseno.codigos.cabecera %></textarea>
+      </div>
+      <div class="campo">
+        <label for="codigoPie">Código para el pie (antes de cerrar &lt;body&gt;)</label>
+        <textarea id="codigoPie" class="codigo-css" name="codigoPie" rows="6" maxlength="<%= diseno.maxCodigo %>" spellcheck="false" autocapitalize="off"><%= diseno.codigos.pie %></textarea>
+        <span class="ayuda">Se imprime tal cual, sin escapar: pegá solo código de confianza. Hasta <%= diseno.maxCodigo.toLocaleString('es-AR') %> caracteres cada uno.</span>
+      </div>
+      <div><button class="boton" type="submit">Guardar códigos</button></div>
+    </form>
+  </div>
+</section>
+
+<% if (suscripcion) { %>
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Suscripción</h2>
+    <p class="texto-suave">El débito automático con Mercado Pago. Cada cobro aprobado suma un mes pagado solo.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% const { activa, pendiente, cancelada } = suscripcion %>
+    <dl class="datos-pedido">
+      <div>
+        <dt>Estado</dt>
+        <dd>
+          <% if (activa) { %><span class="pastilla pastilla-ok"><%= activa.estado === 'pausada' ? 'Pausada' : 'Activa' %></span> <%= activa.planNombre %> · <%= formatearPrecio(activa.montoCentavos) %> por mes
+          <% } else if (cancelada) { %><span class="pastilla">Cancelada</span> <%= cancelada.planNombre %>
+          <% } else { %>Sin suscripción automática<% } %>
+        </dd>
+      </div>
+      <% if (activa && activa.proximoCobro) { %><div><dt>Próximo cobro</dt><dd><%= formatearDia(activa.proximoCobro) %></dd></div><% } %>
+      <% if (activa && activa.mpId) { %><div><dt>Id en Mercado Pago</dt><dd><code><%= activa.mpId %></code></dd></div><% } %>
+      <% if (pendiente) { %><div><dt>Pago sin terminar</dt><dd>Plan <%= pendiente.planNombre %> · empezado el <%= formatearFecha(pendiente.creadaEn).split(',')[0] %></dd></div><% } %>
+    </dl>
+    <div class="acciones">
+      <% if (activa || pendiente) { %>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suscripcion/sincronizar">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="boton boton-secundario" type="submit">Sincronizar con Mercado Pago</button>
+        </form>
+      <% } %>
+      <form method="post" action="/plataforma/clientes/<%= cliente.id %>/bienvenida">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="boton boton-secundario" type="submit">Reenviar mail de bienvenida</button>
+      </form>
+    </div>
+    <% if (activa) { %>
+      <details class="cancelar-suscripcion">
+        <summary>Cancelar el cobro automático</summary>
+        <form method="post" action="/plataforma/clientes/<%= cliente.id %>/suscripcion/cancelar" class="formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <p class="ayuda">Da de baja la suscripción en Mercado Pago: no se cobran más meses. La tienda sigue abierta hasta el vencimiento ya pago.</p>
+          <div><button class="boton boton-secundario" type="submit" data-confirmar>Sí, cancelar la suscripción</button></div>
+        </form>
+      </details>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
 <section class="ajuste">
   <div class="ajuste-intro">
     <h2>Cobro</h2>
-    <p class="texto-suave">Cobrás por fuera; acá registrás hasta cuándo tiene pago. Un cliente vencido no se suspende solo: lo decidís vos.</p>
+    <p class="texto-suave"><%= suscripcion && suscripcion.activa ? 'Paga con débito automático: cada cobro aprobado suma un mes solo. Igual podés registrar un pago a mano o mover la fecha.' : 'Cobrás por fuera; acá registrás hasta cuándo tiene pago.' %> Un cliente vencido no se suspende solo: lo decidís vos.</p>
   </div>
   <div class="tarjeta ajuste-campos">
     <p><span class="pastilla <%= claseCobro %>"><%= textoCobro %></span></p>
@@ -132,7 +288,7 @@
           <label for="monto">Monto cobrado <span class="opcional">(opcional)</span></label>
           <div class="campo-con-prefijo campo-con-sufijo">
             <span class="sufijo">$</span>
-            <input id="monto" type="text" name="monto" value="<%= valores.monto ?? (cliente.precioCentavos ? precioParaEditar(cliente.precioCentavos) : '') %>" inputmode="decimal" autocomplete="off"<%- invalido('pago') %>>
+            <input id="monto" type="text" name="monto" value="<%= valores.monto ?? (cliente.precioEfectivoCentavos ? precioParaEditar(cliente.precioEfectivoCentavos) : '') %>" inputmode="decimal" autocomplete="off"<%- invalido('pago') %>>
           </div>
         </div>
       </div>

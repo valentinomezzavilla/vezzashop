@@ -1,0 +1,52 @@
+<%- include('parciales/cabecera', { titulo: gratis ? 'Empezá tu prueba' : `Plan ${plan.nombre}`, extraCss: '/alta.css', extraJs: '/alta.js' }) %>
+<%
+  const error = (campo) => include('parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+%>
+<section class="ingreso ingreso--ancho" data-tilt>
+  <div class="ingreso-icono" aria-hidden="true"><%- icono('tienda', { tamano: 24 }) %></div>
+  <h1><%= gratis ? 'Empezá tu prueba gratis' : `Suscribite al plan ${plan.nombre}` %></h1>
+  <p class="texto-suave">
+    <% if (gratis) { %>
+      Probá VEZZA Shop sin tarjeta. En el próximo paso completás tus datos y creás tu cuenta.
+    <% } else { %>
+      Pagás todos los meses con débito automático de Mercado Pago, y cancelás cuando quieras desde tu panel. Cuando se confirme el pago, completás tus datos y creás tu cuenta.
+    <% } %>
+  </p>
+
+  <%# El nombre de transición hace que, al venir de la landing, la tarjeta del plan "viaje" hasta acá. %>
+  <div class="alta-plan" style="view-transition-name: plan-<%= planId %>">
+    <strong><%= plan.nombre %></strong>
+    <div class="alta-plan-precio"><span data-precio><%= plan.precio %></span> <small><%= plan.unidad %></small></div>
+    <ul>
+      <% for (const item of plan.items) { %><li><%= item %></li><% } %>
+    </ul>
+  </div>
+
+  <% if (errores.general) { %>
+    <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span><%= errores.general %></span></p>
+  <% } %>
+
+  <form method="post" action="/suscribirse" class="formulario">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="plan" value="<%= planId %>">
+    <div class="campo">
+      <label for="email">Tu email</label>
+      <input id="email" type="email" name="email" value="<%= valores.email ?? '' %>" autocomplete="email" required autofocus<%- invalido('email') %>>
+      <% if (!gratis) { %><span class="ayuda">Es el email con el que vas a pagar en Mercado Pago. Te mandamos ahí el aviso cuando se confirme el pago.</span><% } %>
+      <%- error('email') %>
+    </div>
+    <% if (urlTerminos) { %>
+      <div class="campo">
+        <label class="alta-casilla" for="terminos">
+          <input id="terminos" type="checkbox" name="terminos" value="1"<%= valores.terminos === '1' ? ' checked' : '' %><%- invalido('terminos') %>>
+          <span>Leí y acepto los <a href="<%= urlTerminos %>" target="_blank" rel="noopener">términos y condiciones</a>.</span>
+        </label>
+        <%- error('terminos') %>
+      </div>
+    <% } %>
+    <button class="boton boton-bloque boton-grande" type="submit"><%= gratis ? 'Continuar' : 'Continuar a Mercado Pago' %></button>
+  </form>
+  <p class="ayuda">¿Ya tenés cuenta? <a href="/admin">Ingresá a tu panel</a>.</p>
+</section>
+<%- include('parciales/pie') %>

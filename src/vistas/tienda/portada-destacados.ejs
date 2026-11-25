@@ -1,0 +1,11 @@
+<%# Sección de la portada: los productos destacados. %>
+<% if (destacados.length) { %>
+  <section class="seccion-destacados" aria-labelledby="titulo-destacados">
+    <div class="encabezado-catalogo">
+      <h2 id="titulo-destacados" class="titulo-seccion"><%= ajustes.tituloDestacados %></h2>
+    </div>
+    <ul class="grilla">
+      <% for (const p of destacados) { %><%- include('tarjeta-producto', { p }) %><% } %>
+    </ul>
+  </section>
+<% } %>

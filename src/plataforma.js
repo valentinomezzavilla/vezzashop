@@ -5,6 +5,7 @@ import { crearTienda } from './tiendas.js';
 import { estadoDeCobro, limitesDeTienda, usoDeTienda } from './limites.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
+import { esNivel } from './diseno-por-plan.js';
 import { parsearPrecio, ErrorDeValor } from './importacion/valores.js';
 import { esDiaValido, hoy, sumarDias, sumarMeses } from './util/fechas.js';
 import { estadoEfectivo } from './estado.js';
@@ -65,6 +66,7 @@ export async function cambiarClaveSuperadmin(db, id, { actual, nueva, repetida }
 const COLUMNAS_PLAN = `id, nombre, precio_centavos AS "precioCentavos", max_productos AS "maxProductos",
   max_fotos AS "maxFotos", max_banners AS "maxBanners", (activo = 1) AS "activo",
   dias_prueba AS "diasPrueba", (suspender_al_vencer = 1) AS "suspenderAlVencer",
+  nivel_diseno AS "nivelDiseno",
   (SELECT count(*) FROM tiendas t WHERE t.plan_id = planes.id) AS clientes`;
 
 export function listarPlanes(db) {
@@ -74,6 +76,14 @@ export function listarPlanes(db) {
 export async function leerPlan(db, id) {
   return (await db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes WHERE id = ?`).get(id)) ?? null;
 }
+
+// Se ofrecen a clientes los planes activos con precio o con período de prueba. Un plan gratis y sin prueba (como "Sin límites",
+// el que la migración 007 les puso a las tiendas que ya existían) es interno y no sale.
+export const seOfrece = (plan) => Boolean(plan.activo) && (plan.precioCentavos > 0 || plan.diasPrueba > 0);
+
+// Los que alguien puede contratar solo, sin hablar con nosotros: los que se ofrecen y tienen tope de productos. Un plan sin
+// tope ("A medida") se consulta: se arma a medida de cada negocio.
+export const esAutoservicio = (plan) => seOfrece(plan) && plan.maxProductos !== null;
 
 // Un tope vacío es "sin límite" (null); si se escribe, tiene que ser un entero dentro del rango.
 function tope(valor, minimo, maximo, nombre, errores, campo) {
@@ -114,7 +124,10 @@ export async function validarPlan(db, id, campos) {
     activo: campos.activo === '1' || campos.activo === 'on' || campos.activo === true,
     diasPrueba: null,
     suspenderAlVencer: campos.suspenderAlVencer === '1' || campos.suspenderAlVencer === 'on' || campos.suspenderAlVencer === true,
+    // Cuánto del diseño de la tienda puede personalizar quien lo tiene (ver diseno-por-plan.js). Sin elegir, el de siempre.
+    nivelDiseno: esNivel(texto(campos.nivelDiseno)) ? texto(campos.nivelDiseno) : (campos.nivelDiseno === undefined && id ? ((await leerPlan(db, id))?.nivelDiseno ?? 'esencial') : 'esencial'),
   };
+  if (campos.nivelDiseno !== undefined && texto(campos.nivelDiseno) !== '' && !esNivel(texto(campos.nivelDiseno))) errores.nivelDiseno = 'Elegí una de las opciones';
   // Días de prueba: vacío es "sin prueba". Al darle este plan a un cliente, vence a los N días.
   const dias = texto(campos.diasPrueba);
   if (dias !== '') {
@@ -127,10 +140,10 @@ export async function validarPlan(db, id, campos) {
 export async function crearPlan(db, datos) {
   const { rows } = await db
     .prepare(
-      `INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo, dias_prueba, suspender_al_vencer)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo, dias_prueba, suspender_al_vencer, nivel_diseno)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
-    .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)));
+    .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), datos.nivelDiseno ?? 'esencial');
   return rows[0].id;
 }
 
@@ -139,9 +152,9 @@ export async function editarPlan(db, id, datos) {
     (await db
       .prepare(
         `UPDATE planes SET nombre = ?, precio_centavos = ?, max_productos = ?, max_fotos = ?, max_banners = ?, activo = ?,
-         dias_prueba = ?, suspender_al_vencer = ? WHERE id = ?`,
+         dias_prueba = ?, suspender_al_vencer = ?, nivel_diseno = ? WHERE id = ?`,
       )
-      .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), id)).changes > 0
+      .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), datos.nivelDiseno ?? 'esencial', id)).changes > 0
   );
 }
 
@@ -172,8 +185,12 @@ export const esFiltroClientes = (valor) => typeof valor === 'string' && Object.h
 const SELECCION_CLIENTE = `
   SELECT t.id, t.nombre, t.slug, t.estado, t.motivo_suspension AS "motivoSuspension", t.vence_en AS "venceEn", t.notas,
          t.creada_en AS "creadaEn", t.plan_id AS "planId", p.nombre AS "planNombre", p.precio_centavos AS "precioCentavos",
+         t.precio_fijo_centavos AS "precioFijoCentavos", COALESCE(t.precio_fijo_centavos, p.precio_centavos) AS "precioEfectivoCentavos",
          p.max_productos AS "maxProductos", p.dias_prueba AS "diasPrueba", (p.suspender_al_vencer = 1) AS "suspenderAlVencer",
+         t.dominio_propio AS "dominioPropio", t.dominio_estado AS "dominioEstado",
          (SELECT u.email FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS email,
+         (SELECT u.nombre FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS "titularNombre",
+         (SELECT u.apellido FROM usuarios u WHERE u.tienda_id = t.id ORDER BY u.id LIMIT 1) AS "titularApellido",
          (SELECT count(*) FROM productos x WHERE x.tienda_id = t.id) AS productos,
          (SELECT count(*) FROM pedidos o WHERE o.tienda_id = t.id) AS pedidos
   FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id`;
@@ -225,7 +242,8 @@ export async function resumenPlataforma(db, dia = hoy()) {
     suspendidos: clientes.length - activos.length,
     porVencer: clientes.filter((c) => c.cobro.estado === 'por-vencer').length,
     vencidos: clientes.filter((c) => c.cobro.estado === 'vencido').length,
-    ingresoMensualCentavos: activos.reduce((suma, c) => suma + Number(c.precioCentavos ?? 0), 0),
+    // Lo que paga cada uno de verdad: el precio fijo del cliente, si lo tiene, y si no el del plan.
+    ingresoMensualCentavos: activos.reduce((suma, c) => suma + Number(c.precioEfectivoCentavos ?? 0), 0),
   };
 }
 
@@ -256,11 +274,32 @@ export async function crearCliente(db, datos, dia = hoy()) {
 export async function cambiarPlanDeCliente(db, tiendaId, planId, dia = hoy()) {
   const plan = await db.prepare('SELECT dias_prueba AS "diasPrueba" FROM planes WHERE id = ?').get(planId);
   if (!plan) return { error: 'El plan no existe' };
-  await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(planId, tiendaId);
+  // Un precio fijo es de un plan: al pasar a otro, el cliente vuelve a pagar el precio de su plan nuevo.
+  await db
+    .prepare('UPDATE tiendas SET plan_id = ?, precio_fijo_centavos = CASE WHEN plan_id IS DISTINCT FROM ? THEN NULL ELSE precio_fijo_centavos END WHERE id = ?')
+    .run(planId, planId, tiendaId);
   if (!plan.diasPrueba) return { prueba: null };
   const venceEn = sumarDias(dia, plan.diasPrueba);
   await db.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceEn, tiendaId);
   return { prueba: { dias: plan.diasPrueba, venceEn } };
+}
+
+// Fija (o quita) el precio fijo de un cliente: lo que paga por mes aunque el precio de su plan cambie. Vacío: vuelve a pagar el del plan.
+// Devuelve { error } o { precioFijoCentavos } (null si se quitó). No toca a Mercado Pago: eso lo hace actualizarCobroDeCliente.
+export async function fijarPrecioDeCliente(db, tiendaId, valor) {
+  const limpio = texto(valor);
+  let centavos = null;
+  if (limpio !== '') {
+    try {
+      centavos = parsearPrecio(limpio);
+    } catch (error) {
+      if (!(error instanceof ErrorDeValor)) throw error;
+      return { error: 'Escribí el monto en pesos, por ejemplo 12900 o 12.900,50' };
+    }
+    if (centavos === null || centavos <= 0) return { error: 'El precio fijo tiene que ser mayor a $0. Si no querés uno, dejalo vacío.' };
+  }
+  await db.prepare('UPDATE tiendas SET precio_fijo_centavos = ? WHERE id = ?').run(centavos, tiendaId);
+  return { precioFijoCentavos: centavos };
 }
 
 export async function suspenderCliente(db, tiendaId, motivo) {
@@ -293,16 +332,21 @@ export async function registrarPago(db, tiendaId, { meses, monto, nota }, dia = 
     if (!(error instanceof ErrorDeValor)) throw error;
     return { error: 'Escribí el monto en pesos, por ejemplo 15000 o 15.000,50 (o dejalo vacío)' };
   }
-  return enTransaccion(db, async (tx) => {
-    const { venceEn } = (await tx.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId)) ?? {};
-    const desde = venceEn && venceEn >= dia ? venceEn : dia;
-    const venceDespues = sumarMeses(desde, cantidad);
-    await tx.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceDespues, tiendaId);
-    await tx
-      .prepare('INSERT INTO pagos_plataforma (tienda_id, monto_centavos, meses, vencia_antes, vence_despues, nota) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(tiendaId, montoCentavos, cantidad, venceEn ?? null, venceDespues, texto(nota).slice(0, 200));
-    return { venceDespues };
-  });
+  return enTransaccion(db, (tx) => aplicarPago(tx, tiendaId, { meses: cantidad, montoCentavos, nota }, dia));
+}
+
+// Suma `meses` pagados a una tienda y deja el cobro anotado. Va dentro de una transacción (tx) para que el que la llama pueda
+// juntarlo con otros cambios: lo usan el cobro a mano (registrarPago) y los cobros automáticos de las suscripciones.
+// Devuelve { venceDespues }.
+export async function aplicarPago(tx, tiendaId, { meses, montoCentavos, nota }, dia = hoy()) {
+  const { venceEn } = (await tx.prepare('SELECT vence_en AS "venceEn" FROM tiendas WHERE id = ?').get(tiendaId)) ?? {};
+  const desde = venceEn && venceEn >= dia ? venceEn : dia;
+  const venceDespues = sumarMeses(desde, meses);
+  await tx.prepare('UPDATE tiendas SET vence_en = ? WHERE id = ?').run(venceDespues, tiendaId);
+  await tx
+    .prepare('INSERT INTO pagos_plataforma (tienda_id, monto_centavos, meses, vencia_antes, vence_despues, nota) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(tiendaId, montoCentavos, meses, venceEn ?? null, venceDespues, texto(nota).slice(0, 200));
+  return { venceDespues };
 }
 
 export function listarPagos(db, tiendaId) {
@@ -347,9 +391,9 @@ export async function usoDeCliente(db, tiendaId) {
 export const PLANES_SUGERIDOS = [
   // 7 días de prueba desde que el cliente entra al plan; al terminar, la tienda se cierra hasta que se le registre un pago.
   { nombre: 'Prueba', precioCentavos: 0, maxProductos: 20, maxFotos: 3, maxBanners: 1, diasPrueba: 7, suspenderAlVencer: true },
-  { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2 },
-  { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4 },
-  { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null },
+  { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2, nivelDiseno: 'esencial' },
+  { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4, nivelDiseno: 'acompanado' },
+  { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null, nivelDiseno: 'a_medida' },
 ];
 
 // Crea los que no existan (por nombre, sin distinguir mayúsculas) y deja intactos los demás: se puede correr de nuevo sin pisar

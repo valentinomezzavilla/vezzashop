@@ -2,15 +2,17 @@
 import { slugificar } from './util/slug.js';
 
 // Árbol de categorías de la tienda, sin las que no tienen productos visibles (ni ellas ni sus hijas).
+// Con `sinStock: 'ocultar'` (ajuste de la tienda) los productos sin stock no cuentan: una categoría que solo tiene de esos no se muestra.
 // Cada nodo: { id, nombre, slug, ruta: ['ropa', 'remeras'], enMenu, hijas: [...] }
-export async function arbolCategorias(db, tiendaId) {
+export async function arbolCategorias(db, tiendaId, { sinStock = 'mostrar' } = {}) {
+  const soloConStock = sinStock === 'ocultar' ? ' AND v.stock > 0' : '';
   const categorias = await db
     .prepare(
       `SELECT c.id, c.padre_id AS "padreId", c.nombre, c.slug, (c.en_menu = 1) AS "enMenu",
               exists (SELECT 1 FROM producto_categorias pc
                       JOIN productos p ON p.id = pc.producto_id AND p.visible = 1
                       WHERE pc.categoria_id = c.id
-                        AND exists (SELECT 1 FROM variantes v WHERE v.producto_id = p.id)) AS "conProductos"
+                        AND exists (SELECT 1 FROM variantes v WHERE v.producto_id = p.id${soloConStock})) AS "conProductos"
        FROM categorias c WHERE c.tienda_id = ?
        ORDER BY lower(c.nombre), c.id`,
     )
@@ -61,9 +63,10 @@ const escaparLike = (texto) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
 //  - categoriaId: esa categoría y sus subcategorías. categoriaIds: cualquiera de esas (sin subcategorías).
 //  - busqueda: cada palabra tiene que aparecer en el nombre, la marca o algún SKU. Sin importar tildes.
 //  - conStock, enOferta, precioMin/precioMax (centavos, sobre el precio final más bajo), excluirSlug.
+//  - sinStock: el ajuste de la tienda; con 'ocultar' los productos sin stock no salen (igual que conStock).
 function consultaVisibles(tiendaId, opciones) {
   const { categoriaId = null, categoriaIds = null, soloDestacados = false, busqueda = '', excluirSlug = null } = opciones;
-  const { conStock = false, enOferta = false, precioMin = null, precioMax = null } = opciones;
+  const { conStock = false, enOferta = false, precioMin = null, precioMax = null, sinStock = 'mostrar' } = opciones;
   const donde = ['p.tienda_id = ?', 'p.visible = 1'];
   const parametros = [tiendaId];
   const tener = [];
@@ -89,7 +92,7 @@ function consultaVisibles(tiendaId, opciones) {
       OR exists (SELECT 1 FROM variantes b WHERE b.producto_id = p.id AND lower(b.sku) LIKE ? ESCAPE '\\'))`);
     parametros.push(patron, patron, patron);
   }
-  if (conStock) tener.push('sum(v.stock) > 0');
+  if (conStock || sinStock === 'ocultar') tener.push('sum(v.stock) > 0');
   if (enOferta) tener.push('bool_or(v.precio_promocional_centavos IS NOT NULL)');
   const parametrosTener = [];
   if (precioMin !== null) {
@@ -117,11 +120,13 @@ function consultaVisibles(tiendaId, opciones) {
 }
 
 // Productos para las tarjetas del catálogo. Ver consultaVisibles para los filtros; además orden, limite y desde.
+// Con `sinStock: 'al-final'` los que no tienen stock van después de los que sí, sea cual sea el orden elegido.
 export function productosVisibles(db, tiendaId, opciones = {}) {
-  const { orden = 'nombre', limite = null, desde = 0 } = opciones;
+  const { orden = 'nombre', limite = null, desde = 0, sinStock = 'mostrar' } = opciones;
   const { sql, parametros } = consultaVisibles(tiendaId, opciones);
   const paginado = limite === null ? '' : ` LIMIT ${Number(limite)} OFFSET ${Number(desde)}`;
-  return db.prepare(`${sql} ORDER BY ${ORDENES[esOrden(orden) ? orden : 'nombre'].sql}${paginado}`).all(...parametros);
+  const primero = sinStock === 'al-final' ? '(sum(v.stock) > 0) DESC, ' : '';
+  return db.prepare(`${sql} ORDER BY ${primero}${ORDENES[esOrden(orden) ? orden : 'nombre'].sql}${paginado}`).all(...parametros);
 }
 
 export async function contarVisibles(db, tiendaId, opciones = {}) {

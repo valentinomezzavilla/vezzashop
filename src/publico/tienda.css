@@ -398,6 +398,17 @@ p { margin: 0; }
 }
 .chip:hover { background: var(--superficie); box-shadow: inset 0 0 0 1px var(--borde-campo); }
 
+/* "Ver todas": el resto de las categorías, detrás de un botón con el aspecto de los demás. Cerrado ocupa un lugar más en la fila;
+   abierto pasa a ocupar toda la fila de abajo, con el resto de los botones adentro. */
+.chips-mas { flex: 0 0 auto; }
+.chips-mas[open] { flex: 1 1 100%; }
+.chips-mas > summary { list-style: none; cursor: pointer; }
+.chips-mas > summary::-webkit-details-marker { display: none; }
+.chip-mas { width: fit-content; background: var(--superficie); font-weight: 600; }
+.chips-mas .chips-mas-cerrar, .chips-mas[open] .chips-mas-abrir { display: none; }
+.chips-mas[open] .chips-mas-cerrar { display: inline; }
+.chips-resto { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+
 .grilla {
   list-style: none; margin: 0; padding: 0;
   display: grid;
@@ -641,6 +652,13 @@ p { margin: 0; }
 .pie-enlaces a .icono { flex-shrink: 0; color: var(--texto-tenue); transition: color var(--rapido); }
 .pie-enlaces a:hover { background: var(--acento); color: var(--acento-texto); box-shadow: inset 0 0 0 1px var(--acento); }
 .pie-enlaces a:hover .icono { color: inherit; }
+/* El "Ver todas" del pie: un botón más en la fila que, al abrirse, muestra el resto de las categorías debajo. */
+.pie-mas > summary {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 .85rem;
+  border-radius: min(var(--radio-boton, 999px), 999px); background: var(--superficie-hover);
+  color: var(--texto); font-size: .8125rem; font-weight: 600; box-shadow: inset 0 0 0 1px var(--borde-fuerte);
+}
+.pie-mas .pie-enlaces { margin-top: .45rem; }
 
 .redes { display: flex; gap: .45rem; }
 .red {
@@ -687,6 +705,43 @@ polygon.vz-a, path.vz-a { fill: var(--vezza-acento); }
 
 /* Que el botón flotante no tape el texto del final de la página. */
 .pie:has(~ .boton-whatsapp) .pie-copyright { padding-right: 4.5rem; }
+
+/* ---------- Diseño por plan (ver src/diseno-por-plan.js) ----------
+   Cada regla se activa con un atributo data-* del <body> que solo existe cuando la tienda eligió algo distinto de lo de siempre
+   (los colores y el CSS propio van aparte, en un <style> de la página). */
+
+/* Cabecera que no acompaña al bajar. */
+body[data-cabecera="estatica"] .cabecera { position: relative; animation: none; }
+
+/* Logo al centro: el logo arriba y, en una segunda línea, el menú y los íconos. En el celular no hay lugar: queda a la izquierda, como siempre. */
+@media (min-width: 901px) {
+  body[data-logo="centro"] .cabecera-interior { flex-wrap: wrap; row-gap: 0; padding-top: .5rem; padding-bottom: .15rem; }
+  body[data-logo="centro"] .cabecera .marca { order: -1; flex: 1 0 100%; display: flex; justify-content: center; padding: .25rem 0 .2rem; }
+  body[data-logo="centro"] .navegacion { order: 1; }
+  body[data-logo="centro"] .cabecera-acciones { order: 2; }
+}
+/* Logo a la derecha: el menú y los íconos a la izquierda y el logo en el extremo derecho. */
+body[data-logo="derecha"] .navegacion { order: 1; }
+body[data-logo="derecha"] .cabecera-acciones { order: 2; margin-left: 0; margin-right: 0; }
+body[data-logo="derecha"] .cabecera .marca { order: 3; margin-left: auto; }
+
+/* Tarjetas de producto con marco: borde fino o sombra, con el color de tarjeta que eligió la tienda (--tarjeta). */
+body[data-tarjeta] .grilla > li { display: flex; }
+body[data-tarjeta] .tarjeta-producto { flex: 1; padding: .6rem .6rem .85rem; background: var(--tarjeta, var(--fondo)); border-radius: var(--radio); }
+body[data-tarjeta="borde"] .tarjeta-producto { box-shadow: 0 0 0 1px var(--borde-fuerte); }
+body[data-tarjeta="sombra"] .tarjeta-producto { box-shadow: var(--sombra-alta); }
+body[data-tarjeta] .etiquetas { top: 1.2rem; left: 1.2rem; }
+/* La proporción de la foto y la alineación del texto. */
+body[data-foto="cuadrada"] .foto { aspect-ratio: 1 / 1; }
+body[data-foto="apaisada"] .foto { aspect-ratio: 4 / 3; }
+body[data-texto-tarjeta="centro"] .datos { text-align: center; justify-items: center; }
+body[data-texto-tarjeta="centro"] .precio { justify-content: center; }
+
+/* Banners de punta a punta: salen de los márgenes de la página y ocupan todo el ancho de la pantalla. */
+body[data-banners="completo"] { overflow-x: clip; }
+body[data-banners="completo"] .carrusel { width: 100vw; margin-left: calc(50% - 50vw); border-radius: 0; }
+body[data-banners="completo"] .contenido > .carrusel:first-child { margin-top: -1.5rem; }
+body[data-banners="completo"] .carrusel-diapositiva img { max-height: 640px; }
 
 .boton-whatsapp {
   position: fixed; right: max(1.25rem, env(safe-area-inset-right)); bottom: max(1.25rem, env(safe-area-inset-bottom)); z-index: 15;
@@ -950,7 +1005,7 @@ dialog::backdrop { background: rgb(9 9 11 / .38); -webkit-backdrop-filter: blur(
 .opcion-checkout-textos { display: grid; gap: .1rem; font-size: .8125rem; color: var(--texto-suave); line-height: 1.4; }
 .opcion-checkout-textos strong { color: var(--texto); font-size: .9375rem; font-weight: 600; }
 .opcion-checkout-nota { color: var(--ok); font-weight: 600; }
-[data-sin-efectivo].opcion-checkout-nota { color: var(--aviso); }
+[data-sin-opcion].opcion-checkout-nota { color: var(--aviso); }
 .opcion-checkout-precio { font: 600 .9375rem var(--fuente-titulos); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .opcion-checkout-precio.gratis { color: var(--ok); }
 .opcion-checkout.no-disponible { cursor: not-allowed; opacity: .55; background: var(--superficie); }
@@ -1016,6 +1071,23 @@ dialog::backdrop { background: rgb(9 9 11 / .38); -webkit-backdrop-filter: blur(
 .pedido-pago { border-color: var(--acento); box-shadow: inset 0 0 0 1px var(--acento); }
 .pedido-monto { font: 650 1.1875rem var(--fuente-titulos); letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pedido-nota { font-size: .875rem; color: var(--texto-suave); }
+.pedido-nota-error { color: var(--aviso); font-weight: 600; }
+
+/* Seguimiento del pedido: la línea de tiempo (lo que ya pasó, el paso de ahora y lo que falta). */
+.seguimiento { list-style: none; margin: 0; padding: 0; display: grid; }
+.seguimiento-paso { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: .75rem; padding: 0 0 1.15rem; }
+.seguimiento-paso:last-child { padding-bottom: 0; }
+.seguimiento-paso::before { content: ""; position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--borde-fuerte); }
+.seguimiento-paso:last-child::before { display: none; }
+.seguimiento-hecho::before { background: var(--ok); }
+.seguimiento-marca { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--fondo); box-shadow: inset 0 0 0 2px var(--borde-fuerte); color: #fff; }
+.seguimiento-hecho .seguimiento-marca { background: var(--ok); box-shadow: none; }
+.seguimiento-actual .seguimiento-marca { background: var(--acento); box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 22%, transparent); }
+.seguimiento-actual .seguimiento-marca::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--acento-texto); }
+.seguimiento-textos { display: grid; gap: .1rem; min-width: 0; padding-top: .2rem; }
+.seguimiento-pendiente .seguimiento-textos strong { color: var(--texto-tenue); font-weight: 500; }
+.seguimiento-fecha { color: var(--texto-suave); font-size: .8125rem; }
+.pedido-seguimiento > .boton { justify-self: start; }
 .pedido-dato { display: flex; gap: .6rem; align-items: flex-start; color: var(--texto-suave); font-size: .9375rem; overflow-wrap: anywhere; }
 .pedido-dato .icono { flex-shrink: 0; margin-top: .15rem; color: var(--texto-tenue); }
 .texto-tenue { color: var(--texto-tenue); }

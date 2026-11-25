@@ -449,22 +449,32 @@ if (formProducto) {
   });
 }
 
-// ---------- Forma de entrega: costo a coordinar ----------
-// Si el costo se coordina después, los montos no se usan: se deshabilitan para que quede claro.
+// ---------- Forma de entrega: costo a coordinar y precio por provincia ----------
+// Si el costo se coordina después, el costo base no se usa: se deshabilita para que quede claro. "Gratis desde" sigue valiendo
+// si alguna provincia tiene su propio precio. La tabla de precios por provincia solo tiene sentido en un envío a domicilio.
 
 const aCoordinar = document.querySelector('[data-a-coordinar]');
 if (aCoordinar) {
-  const montos = document.querySelectorAll('[data-costo], [data-gratis-desde]');
+  const costoBase = document.querySelector('[data-costo]');
+  const gratisDesde = document.querySelector('[data-gratis-desde]');
   const tipos = document.querySelectorAll('[data-form-entrega] input[name="tipo"]');
+  const tabla = document.querySelector('[data-precios-provincia]');
+  const preciosProvincia = document.querySelectorAll('[data-precio-provincia]');
   const actualizar = () => {
-    for (const campo of montos) campo.disabled = aCoordinar.checked;
+    const tipo = document.querySelector('[data-form-entrega] input[name="tipo"]:checked');
+    const conTabla = tabla !== null && !(tipo && tipo.value === 'retiro');
+    if (tabla) tabla.hidden = !conTabla;
+    const hayPrecioPorProvincia = conTabla && [...preciosProvincia].some((campo) => campo.value.trim() !== '');
+    costoBase.disabled = aCoordinar.checked;
+    gratisDesde.disabled = aCoordinar.checked && !hayPrecioPorProvincia;
   };
   aCoordinar.addEventListener('change', actualizar);
+  for (const campo of preciosProvincia) campo.addEventListener('input', actualizar);
   // Un retiro casi siempre es gratis: si se elige y el costo está vacío, se completa con 0.
   for (const tipo of tipos) {
     tipo.addEventListener('change', () => {
-      const costo = document.querySelector('[data-costo]');
-      if (tipo.checked && tipo.value === 'retiro' && costo.value.trim() === '' && !aCoordinar.checked) costo.value = '0';
+      if (tipo.checked && tipo.value === 'retiro' && costoBase.value.trim() === '' && !aCoordinar.checked) costoBase.value = '0';
+      actualizar();
     });
   }
   actualizar();
@@ -546,6 +556,39 @@ if (barraSeleccion) {
     actualizar();
   });
   actualizar();
+}
+
+// ---------- Listados: los selects de orden y categoría se aplican al elegirlos ----------
+// Sin JavaScript queda el botón "Aplicar" (data-sin-js), que acá se oculta.
+for (const select of document.querySelectorAll('select[data-autoenviar]')) {
+  select.addEventListener('change', () => select.form.requestSubmit());
+  for (const boton of select.form.querySelectorAll('[data-sin-js]')) boton.hidden = true;
+}
+
+// ---------- Menús de acciones (los de cada fila de la lista de pedidos) ----------
+// El menú es un popover: se dibuja arriba de todo (la tabla tiene su propio scroll y lo recortaría) y se cierra solo con un clic afuera
+// o con Esc. Acá se lo ubica al lado de su botón, sin salirse de la pantalla, y se cierra si la página se mueve.
+for (const menu of document.querySelectorAll('[data-menu-acciones]')) {
+  const boton = document.querySelector(`[popovertarget="${menu.id}"]`);
+  if (!boton) continue;
+  menu.addEventListener('toggle', (evento) => {
+    if (evento.newState !== 'open') return;
+    const b = boton.getBoundingClientRect();
+    const m = menu.getBoundingClientRect();
+    const izquierda = Math.min(Math.max(8, b.right - m.width), window.innerWidth - m.width - 8);
+    const abajo = b.bottom + 4;
+    menu.style.left = `${izquierda}px`;
+    menu.style.top = `${abajo + m.height > window.innerHeight - 8 ? Math.max(8, b.top - m.height - 4) : abajo}px`;
+    const cerrar = () => {
+      try {
+        if (menu.matches(':popover-open')) menu.hidePopover();
+      } catch {
+        // Un navegador sin popover no llega hasta acá: el menú no se abre.
+      }
+    };
+    addEventListener('scroll', cerrar, { once: true, passive: true, capture: true });
+    addEventListener('resize', cerrar, { once: true });
+  });
 }
 
 // Formularios que no se pueden mandar dos veces (por ejemplo, confirmar un borrado): se desactiva el botón al enviar.
@@ -643,3 +686,10 @@ if (vistaMenu) {
     vistaMenu.querySelector('.vista-previa-marca').replaceChildren(imagen);
   });
 }
+
+// Diseño por plan: al elegir un color, se tilda solo su casilla "usar otro color" (si no, el color elegido se ignoraría sin que se note).
+document.addEventListener('input', (evento) => {
+  if (!evento.target.matches('[data-color-opcional]')) return;
+  const casilla = evento.target.closest('.color-opcional')?.querySelector('[data-color-propio]');
+  if (casilla && !casilla.checked) casilla.checked = true;
+});

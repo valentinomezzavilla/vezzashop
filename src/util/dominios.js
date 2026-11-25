@@ -22,3 +22,10 @@ const puertoDe = (req) => req.host.match(/:\d+$/)?.[0] ?? '';
 
 export const urlPanel = (req, dominio) => `${req.protocol}://${dominio}${puertoDe(req)}`;
 export const urlTienda = (req, dominio, slug) => `${req.protocol}://${slug}.${dominio}${puertoDe(req)}`;
+
+// La dirección pública de una tienda: su dominio propio si ya está activo (plan a medida; ver dominios-propios.js) y, si no, su subdominio.
+// `tienda` viene de buscarTienda o buscarTiendaPorSlug. Es la que se usa en mails, links de pedidos y "Ver mi tienda".
+export const urlPublicaDeTienda = (req, config, tienda) =>
+  tienda.dominioPropio && tienda.dominioEstado === 'activo'
+    ? `${req.protocol}://${tienda.dominioPropio}`
+    : urlTienda(req, dominioDeTiendas(config), tienda.slug);

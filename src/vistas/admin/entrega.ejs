@@ -77,6 +77,23 @@
         <span class="interruptor-texto"><strong>El costo se coordina después</strong><span class="ayuda">Para envíos que dependen del destino (por ejemplo, por correo). El cliente ve "A coordinar" y se lo pasás por WhatsApp.</span></span>
       </label>
     </section>
+
+    <section class="tarjeta seccion-editor" data-precios-provincia>
+      <h2>Precio por provincia <span class="opcional">(opcional)</span></h2>
+      <p class="ayuda">Si dejás una provincia vacía, se cobra el costo de arriba. 0 es envío gratis a esa provincia.</p>
+      <div class="ajuste-campos-dos">
+        <% provincias.forEach((provincia, i) => { const campo = `precioProvincia_${i}`; %>
+          <div class="campo">
+            <label for="<%= campo %>"><%= provincia %></label>
+            <div class="campo-con-sufijo campo-con-prefijo">
+              <span class="sufijo">$</span>
+              <input id="<%= campo %>" type="text" name="<%= campo %>" value="<%= f.preciosProvincia?.[provincia] ?? '' %>" inputmode="decimal" placeholder="Costo base" data-precio-provincia<%- accesibilidad(campo) %>>
+            </div>
+            <%- error(campo) %>
+          </div>
+        <% }) %>
+      </div>
+    </section>
   </form>
 
   <aside class="editor-lateral">

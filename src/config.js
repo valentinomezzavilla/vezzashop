@@ -48,5 +48,49 @@ export function leerConfig(env = process.env) {
     dirSubidas: env.DIR_SUBIDAS ?? path.join(RAIZ, 'data', 'subidas'),
     // Cómo contactarte, para los avisos que ven los clientes (tienda suspendida, tope del plan): por ejemplo "WhatsApp 351 123 4567".
     contactoPlataforma: (env.CONTACTO_PLATAFORMA ?? '').trim(),
+    mercadopago: leerMercadoPago(env),
+    mercadopagoTiendas: leerMercadoPagoTiendas(env),
+    // Página con los términos y condiciones del servicio: si se configura, el alta pide aceptarlos.
+    urlTerminos: (env.URL_TERMINOS ?? '').trim(),
+    // La IP pública del servidor, para los dominios propios sin www (un registro A). Opcional: sin ella, se compara con las direcciones del panel.
+    ipServidor: (env.IP_SERVIDOR ?? '').trim(),
+    n8n: leerN8n(env),
   };
+}
+
+// Cobro de las suscripciones a los planes con Mercado Pago. Sin MP_ACCESS_TOKEN la función queda apagada: la landing sigue
+// mandando por WhatsApp y el resto de la plataforma funciona igual. Devuelve null o { accessToken, webhookSecret, apiUrl }.
+function leerMercadoPago(env) {
+  const accessToken = (env.MP_ACCESS_TOKEN ?? '').trim();
+  if (!accessToken) return null;
+  const webhookSecret = (env.MP_WEBHOOK_SECRET ?? '').trim();
+  if (!webhookSecret) {
+    throw new Error('Falta MP_WEBHOOK_SECRET (la clave secreta de los webhooks de Mercado Pago). Sin ella no se pueden validar los avisos de pago. Mirá .env.example.');
+  }
+  return { accessToken, webhookSecret, apiUrl: (env.MP_API_URL || 'https://api.mercadopago.com').trim().replace(/\/+$/, '') };
+}
+
+// Mercado Pago dentro de cada tienda: cada una conecta SU cuenta de Mercado Pago y el comprador le paga a ella. Pegar el Access Token a mano
+// siempre se puede; el botón "Conectar con Mercado Pago" (OAuth) solo aparece si cargás MP_CLIENT_ID y MP_CLIENT_SECRET, que son los de tu
+// aplicación en Mercado Pago Developers. Devuelve siempre un objeto: { oauth, clientId, clientSecret, apiUrl, authUrl }.
+function leerMercadoPagoTiendas(env) {
+  const clientId = (env.MP_CLIENT_ID ?? '').trim();
+  const clientSecret = (env.MP_CLIENT_SECRET ?? '').trim();
+  if (Boolean(clientId) !== Boolean(clientSecret)) {
+    throw new Error('Para el botón "Conectar con Mercado Pago" hacen falta MP_CLIENT_ID y MP_CLIENT_SECRET (las dos). Mirá .env.example.');
+  }
+  return {
+    oauth: Boolean(clientId),
+    clientId,
+    clientSecret,
+    apiUrl: (env.MP_API_URL || 'https://api.mercadopago.com').trim().replace(/\/+$/, ''),
+    authUrl: (env.MP_AUTH_URL || 'https://auth.mercadopago.com.ar').trim().replace(/\/+$/, ''),
+  };
+}
+
+// Los mails de la plataforma (alta de cuenta, pago recibido) los manda un flujo de n8n al que se le avisa por webhook.
+// Sin N8N_WEBHOOK_URL no se manda ningún mail. Devuelve null o { url, secreto }.
+function leerN8n(env) {
+  const url = (env.N8N_WEBHOOK_URL ?? '').trim();
+  return url ? { url, secreto: (env.N8N_WEBHOOK_SECRET ?? '').trim() } : null;
 }

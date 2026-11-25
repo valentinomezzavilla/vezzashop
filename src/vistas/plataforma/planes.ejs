@@ -21,6 +21,7 @@
         <th scope="col">Productos</th>
         <th scope="col">Fotos</th>
         <th scope="col">Banners</th>
+        <th scope="col">Diseño</th>
         <th scope="col">Prueba</th>
         <th scope="col" class="numero">Clientes</th>
         <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
@@ -41,6 +42,7 @@
           <td data-etiqueta="Productos"><%= tope(p.maxProductos) %></td>
           <td data-etiqueta="Fotos por producto"><%= tope(p.maxFotos) %></td>
           <td data-etiqueta="Banners"><%= tope(p.maxBanners) %></td>
+          <td data-etiqueta="Diseño"><%= niveles[p.nivelDiseno]?.titulo ?? '—' %></td>
           <td data-etiqueta="Prueba"><%= p.diasPrueba ? plural(p.diasPrueba, 'día', 'días') : '—' %><% if (p.suspenderAlVencer) { %><span class="celda-nota ayuda">cierra al vencer</span><% } %></td>
           <td data-etiqueta="Clientes" class="numero"><%= Number(p.clientes) %></td>
           <td class="celda-acciones">

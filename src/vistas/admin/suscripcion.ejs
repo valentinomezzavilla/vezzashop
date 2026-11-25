@@ -1,0 +1,146 @@
+<%- include('../parciales/cabecera', { titulo: 'Suscripción', extraCss: '/alta.css' }) %>
+<header class="encabezado">
+  <div>
+    <h1>Suscripción</h1>
+    <p class="texto-suave">Tu plan, cómo se paga y tus pagos.</p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton-secundario" href="/admin/cuenta">Volver a Cuenta</a>
+  </div>
+</header>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Estado</h2>
+    <p class="texto-suave">Tu plan actual y cuándo vence lo ya pagado.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <dl class="datos-pedido">
+      <div><dt>Plan</dt><dd><%= limites.plan ? limites.plan.nombre : 'Sin plan' %></dd></div>
+      <div>
+        <dt>Pago hasta</dt>
+        <dd>
+          <% if (!limites.venceEn) { %>Sin vencimiento
+          <% } else if (limites.cobro.estado === 'vencido') { %><span class="pastilla pastilla-cancelado">Venció el <%= formatearDia(limites.venceEn) %></span>
+          <% } else if (limites.cobro.estado === 'por-vencer') { %><span class="pastilla pastilla-ambar">Vence el <%= formatearDia(limites.venceEn) %></span>
+          <% } else { %><%= formatearDia(limites.venceEn) %><% } %>
+        </dd>
+      </div>
+      <div>
+        <dt>Cobro automático</dt>
+        <dd>
+          <% if (activa) { %>
+            <span class="pastilla pastilla-ok"><%= activa.estado === 'pausada' ? 'Pausado' : 'Activo' %></span>
+            <%= activa.planNombre %> · <%= formatearPrecio(activa.montoCentavos) %> por mes<% if (activa.proximoCobro) { %> · próximo cobro el <%= formatearDia(activa.proximoCobro) %><% } %>
+          <% } else if (cancelada) { %>
+            <span class="pastilla">Cancelado</span> No se te cobran más meses.<% if (acceso) { %> <strong>Tu tienda sigue activa hasta el <%= formatearDiaLargo(limites.venceEn) %></strong> (lo que ya pagaste). Podés reactivarla cuando quieras.<% } else { %> Podés reactivarla cuando quieras.<% } %>
+          <% } else { %>
+            Sin cobro automático
+          <% } %>
+        </dd>
+      </div>
+    </dl>
+
+    <% if (!pagosActivos) { %>
+      <p class="ayuda">Por ahora los pagos se coordinan con nosotros. <%= contactoPlataforma ? `Contactanos: ${contactoPlataforma}.` : 'Contactanos para pagar o cambiar de plan.' %></p>
+    <% } %>
+
+    <% if (pendiente) { %>
+      <p class="aviso aviso-info"><%- icono('reloj', { tamano: 18 }) %><span><strong>Tenés un pago sin terminar</strong> (plan <%= pendiente.planNombre %>). Completalo para activar la suscripción.</span></p>
+      <div><a class="boton" href="/admin/suscripcion/pagar">Completar el pago</a></div>
+    <% } %>
+
+    <% if (activa) { %>
+      <details class="cancelar-suscripcion">
+        <summary>Cancelar el cobro automático</summary>
+        <form method="post" action="/admin/suscripcion/cancelar" class="formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <p class="ayuda">Si cancelás, no se te cobran más meses. Tu tienda sigue funcionando hasta el <%= limites.venceEn ? formatearDiaLargo(limites.venceEn) : 'vencimiento ya pago' %> y podés reactivarla cuando quieras. Te mandamos un mail con la fecha.</p>
+          <div><button class="boton boton-secundario" type="submit" data-confirmar>Sí, cancelar el cobro automático</button></div>
+        </form>
+      </details>
+    <% } %>
+  </div>
+</section>
+
+<% if (pagosActivos && cancelada && !activa && !pendiente) { %>
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2>Reactivar tu suscripción</h2>
+      <p class="texto-suave">Podés volver cuando quieras, sin perder nada de tu tienda.</p>
+    </div>
+    <div class="ajuste-campos">
+      <% if (planAnterior) { %>
+        <form method="post" action="/admin/suscripcion/iniciar" class="tarjeta formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="plan" value="<%= planAnterior.id %>">
+          <h3>Volver al plan <%= planAnterior.nombre %></h3>
+          <p><strong><%= planAnterior.precio %></strong> <span class="texto-suave"><%= planAnterior.unidad %></span></p>
+          <p class="ayuda">
+            <% if (primerCobroAlReactivar) { %>No se te cobra ahora: el primer cobro es el <strong><%= formatearDiaLargo(primerCobroAlReactivar) %></strong>, cuando termina lo que ya pagaste. Tu tienda no se interrumpe.
+            <% } else { %>Se te cobra apenas autorices el pago en Mercado Pago y tu tienda queda activa.<% } %>
+          </p>
+          <div><button class="boton" type="submit">Reactivar mi suscripción</button></div>
+        </form>
+      <% } else { %>
+        <p class="texto-suave">El plan que tenías ya no se ofrece. Elegí uno de los de abajo.</p>
+      <% } %>
+    </div>
+  </section>
+<% } %>
+
+<% if (pagosActivos && planes.length) { %>
+  <section class="ajuste">
+    <div class="ajuste-intro">
+      <h2><%= activa ? 'Cambiar de plan' : (cancelada ? 'O elegí otro plan' : 'Elegí tu plan') %></h2>
+      <p class="texto-suave">Pagás cada mes con débito automático de Mercado Pago, y cancelás cuando quieras.<% if (activa) { %> Al cambiar de plan, el nuevo se activa apenas se confirma el pago y se da de baja el anterior.<% } %></p>
+    </div>
+    <div class="ajuste-campos">
+      <% for (const plan of planes) { %>
+        <% const esElActual = activa && activa.planId === plan.id %>
+        <form method="post" action="/admin/suscripcion/iniciar" class="tarjeta formulario">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="plan" value="<%= plan.id %>">
+          <h3><%= plan.nombre %><% if (esElActual) { %> <span class="pastilla pastilla-ok">Tu plan</span><% } %></h3>
+          <p><strong><%= plan.precio %></strong> <span class="texto-suave"><%= plan.unidad %></span></p>
+          <ul class="ayuda">
+            <% for (const item of plan.items) { %><li><%= item %></li><% } %>
+          </ul>
+          <% if (!esElActual) { %>
+            <div><button class="boton" type="submit"><%= activa ? `Cambiar a ${plan.nombre}` : `Suscribirme a ${plan.nombre}` %></button></div>
+          <% } %>
+        </form>
+      <% } %>
+    </div>
+  </section>
+<% } %>
+
+<section class="ajuste">
+  <div class="ajuste-intro">
+    <h2>Tus pagos</h2>
+    <p class="texto-suave">Lo que se registró como pago de tu plan.</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (pagos.length === 0) { %>
+      <p class="texto-suave">Todavía no hay pagos registrados.</p>
+    <% } else { %>
+      <div class="tabla-contenedor">
+        <table class="tabla tabla-planes">
+          <thead><tr><th scope="col">Fecha</th><th scope="col">Cubre</th><th scope="col" class="numero">Monto</th><th scope="col">Pago hasta</th><th scope="col">Detalle</th></tr></thead>
+          <tbody>
+            <% for (const pago of pagos) { %>
+              <tr>
+                <td data-etiqueta="Fecha"><%= formatearFecha(pago.creadoEn) %></td>
+                <td data-etiqueta="Cubre"><%= pago.meses === 1 ? '1 mes' : `${pago.meses} meses` %></td>
+                <td data-etiqueta="Monto" class="numero"><%= pago.montoCentavos ? formatearPrecio(pago.montoCentavos) : '—' %></td>
+                <td data-etiqueta="Pago hasta"><%= formatearDia(pago.venceDespues) %></td>
+                <td data-etiqueta="Detalle" class="celda-envolver"><%= pago.nota || '—' %></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</section>
+<%- include('../parciales/pie') %>

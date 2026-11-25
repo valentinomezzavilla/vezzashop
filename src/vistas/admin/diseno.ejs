@@ -15,6 +15,8 @@
   const fuenteActual = Object.hasOwn(opcionesFuente, valor('fuente')) ? valor('fuente') : 'sistema';
   const esquinasActual = Object.hasOwn(opcionesEsquinas, valor('esquinas')) ? valor('esquinas') : 'redondeadas';
   const tarjetasActual = Object.hasOwn(opcionesTarjetas, valor('tarjetas')) ? valor('tarjetas') : 'normales';
+  const sinStockActual = Object.hasOwn(opcionesSinStock, valor('sinStock')) ? valor('sinStock') : 'mostrar';
+  const categoriasPortadaActual = Object.hasOwn(opcionesCategoriasPortada, valor('categoriasPortada')) ? valor('categoriasPortada') : 'pocas';
   // Para mostrar cada tipografía con su propia letra en las tarjetas de arriba (se piden juntas, en un solo pedido).
   const hojaFuentes = 'https://fonts.googleapis.com/css2?' + Object.values(opcionesFuente).filter((f) => f.google).map((f) => `family=${f.google.split(':')[0]}:wght@600`).join('&') + '&display=swap';
 %>
@@ -28,6 +30,8 @@
     <a class="boton boton-secundario" href="<%= urlMiTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver cómo queda</a>
   <% } %>
 </header>
+
+<%- include('diseno-plan-resumen', { plan }) %>
 
 <% if (Object.keys(errores).length) { %>
   <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>
@@ -245,6 +249,30 @@
         <%- error('tarjetas') %>
       </fieldset>
 
+      <fieldset class="tipos-entrega tipos-tres">
+        <legend class="etiqueta">Productos sin stock</legend>
+        <% for (const [clave, opcion] of Object.entries(opcionesSinStock)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="sinStock" value="<%= clave %>"<%= sinStockActual === clave ? ' checked' : '' %>>
+            <span><strong><%= opcion.titulo %></strong></span>
+            <span class="ayuda"><%= opcion.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('sinStock') %>
+      </fieldset>
+
+      <fieldset class="tipos-entrega tipos-tres">
+        <legend class="etiqueta">Categorías en la portada</legend>
+        <% for (const [clave, opcion] of Object.entries(opcionesCategoriasPortada)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="categoriasPortada" value="<%= clave %>"<%= categoriasPortadaActual === clave ? ' checked' : '' %>>
+            <span><strong><%= opcion.titulo %></strong></span>
+            <span class="ayuda"><%= opcion.ayuda %></span>
+          </label>
+        <% } %>
+        <%- error('categoriasPortada') %>
+      </fieldset>
+
       <div class="ajuste-campos-dos">
         <div class="campo">
           <label for="tituloCatalogo">Título del catálogo</label>
@@ -261,6 +289,9 @@
       </div>
     </div>
   </section>
+
+  <%# Colores, portada, tarjetas, logo, pie y diseño a medida: dependen del nivel de diseño del plan (ver diseno-plan.ejs). %>
+  <%- include('diseno-plan', { plan }) %>
 
   <section class="ajuste" id="sobre">
     <div class="ajuste-intro">

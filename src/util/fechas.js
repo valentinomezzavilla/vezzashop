@@ -31,3 +31,11 @@ export function formatearDia(dia) {
   const [anio, mes, dd] = dia.split('-').map(Number);
   return `${dd}/${mes}/${anio}`;
 }
+
+const DIA_LARGO = new Intl.DateTimeFormat('es-AR', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' });
+
+// "2026-11-25" -> "25 de noviembre de 2026" (para mails y avisos que se leen como una frase).
+export function formatearDiaLargo(dia) {
+  if (!dia) return '';
+  return DIA_LARGO.format(new Date(`${dia}T00:00:00Z`));
+}

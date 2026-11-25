@@ -1,30 +1,6 @@
 <%- include('cabecera', { titulo }) %>
-<% if (banners.length) { %>
-  <section class="carrusel" aria-roledescription="carrusel" aria-label="Novedades" data-carrusel>
-    <div class="carrusel-pista" data-pista>
-      <% banners.forEach((banner, n) => { %>
-        <div class="carrusel-diapositiva" role="group" aria-roledescription="diapositiva" aria-label="<%= n + 1 %> de <%= banners.length %>">
-          <% if (banner.enlace) { %><a href="<%= banner.enlace %>"><% } %>
-          <picture>
-            <% if (banner.urlImagenMovil) { %><source media="(max-width: 640px)" srcset="<%= banner.urlImagenMovil %>"<%- banner.medidasMovil ? ` width="${banner.medidasMovil.ancho}" height="${banner.medidasMovil.alto}"` : '' %>><% } %>
-            <%# Width y height reservan el alto del banner antes de que cargue. El primero es la imagen principal de la portada: sin lazy y con prioridad. %>
-            <img src="<%= banner.urlImagen %>" alt="<%= banner.textoAlternativo %>"<%- banner.medidas ? ` width="${banner.medidas.ancho}" height="${banner.medidas.alto}"` : '' %> decoding="async"<%- n > 0 ? ' loading="lazy"' : ' fetchpriority="high"' %>>
-          </picture>
-          <% if (banner.enlace) { %></a><% } %>
-        </div>
-      <% }) %>
-    </div>
-    <% if (banners.length > 1) { %>
-      <button class="carrusel-flecha carrusel-anterior" type="button" data-anterior aria-label="Banner anterior"><%- icono('izquierda', { tamano: 22 }) %></button>
-      <button class="carrusel-flecha carrusel-siguiente" type="button" data-siguiente aria-label="Banner siguiente"><%- icono('derecha', { tamano: 22 }) %></button>
-      <div class="carrusel-puntos" data-puntos>
-        <% banners.forEach((_, n) => { %>
-          <button type="button" class="carrusel-punto" data-punto="<%= n %>" aria-label="Ir al banner <%= n + 1 %>"<%- n === 0 ? ' aria-current="true"' : '' %>></button>
-        <% }) %>
-      </div>
-    <% } %>
-  </section>
-<% } %>
+<%# Las secciones de arriba de la portada, en el orden que eligió la tienda (Diseño, plan Acompañado). Por defecto: banners y destacados. %>
+<% for (const seccion of (locals.seccionesPortada ?? ['banners', 'destacados'])) { %><%- include(`portada-${seccion}`) %><% } %>
 
 <% if (migas.length) { %>
   <nav class="migas" aria-label="Estás en">
@@ -34,17 +10,6 @@
     <% } %>
     <%- icono('derecha', { tamano: 14 }) %><span aria-current="page"><%= migas.at(-1).nombre %></span>
   </nav>
-<% } %>
-
-<% if (destacados.length) { %>
-  <section class="seccion-destacados" aria-labelledby="titulo-destacados">
-    <div class="encabezado-catalogo">
-      <h2 id="titulo-destacados" class="titulo-seccion"><%= ajustes.tituloDestacados %></h2>
-    </div>
-    <ul class="grilla">
-      <% for (const p of destacados) { %><%- include('tarjeta-producto', { p }) %><% } %>
-    </ul>
-  </section>
 <% } %>
 
 <% const busquedaPagina = locals.paginaBusqueda %>
@@ -127,9 +92,22 @@
 <% } %>
 
 <% if (subcategorias.length) { %>
+  <%# Con muchas categorías, se ven las primeras y el resto queda detrás de "Ver todas" (un <details>: anda sin JavaScript). %>
+  <% const chipsVisibles = subcategorias.slice(0, limiteCategoriasPortada) %>
+  <% const chipsResto = subcategorias.slice(limiteCategoriasPortada) %>
   <nav class="chips" aria-label="<%= migas.length ? 'Subcategorías' : 'Categorías' %>">
-    <% for (const sub of subcategorias) { %>
+    <% for (const sub of chipsVisibles) { %>
       <a class="chip" href="<%= urlCategoria(sub) %>"><%= sub.nombre %></a>
+    <% } %>
+    <% if (chipsResto.length) { %>
+      <details class="chips-mas">
+        <summary class="chip chip-mas"><span class="chips-mas-abrir">Ver todas (<%= subcategorias.length %>)</span><span class="chips-mas-cerrar">Ver menos</span></summary>
+        <div class="chips-resto">
+          <% for (const sub of chipsResto) { %>
+            <a class="chip" href="<%= urlCategoria(sub) %>"><%= sub.nombre %></a>
+          <% } %>
+        </div>
+      </details>
     <% } %>
   </nav>
 <% } %>
@@ -161,7 +139,7 @@
 <% } else { %>
   <ul class="grilla" data-grilla>
     <%# Las primeras fotos van sin lazy (se ven apenas abre la página), salvo que haya banners o destacados arriba, o sea la página 2. %>
-    <% const hayArriba = pagina !== 1 || banners.length > 0 || destacados.length > 0 %>
+    <% const hayArriba = pagina !== 1 || banners.length > 0 || destacados.length > 0 || (locals.ofertas ?? []).length > 0 %>
     <% for (const [n, p] of productos.entries()) { %><%- include('tarjeta-producto', { p, conTransicion: true, prioridad: !hayArriba && n < 4 }) %><% } %>
   </ul>
   <% if (urlSiguiente) { %>

@@ -1,6 +1,7 @@
 // Ajustes de cómo se ve la vidriera de cada tienda (sección Diseño del panel) y sus banners.
 import { enTransaccion } from './db.js';
 import { esOrden } from './vidriera.js';
+import { AJUSTES_AVANZADOS_POR_DEFECTO, BOOLEANOS_AVANZADOS, COLUMNAS_AVANZADAS, estiloAvanzado } from './diseno-por-plan.js';
 
 export const MAX_BANNERS = 6;
 const LARGO_FRANJA = 200;
@@ -42,6 +43,23 @@ export const TARJETAS = {
   grandes: { titulo: 'Grandes', ayuda: 'Fotos más grandes: 3 por fila en la computadora.', columnas: { media: 2, ancha: 3 } },
 };
 
+// Qué se hace en la vidriera con los productos que no tienen stock (los valores son los del ajuste `sinStock`).
+export const SIN_STOCK = {
+  mostrar: { titulo: 'Mostrarlos como a los demás', ayuda: 'Aparecen en su lugar, con la etiqueta "Sin stock".' },
+  'al-final': { titulo: 'Mostrarlos al final', ayuda: 'En cada lista van primero los que tienen stock.' },
+  ocultar: { titulo: 'Ocultarlos', ayuda: 'No aparecen en el catálogo, las categorías ni el buscador hasta que vuelva a haber stock. Su link directo sigue abierto.' },
+};
+
+// Cuántas categorías se muestran como botones en la portada (valores del ajuste `categoriasPortada`).
+export const CATEGORIAS_PORTADA = {
+  pocas: { titulo: 'Las primeras 8', ayuda: 'Con un botón "Ver todas" para el resto. Lo mejor si tenés muchas categorías.' },
+  todas: { titulo: 'Todas', ayuda: 'Se muestran todas, una al lado de la otra.' },
+  ninguna: { titulo: 'Ninguna', ayuda: 'La portada no lista categorías (siguen en el menú y en el pie).' },
+};
+// Cuántas se ven de entrada cuando son "pocas" (en el pie de página son 12).
+export const CATEGORIAS_EN_PORTADA = 8;
+export const CATEGORIAS_EN_PIE = 12;
+
 const AJUSTES_POR_DEFECTO = {
   logo: null,
   menuEstilo: 'barra',
@@ -58,6 +76,8 @@ const AJUSTES_POR_DEFECTO = {
   descuentoTransferencia: 0,
   cuotasSinInteres: 0,
   ordenCatalogo: 'nombre',
+  sinStock: 'mostrar',
+  categoriasPortada: 'pocas',
   descripcion: '',
   whatsapp: '',
   instagram: '',
@@ -78,10 +98,17 @@ const AJUSTES_POR_DEFECTO = {
   descuentoEfectivo: 0,
   pagoMercadopago: false,
   mercadopagoInstrucciones: '',
+  // Avisos al comprador (sección Envíos y pagos): si se le manda un mail cada vez que cambia el estado de su pedido.
+  avisosPedidoEmail: false,
+  // Para la calculadora de comisiones de Mercado Pago: cuándo cobra la plata ('instante', '10', '18' o '35' días) y otros costos en centésimas de % (ver comisiones-mp.js).
+  mpPlazo: 'instante',
+  mpOtrosBp: 0,
+  // Lo que depende del nivel de diseño del plan (colores, portada, tarjetas, CSS propio...): ver diseno-por-plan.js.
+  ...AJUSTES_AVANZADOS_POR_DEFECTO,
 };
 
 // Ajustes que en la base son 0/1.
-const BOOLEANOS = new Set(['pagoTransferencia', 'pagoEfectivo', 'pagoMercadopago']);
+const BOOLEANOS = new Set(['pagoTransferencia', 'pagoEfectivo', 'pagoMercadopago', 'avisosPedidoEmail', ...BOOLEANOS_AVANZADOS]);
 
 // Las claves de AJUSTES_POR_DEFECTO, como columnas de ajustes_tienda.
 const COLUMNAS = {
@@ -104,6 +131,8 @@ const COLUMNAS = {
   descuentoTransferencia: 'descuento_transferencia',
   cuotasSinInteres: 'cuotas_sin_interes',
   ordenCatalogo: 'orden_catalogo',
+  sinStock: 'sin_stock',
+  categoriasPortada: 'categorias_portada',
   whatsapp: 'whatsapp',
   instagram: 'instagram',
   facebook: 'facebook',
@@ -119,6 +148,10 @@ const COLUMNAS = {
   descuentoEfectivo: 'descuento_efectivo',
   pagoMercadopago: 'pago_mercadopago',
   mercadopagoInstrucciones: 'mercadopago_instrucciones',
+  avisosPedidoEmail: 'avisos_pedido_email',
+  mpPlazo: 'mp_plazo',
+  mpOtrosBp: 'mp_otros_bp',
+  ...COLUMNAS_AVANZADAS,
 };
 
 export async function leerAjustes(db, tiendaId) {
@@ -215,6 +248,8 @@ export function validarAjustes(campos) {
   opcion('fuente', FUENTES);
   opcion('esquinas', ESQUINAS);
   opcion('tarjetas', TARJETAS);
+  opcion('sinStock', SIN_STOCK);
+  opcion('categoriasPortada', CATEGORIAS_PORTADA);
 
   // Un texto de una línea (se juntan los espacios y los saltos). Vacío es válido; con `porDefecto`, vacío vuelve al texto de siempre.
   const linea = (campo, maximo, { porDefecto } = {}) => {
@@ -300,9 +335,16 @@ export function estiloDeTienda(ajustes) {
   if (/^#[0-9a-f]{6}$/.test(ajustes.colorFranja)) {
     variables.push(`--franja: ${ajustes.colorFranja}`, `--franja-texto: ${colorDeTextoSobre(ajustes.colorFranja)}`);
   }
+  // Lo que depende del plan (ver diseno-por-plan.js): ancho y tipografías a elección, reglas de colores y CSS propio, y los atributos del <body>.
+  const avanzado = estiloAvanzado(ajustes);
+  if (avanzado.variables) variables.push(avanzado.variables);
   return {
     variables: variables.join('; '),
     hojaDeFuente: fuente.google ? `https://fonts.googleapis.com/css2?family=${fuente.google}&display=swap` : null,
+    // Solo cuando hay algo: con los valores de siempre, no agrega nada (las vistas leen estos campos con un valor por defecto).
+    ...(avanzado.hojasDeFuente.length > 0 && { hojasExtra: avanzado.hojasDeFuente }),
+    ...(avanzado.css && { css: avanzado.css }),
+    ...(avanzado.atributos && { atributos: avanzado.atributos }),
   };
 }
 

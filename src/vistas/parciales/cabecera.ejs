@@ -14,7 +14,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/admin.css">
+  <%# Pantallas que piden su propio CSS o JS extra (por ejemplo, el alta de cuentas): extraCss y extraJs. %>
+  <% if (locals.extraCss) { %><link rel="stylesheet" href="<%= extraCss %>"><% } %>
   <script src="/admin.js" defer></script>
+  <% if (locals.extraJs) { %><script src="<%= extraJs %>" defer></script><% } %>
 </head>
 <body>
 <a class="saltar" href="#contenido">Ir al contenido</a>

@@ -1,0 +1,13 @@
+<%# Sección de la portada: los productos con precio promocional (los mismos que muestra el filtro "Solo en oferta"). %>
+<% const ofertasPortada = locals.ofertas ?? [] %>
+<% if (ofertasPortada.length) { %>
+  <section class="seccion-destacados seccion-ofertas" aria-labelledby="titulo-ofertas">
+    <div class="encabezado-catalogo">
+      <h2 id="titulo-ofertas" class="titulo-seccion">Ofertas</h2>
+      <a class="enlace" href="/?oferta=1">Ver todas las ofertas</a>
+    </div>
+    <ul class="grilla">
+      <% for (const p of ofertasPortada) { %><%- include('tarjeta-producto', { p }) %><% } %>
+    </ul>
+  </section>
+<% } %>
