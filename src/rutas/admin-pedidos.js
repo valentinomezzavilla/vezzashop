@@ -5,6 +5,7 @@ import { verificarCsrf } from '../csrf.js';
 import { leerAjustes, actualizarAjustes } from '../diseno.js';
 import { IVA_BP, MAX_OTROS_BP, esPlazo, listaDePlazos, calcularComision, precioParaRecibir, tablaDeComisiones } from '../comisiones-mp.js';
 import { sincronizarPedido, tituloPagoMp } from '../cobros-mp.js';
+import { PROVINCIAS } from '../provincias.js';
 import { urlDeAutorizacion } from '../mercadopago-tiendas.js';
 import { ErrorDeConexion, configMp, conectarConCodigo, conectarConToken, desconectar, leerConexion } from '../tienda-mercadopago.js';
 import {
@@ -458,7 +459,7 @@ export function rutasAdminPedidos({ db, config, notificar = async () => false })
   });
 
   function mostrarEntrega(req, res, { metodo = null, formulario, errores = {}, status = 200 }) {
-    res.status(status).render('admin/entrega', { metodo, formulario, errores, tipos: TIPOS_ENTREGA });
+    res.status(status).render('admin/entrega', { metodo, formulario, errores, tipos: TIPOS_ENTREGA, provincias: PROVINCIAS });
   }
 
   router.get('/pagos/entregas/nueva', async (req, res) => {

@@ -2,7 +2,8 @@
 import { randomBytes } from 'node:crypto';
 import { enTransaccion } from './db.js';
 import { variantesParaCarrito } from './vidriera.js';
-import { FORMAS_DE_PAGO } from './pagos.js';
+import { FORMAS_DE_PAGO, costoParaProvincia, dependeDeProvincia } from './pagos.js';
+import { PROVINCIAS } from './provincias.js';
 import { formatearPrecio } from './util/formato.js';
 import { slugificar } from './util/slug.js';
 import { ESTADOS, ORDEN_ESTADOS, esEstado, tituloEstado } from './estados-pedido.js';
@@ -13,11 +14,8 @@ export const MAX_POR_LINEA = 50;
 // Primer número del par de pg_advisory_xact_lock(<este>, <id de tienda>): un candado por tienda para crear pedidos.
 const CANDADO_PEDIDOS = 727_002;
 
-export const PROVINCIAS = [
-  'Buenos Aires', 'Ciudad de Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos',
-  'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan',
-  'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán',
-];
+// La lista vive en provincias.js; acá se vuelve a exportar para quien ya la importaba de pedidos.js.
+export { PROVINCIAS };
 
 // Los estados de un pedido viven en estados-pedido.js; acá se vuelven a exportar para quien ya los importaba de pedidos.js.
 export { ESTADOS, esEstado, tituloEstado };
@@ -81,18 +79,22 @@ export async function lineasDelCarrito(db, tiendaId, items) {
 
 // ---------- Totales ----------
 
-// Costo del envío para un subtotal: null si se coordina después.
-export function costoEnvio(entrega, subtotal) {
-  if (!entrega || entrega.costo === null) return null;
+// Costo del envío para un subtotal y una provincia: null si se coordina después (o si la entrega tiene precios por
+// provincia y todavía no se eligió una). El "gratis desde" vale por encima del precio de cualquier provincia.
+export function costoEnvio(entrega, subtotal, provincia = '') {
+  if (!entrega) return null;
+  if (dependeDeProvincia(entrega) && !provincia) return null;
+  const costo = costoParaProvincia(entrega, provincia);
+  if (costo === null) return null;
   if (entrega.gratisDesde !== null && subtotal >= entrega.gratisDesde) return 0;
-  return entrega.costo;
+  return costo;
 }
 
 // El descuento de la forma de pago se aplica sobre los productos, no sobre el envío.
-export function calcularTotales(subtotal, entrega, pago) {
+export function calcularTotales(subtotal, entrega, pago, provincia = '') {
   const descuentoPorcentaje = pago?.descuento ?? 0;
   const descuento = Math.round((subtotal * descuentoPorcentaje) / 100);
-  const envio = costoEnvio(entrega, subtotal);
+  const envio = costoEnvio(entrega, subtotal, provincia);
   return { subtotal, descuentoPorcentaje, descuento, envio, total: subtotal - descuento + (envio ?? 0) };
 }
 
@@ -131,8 +133,9 @@ export function validarCheckout(campos, { entregas, pagos }) {
   if (!pago) errores.pago = 'Elegí cómo querés pagar';
   else if (pago.clave === 'efectivo' && entrega && !entrega.aceptaEfectivo) {
     errores.pago = `El pago en efectivo no está disponible con "${entrega.nombre}". Elegí otra forma de pago.`;
-  } else if (pago.clave === 'mercadopago' && pago.enLinea && entrega && entrega.costo === null) {
-    // Mercado Pago cobra en el momento y necesita el monto final: con un envío que se coordina después todavía no se sabe.
+  } else if (pago.clave === 'mercadopago' && pago.enLinea && entrega && costoParaProvincia(entrega, valores.provincia) === null) {
+    // Mercado Pago cobra en el momento y necesita el monto final: con un envío que se coordina después todavía no se sabe
+    // (con precios por provincia depende de la provincia elegida).
     errores.pago = `El pago con Mercado Pago no está disponible con "${entrega.nombre}", porque su costo se coordina después. Elegí otra forma de pago.`;
   }
 
@@ -174,7 +177,7 @@ export function crearPedido(db, tiendaId, items, datos) {
       }
     }
 
-    const totales = calcularTotales(subtotalDe(lineas), datos.entrega, datos.pago);
+    const totales = calcularTotales(subtotalDe(lineas), datos.entrega, datos.pago, datos.direccion.provincia);
     const token = randomBytes(18).toString('base64url');
     const { cliente, entrega, direccion } = datos;
     const pedido = await tx

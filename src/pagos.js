@@ -3,6 +3,7 @@ import { entero } from './diseno.js';
 import { enTransaccion } from './db.js';
 import { parsearPrecio, ErrorDeValor } from './importacion/valores.js';
 import { precioParaEditar } from './productos.js';
+import { PROVINCIAS } from './provincias.js';
 import { leerConexion } from './tienda-mercadopago.js';
 import { formatearPrecio } from './util/formato.js';
 
@@ -130,34 +131,68 @@ function filaAMetodo(fila) {
     gratisDesde: fila.gratisDesde,
     aceptaEfectivo: Boolean(fila.aceptaEfectivo),
     activo: Boolean(fila.activo),
+    // { [provincia]: centavos }: vacío si la forma de entrega cobra lo mismo en todo el país.
+    preciosProvincia: {},
   };
 }
 
 const SELECCION_METODO = `SELECT id, tipo, nombre, descripcion, costo_centavos AS costo, gratis_desde_centavos AS "gratisDesde",
   acepta_efectivo AS "aceptaEfectivo", activo FROM metodos_entrega`;
 
+// Los precios por provincia de las formas de entrega de la tienda (o de una sola), en una consulta: Map de id -> { [provincia]: centavos }.
+async function preciosPorMetodo(db, tiendaId, metodoId = null) {
+  const filas = await db
+    .prepare(
+      `SELECT p.metodo_id AS "metodoId", p.provincia, p.costo_centavos AS costo
+       FROM metodo_entrega_provincias p JOIN metodos_entrega m ON m.id = p.metodo_id
+       WHERE m.tienda_id = ?${metodoId === null ? '' : ' AND m.id = ?'}`,
+    )
+    .all(...(metodoId === null ? [tiendaId] : [tiendaId, metodoId]));
+  const precios = new Map();
+  for (const fila of filas) precios.set(fila.metodoId, { ...precios.get(fila.metodoId), [fila.provincia]: fila.costo });
+  return precios;
+}
+
 export async function listarMetodosEntrega(db, tiendaId, { soloActivos = false } = {}) {
-  return (await db
+  const metodos = (await db
     .prepare(`${SELECCION_METODO} WHERE tienda_id = ?${soloActivos ? ' AND activo = 1' : ''} ORDER BY orden, id`)
     .all(tiendaId))
     .map(filaAMetodo);
+  const precios = await preciosPorMetodo(db, tiendaId);
+  for (const metodo of metodos) metodo.preciosProvincia = precios.get(metodo.id) ?? {};
+  return metodos;
 }
 
 export async function leerMetodoEntrega(db, tiendaId, id) {
   const fila = await db.prepare(`${SELECCION_METODO} WHERE tienda_id = ? AND id = ?`).get(tiendaId, id);
-  return fila ? filaAMetodo(fila) : null;
+  if (!fila) return null;
+  const metodo = filaAMetodo(fila);
+  metodo.preciosProvincia = (await preciosPorMetodo(db, tiendaId, metodo.id)).get(metodo.id) ?? {};
+  return metodo;
 }
 
-// "Gratis", "$ 4.500,00", "A coordinar"; con "gratis desde" si corresponde.
-export function textoCosto(metodo) {
-  if (metodo.costo === null) return 'A coordinar';
-  return metodo.costo === 0 ? 'Gratis' : formatearPrecio(metodo.costo);
+// ¿La forma de entrega tiene al menos un precio por provincia cargado?
+export const dependeDeProvincia = (entrega) => Object.keys(entrega.preciosProvincia ?? {}).length > 0;
+
+// El costo de la lista para una provincia: su precio propio si lo tiene (un 0 es gratis), si no el costo base.
+// null si se coordina después. No tiene en cuenta el "gratis desde": eso depende del subtotal (ver costoEnvio en pedidos.js).
+export function costoParaProvincia(entrega, provincia = '') {
+  const precios = entrega.preciosProvincia ?? {};
+  return Object.hasOwn(precios, provincia) ? precios[provincia] : entrega.costo;
+}
+
+// "Gratis", "$ 4.500,00", "A coordinar"; "Según provincia" si hay una tabla y todavía no se eligió la provincia.
+export function textoCosto(metodo, provincia = '') {
+  if (dependeDeProvincia(metodo) && !provincia) return 'Según provincia';
+  const costo = costoParaProvincia(metodo, provincia);
+  if (costo === null) return 'A coordinar';
+  return costo === 0 ? 'Gratis' : formatearPrecio(costo);
 }
 
 // Lo que se muestra en el formulario: de un método guardado, de un modelo o vacío.
 export function formularioEntrega(metodo) {
-  if (!metodo) return { tipo: 'domicilio', nombre: '', descripcion: '', costo: '', aCoordinar: false, gratisDesde: '', aceptaEfectivo: false, activo: true };
-  if (!('id' in metodo)) return { gratisDesde: '', aCoordinar: false, activo: true, ...metodo };
+  if (!metodo) return { tipo: 'domicilio', nombre: '', descripcion: '', costo: '', aCoordinar: false, gratisDesde: '', aceptaEfectivo: false, activo: true, preciosProvincia: {} };
+  if (!('id' in metodo)) return { gratisDesde: '', aCoordinar: false, activo: true, preciosProvincia: {}, ...metodo };
   return {
     tipo: metodo.tipo,
     nombre: metodo.nombre,
@@ -167,6 +202,7 @@ export function formularioEntrega(metodo) {
     gratisDesde: metodo.gratisDesde === null ? '' : precioParaEditar(metodo.gratisDesde),
     aceptaEfectivo: metodo.aceptaEfectivo,
     activo: metodo.activo,
+    preciosProvincia: Object.fromEntries(Object.entries(metodo.preciosProvincia ?? {}).map(([provincia, costo]) => [provincia, precioParaEditar(costo)])),
   };
 }
 
@@ -182,7 +218,13 @@ export function validarMetodoEntrega(campos) {
     gratisDesde: texto(campos.gratisDesde),
     aceptaEfectivo: marcado(campos.aceptaEfectivo),
     activo: marcado(campos.activo),
+    // Lo escrito en cada provincia (los campos son precioProvincia_<posición en PROVINCIAS>); las vacías no se guardan.
+    preciosProvincia: {},
   };
+  for (const [i, provincia] of PROVINCIAS.entries()) {
+    const escrito = texto(campos[`precioProvincia_${i}`]);
+    if (escrito) formulario.preciosProvincia[provincia] = escrito;
+  }
   if (!Object.hasOwn(TIPOS_ENTREGA, formulario.tipo)) errores.tipo = 'Elegí si es retiro o envío';
   if (!formulario.nombre) errores.nombre = 'Poné un nombre, por ejemplo "Envío en moto en Córdoba Capital"';
   else if (formulario.nombre.length > 80) errores.nombre = 'Máximo 80 caracteres';
@@ -212,7 +254,21 @@ export function validarMetodoEntrega(campos) {
     else if (resultado.valor === 0) errores.gratisDesde = 'Dejalo vacío si no hay envío gratis';
     else gratisDesde = resultado.valor;
   }
-  if (costo === 0 || formulario.aCoordinar) gratisDesde = null;
+
+  // Solo un envío a domicilio lleva tabla. Una provincia vacía usa el costo base; un 0 es gratis a esa provincia.
+  const preciosProvincia = {};
+  if (formulario.tipo === 'domicilio') {
+    for (const [i, provincia] of PROVINCIAS.entries()) {
+      if (!Object.hasOwn(formulario.preciosProvincia, provincia)) continue;
+      const resultado = precio(formulario.preciosProvincia[provincia]);
+      if (resultado.error) errores[`precioProvincia_${i}`] = resultado.error;
+      else if (resultado.valor !== null) preciosProvincia[provincia] = resultado.valor;
+    }
+  }
+
+  // "Gratis desde" no tiene sentido si en ningún lado se cobra el envío.
+  const seCobraEnAlgunLado = (costo ?? 0) > 0 || Object.values(preciosProvincia).some((valor) => valor > 0);
+  if (!seCobraEnAlgunLado) gratisDesde = null;
 
   return {
     datos: {
@@ -223,6 +279,7 @@ export function validarMetodoEntrega(campos) {
       gratisDesde,
       aceptaEfectivo: formulario.aceptaEfectivo,
       activo: formulario.activo,
+      preciosProvincia,
     },
     formulario,
     errores,
@@ -233,28 +290,41 @@ export async function contarMetodosEntrega(db, tiendaId) {
   return (await db.prepare('SELECT count(*) AS n FROM metodos_entrega WHERE tienda_id = ?').get(tiendaId)).n;
 }
 
-export async function crearMetodoEntrega(db, tiendaId, datos) {
-  const { rows } = await db
-    .prepare(
-      `INSERT INTO metodos_entrega (tienda_id, tipo, nombre, descripcion, costo_centavos, gratis_desde_centavos, acepta_efectivo, activo, orden)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM metodos_entrega WHERE tienda_id = ?))
-       RETURNING id`,
-    )
-    .run(tiendaId, datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
-      Number(datos.aceptaEfectivo), Number(datos.activo), tiendaId);
-  return rows[0].id;
+// Reemplaza la tabla de precios por provincia de una forma de entrega (que ya se sabe que es de la tienda).
+async function guardarPreciosProvincia(tx, metodoId, preciosProvincia = {}) {
+  await tx.prepare('DELETE FROM metodo_entrega_provincias WHERE metodo_id = ?').run(metodoId);
+  const insertar = tx.prepare('INSERT INTO metodo_entrega_provincias (metodo_id, provincia, costo_centavos) VALUES (?, ?, ?)');
+  for (const [provincia, costo] of Object.entries(preciosProvincia)) await insertar.run(metodoId, provincia, costo);
 }
 
-export async function editarMetodoEntrega(db, tiendaId, id, datos) {
-  return (
-    (await db
+export function crearMetodoEntrega(db, tiendaId, datos) {
+  return enTransaccion(db, async (tx) => {
+    const { rows } = await tx
+      .prepare(
+        `INSERT INTO metodos_entrega (tienda_id, tipo, nombre, descripcion, costo_centavos, gratis_desde_centavos, acepta_efectivo, activo, orden)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM metodos_entrega WHERE tienda_id = ?))
+         RETURNING id`,
+      )
+      .run(tiendaId, datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
+        Number(datos.aceptaEfectivo), Number(datos.activo), tiendaId);
+    await guardarPreciosProvincia(tx, rows[0].id, datos.preciosProvincia);
+    return rows[0].id;
+  });
+}
+
+// Guarda los datos y reemplaza la tabla de precios por provincia entera, todo junto.
+export function editarMetodoEntrega(db, tiendaId, id, datos) {
+  return enTransaccion(db, async (tx) => {
+    const actualizado = (await tx
       .prepare(
         `UPDATE metodos_entrega SET tipo = ?, nombre = ?, descripcion = ?, costo_centavos = ?, gratis_desde_centavos = ?,
          acepta_efectivo = ?, activo = ? WHERE id = ? AND tienda_id = ?`,
       )
       .run(datos.tipo, datos.nombre, datos.descripcion, datos.costo, datos.gratisDesde,
-        Number(datos.aceptaEfectivo), Number(datos.activo), id, tiendaId)).changes > 0
-  );
+        Number(datos.aceptaEfectivo), Number(datos.activo), id, tiendaId)).changes > 0;
+    if (actualizado) await guardarPreciosProvincia(tx, id, datos.preciosProvincia);
+    return actualizado;
+  });
 }
 
 export async function activarMetodoEntrega(db, tiendaId, id, activo) {

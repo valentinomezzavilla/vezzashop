@@ -262,6 +262,11 @@ tiene al menos una forma de entrega y una de pago activas (si no, el carrito sig
   demora, horarios), costo, "gratis desde $X" o costo "a coordinar", y si acepta efectivo. Hay modelos para
   empezar: retiro en el local (con la dirección de la tienda), envío en moto en Córdoba Capital y envío a
   todo el país; se abren completos para revisar el costo antes de guardar.
+  Un *envío a domicilio* puede además tener un **precio por provincia** cargado a mano (tarjeta "Precio por provincia" del formulario, una casilla por
+  provincia): una provincia vacía cobra el costo base de la forma de entrega (si ese costo es "a coordinar", queda "a coordinar"), un `0` es envío gratis
+  a esa provincia, y "gratis desde $X" vale por encima del precio de cualquier provincia. En el checkout, mientras no se elige la provincia el envío dice
+  "Según provincia" / "Elegí la provincia"; al elegirla aparece su costo y el total se actualiza. Un retiro no lleva tabla, y borrar la forma de entrega
+  borra sus precios. Las que no cargan nada funcionan igual que antes.
 - **Formas de pago:** *transferencia* (alias, CBU/CVU, titular, banco y % de descuento; el descuento también
   se muestra en cada producto), *efectivo* (% de descuento; solo con entregas que lo aceptan) y *Mercado Pago*
   (con la cuenta de la tienda conectada, el cliente paga en el momento; si no, la tienda manda un link de pago por
@@ -281,7 +286,7 @@ Con la cuenta conectada:
 
 1. **Cobro en el momento.** Si el comprador elige Mercado Pago, al confirmar el pedido se lo lleva **directo a Mercado Pago** (se arma el pago con los
    productos y el envío, con el pedido como referencia; vale 3 días). Si algo falla, el pedido igual queda hecho y en su página tiene un botón
-   **Pagar con Mercado Pago** para intentar de nuevo (reutiliza el mismo pago mientras no venza). Con una entrega de costo "a coordinar" Mercado Pago
+   **Pagar con Mercado Pago** para intentar de nuevo (reutiliza el mismo pago mientras no venza). Con una entrega de costo "a coordinar" (o con una provincia que queda "a coordinar") Mercado Pago
    no se puede elegir (todavía no hay un monto final).
 2. **El pedido pasa a Pagado solo.** Cuando Mercado Pago avisa (`POST /webhooks/mercadopago/tienda/<id>`) o el comprador vuelve a la tienda, la
    plataforma **consulta el pago a Mercado Pago con el token de la tienda** y recién ahí, si está aprobado, es de ese pedido y por su monto
@@ -679,7 +684,7 @@ Etapas siguientes, en orden sugerido:
    dinero desde la plataforma (hoy el reembolso se hace desde Mercado Pago).
 2. Avisos por email: a la tienda cuando entra un pedido y al comprador con el detalle al hacerlo (los cambios de estado y de envío ya le llegan por mail y por WhatsApp;
    hoy la tienda se entera de un pedido nuevo por el contador del panel).
-3. Cotizar envíos con Correo Argentino / Andreani según el código postal (hoy: costo fijo o "a coordinar").
+3. Cotizar envíos con Correo Argentino / Andreani según el código postal (hoy: costo fijo, precio por provincia cargado a mano en el panel, o "a coordinar").
 4. Que el dominio propio se agregue solo en Coolify (hoy lo hacés a mano, ver [Dominio propio](#dominio-propio)) y un aviso por mail cuando un cliente pide o verifica el suyo.
 5. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
 6. Foto por color en las variantes.

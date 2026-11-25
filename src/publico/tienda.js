@@ -248,15 +248,28 @@ function checkout(panel) {
   const direccion = $('[data-direccion]', formulario);
   const total = (clave) => $(`[data-total="${clave}"]`, formulario);
   const elegido = (nombre) => $(`input[name="${nombre}"]:checked`, formulario)?.value;
+  const selectorProvincia = $('[data-provincia]', formulario);
+
+  // La regla del costo del envío, en miniatura y solo para mostrar: el servidor la vuelve a calcular al confirmar (ver costoEnvio en pedidos.js).
+  // Una provincia con precio propio cobra ese precio (0 es gratis); si no, el costo base (null: se coordina después).
+  const tieneTabla = (e) => Object.keys(e.preciosProvincia).length > 0;
+  const costoLista = (e, provincia) => (Object.hasOwn(e.preciosProvincia, provincia) ? e.preciosProvincia[provincia] : e.costo);
+  function costoEnvio(e, provincia) {
+    if (!e || (tieneTabla(e) && !provincia)) return null;
+    const costo = costoLista(e, provincia);
+    if (costo === null) return null;
+    return e.gratisDesde !== null && datos.subtotal >= e.gratisDesde ? 0 : costo;
+  }
 
   function actualizar() {
     const entrega = datos.entregas.find((e) => e.id === elegido('entrega'));
+    const provincia = selectorProvincia?.value ?? '';
     // Hay formas de pago que no se pueden usar con la entrega elegida: el efectivo, con las que no lo aceptan; y Mercado Pago (cobra en el
     // momento, en línea), con las que tienen el costo a coordinar, porque todavía no hay un monto final.
     const mercadoPagoEnLinea = datos.pagos.some((p) => p.clave === 'mercadopago' && p.enLinea);
     const noDisponibles = {
       efectivo: Boolean(entrega && !entrega.aceptaEfectivo),
-      mercadopago: Boolean(entrega && entrega.costo === null && mercadoPagoEnLinea),
+      mercadopago: Boolean(entrega && costoLista(entrega, provincia) === null && mercadoPagoEnLinea),
     };
     for (const [clave, noDisponible] of Object.entries(noDisponibles)) {
       const opcion = $(`[data-opcion-pago="${clave}"]`, formulario);
@@ -281,17 +294,27 @@ function checkout(panel) {
 
     const porcentaje = pago?.descuento ?? 0;
     const descuento = Math.round((datos.subtotal * porcentaje) / 100);
-    const envio = !entrega || entrega.costo === null ? null
-      : entrega.gratisDesde !== null && datos.subtotal >= entrega.gratisDesde ? 0 : entrega.costo;
+    const envio = costoEnvio(entrega, provincia);
     total('porcentaje').textContent = String(porcentaje);
     total('descuento').textContent = `−${pesos(descuento)}`;
     $('[data-fila-descuento]', formulario).hidden = descuento === 0;
-    total('envio').textContent = !entrega ? 'Elegí la entrega' : envio === null ? 'A coordinar' : envio === 0 ? 'Gratis' : pesos(envio);
+    total('envio').textContent = !entrega ? 'Elegí la entrega'
+      : envio === null ? (tieneTabla(entrega) && !provincia ? 'Elegí la provincia' : 'A coordinar')
+      : envio === 0 ? 'Gratis' : pesos(envio);
     total('total').textContent = pesos(datos.subtotal - descuento + (envio ?? 0));
     $('[data-mas-envio]', formulario).hidden = !(entrega && envio === null);
+
+    // Lo que cuesta cada entrega con precio por provincia, según la provincia elegida.
+    for (const e of datos.entregas.filter(tieneTabla)) {
+      const etiqueta = $(`[data-entrega-costo="${e.id}"]`, formulario);
+      if (!etiqueta) continue;
+      const costo = costoEnvio(e, provincia);
+      etiqueta.textContent = !provincia ? 'Según provincia' : costo === null ? 'A coordinar' : costo === 0 ? 'Gratis' : pesos(costo);
+      etiqueta.classList.toggle('gratis', costo === 0);
+    }
   }
   formulario.addEventListener('change', (evento) => {
-    if (evento.target.matches('[data-entrega], [data-pago]')) actualizar();
+    if (evento.target.matches('[data-entrega], [data-pago], [data-provincia]')) actualizar();
   });
   actualizar();
 

@@ -107,7 +107,7 @@
           </div>
           <div class="campo">
             <label for="provincia">Provincia</label>
-            <select id="provincia" name="provincia" autocomplete="address-level1" required<%- accesibilidad('provincia') %>>
+            <select id="provincia" name="provincia" autocomplete="address-level1" data-provincia required<%- accesibilidad('provincia') %>>
               <option value="">Elegí</option>
               <% for (const provincia of provincias) { %><option<%= v('provincia') === provincia ? ' selected' : '' %>><%= provincia %></option><% } %>
             </select>
@@ -130,7 +130,7 @@
             // Hay formas de pago que no se pueden usar con la entrega elegida: el efectivo con las que no lo aceptan, y Mercado Pago (cobra en el momento)
             // cuando el costo del envío se coordina después.
             const sinOpcion = (p.clave === 'efectivo' && entregaElegida && !entregaElegida.aceptaEfectivo)
-              || (p.clave === 'mercadopago' && p.enLinea && entregaElegida && entregaElegida.costo === null);
+              || (p.clave === 'mercadopago' && p.enLinea && entregaElegida && costoEntregaElegida === null);
           %>
           <label class="opcion-checkout<%= sinOpcion ? ' no-disponible' : '' %>" data-opcion-pago="<%= p.clave %>">
             <input type="radio" name="pago" value="<%= p.clave %>" data-pago<%= v('pago') === p.clave ? ' checked' : '' %> required>
@@ -184,7 +184,7 @@
         </div>
         <div>
           <dt>Envío</dt>
-          <dd data-total="envio"><%= !entregaElegida ? 'Elegí la entrega' : totales.envio === null ? 'A coordinar' : totales.envio === 0 ? 'Gratis' : formatearPrecio(totales.envio) %></dd>
+          <dd data-total="envio"><%= !entregaElegida ? 'Elegí la entrega' : totales.envio === null ? (entregaPorProvincia && !v('provincia') ? 'Elegí la provincia' : 'A coordinar') : totales.envio === 0 ? 'Gratis' : formatearPrecio(totales.envio) %></dd>
         </div>
         <div class="resumen-total">
           <dt>Total</dt>

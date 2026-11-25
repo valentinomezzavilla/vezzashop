@@ -28,7 +28,7 @@ import { formatearFecha, formatearPrecio } from '../util/formato.js';
 import { leerEventos, armarSeguimiento, tituloParaCliente } from '../envios.js';
 import { urlPanel } from '../util/dominios.js';
 import { crearLimite } from '../util/limite.js';
-import { estadoCheckout, textoCosto, instruccionesMercadopago, DETALLE_MERCADOPAGO_EN_LINEA } from '../pagos.js';
+import { estadoCheckout, textoCosto, costoParaProvincia, dependeDeProvincia, instruccionesMercadopago, DETALLE_MERCADOPAGO_EN_LINEA } from '../pagos.js';
 import { iniciarCobro, sincronizarPedido } from '../cobros-mp.js';
 import {
   leerItems,
@@ -394,16 +394,18 @@ export function rutasTienda({ db, config, notificar = async () => false }) {
   // a calcular acá con los precios y el stock de la base: lo que manda el navegador es solo qué y cuánto.
 
   // Las opciones de entrega y pago listas para mostrar, con lo que necesita el script para recalcular el total.
-  function opcionesCheckout(req, subtotal) {
+  // `provincia`: la que eligió el comprador ('' si todavía no): las entregas con precio por provincia cobran según ella.
+  function opcionesCheckout(req, subtotal, provincia = '') {
     const { entregas, pagos } = req.checkout;
     return {
       entregas: entregas.map((e) => {
-        const envio = costoEnvio(e, subtotal);
+        const envio = costoEnvio(e, subtotal, provincia);
         return {
           ...e,
-          textoCosto: envio === 0 && e.costo > 0 ? 'Gratis' : textoCosto(e),
+          textoCosto: envio === 0 && costoParaProvincia(e, provincia) > 0 ? 'Gratis' : textoCosto(e, provincia),
           // "Gratis desde $X" solo si todavía no se llegó.
-          textoGratis: e.gratisDesde !== null && envio !== 0 ? `Gratis desde ${formatearPrecio(e.gratisDesde)}` : null,
+          // Se mira el subtotal y no el envío: con precios por provincia y sin provincia elegida el envío todavía es desconocido (null).
+          textoGratis: e.gratisDesde !== null && subtotal < e.gratisDesde ? `Gratis desde ${formatearPrecio(e.gratisDesde)}` : null,
         };
       }),
       pagos: pagos.map((p) => ({
@@ -419,7 +421,8 @@ export function rutasTienda({ db, config, notificar = async () => false }) {
   // sinItems: se entró a /checkout sin productos en la URL (el script usa el carrito guardado en el navegador).
   function mostrarCheckout(req, res, { lineas, cambios = [], valores = {}, errores = {}, status = 200, sinItems = false }) {
     const subtotal = subtotalDe(lineas);
-    const { entregas, pagos } = opcionesCheckout(req, subtotal);
+    const provincia = valores.provincia ?? '';
+    const { entregas, pagos } = opcionesCheckout(req, subtotal, provincia);
     // Si hay una sola opción, ya viene elegida.
     const elegida = {
       entrega: valores.entrega ?? (entregas.length === 1 ? String(entregas[0].id) : ''),
@@ -439,11 +442,14 @@ export function rutasTienda({ db, config, notificar = async () => false }) {
       entregas,
       pagos,
       entregaElegida: entrega,
-      totales: calcularTotales(subtotal, entrega, pago),
+      // El costo de la entrega elegida para la provincia elegida (null: se coordina después; undefined: no hay entrega elegida).
+      costoEntregaElegida: entrega ? costoParaProvincia(entrega, provincia) : undefined,
+      entregaPorProvincia: Boolean(entrega && dependeDeProvincia(entrega)),
+      totales: calcularTotales(subtotal, entrega, pago, provincia),
       provincias: PROVINCIAS,
       datosCheckout: jsonEnScript({
         subtotal,
-        entregas: entregas.map(({ id, tipo, costo, gratisDesde, aceptaEfectivo }) => ({ id: String(id), tipo, costo, gratisDesde, aceptaEfectivo })),
+        entregas: entregas.map(({ id, tipo, costo, gratisDesde, aceptaEfectivo, preciosProvincia }) => ({ id: String(id), tipo, costo, gratisDesde, aceptaEfectivo, preciosProvincia })),
         pagos: pagos.map(({ clave, descuento, enLinea }) => ({ clave, descuento, enLinea: Boolean(enLinea) })),
         carrito: lineas.map(({ sku, cantidad }) => ({ sku, cantidad })),
         sinItems,

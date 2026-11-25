@@ -11,8 +11,10 @@ import { crearTienda } from '../src/tiendas.js';
 import { interpretarHoja } from '../src/importacion/interpretar.js';
 import { aplicarImportacion } from '../src/importacion/aplicar.js';
 import { leerAjustes, actualizarAjustes } from '../src/diseno.js';
-import { validarPagos, validarMetodoEntrega, crearMetodoEntrega } from '../src/pagos.js';
-import { calcularTotales, costoEnvio, leerItems, telefonoParaWhatsapp } from '../src/pedidos.js';
+import { validarPagos, validarMetodoEntrega, crearMetodoEntrega, costoParaProvincia, textoCosto, listarMetodosEntrega, leerMetodoEntrega } from '../src/pagos.js';
+import { PROVINCIAS } from '../src/provincias.js';
+import { precioParaEditar } from '../src/productos.js';
+import { calcularTotales, costoEnvio, leerItems, telefonoParaWhatsapp, validarCheckout } from '../src/pedidos.js';
 import { crearNavegador, pedirConHost, enviarConHost } from './ayudantes.js';
 
 let servidor;
@@ -88,6 +90,32 @@ test('el envío es gratis desde el monto configurado, y a coordinar no suma al t
     subtotal: 3000000, descuentoPorcentaje: 10, descuento: 300000, envio: 450000, total: 3150000,
   }, 'el descuento es solo sobre los productos');
   assert.equal(calcularTotales(3000000, { costo: null, gratisDesde: null }, null).total, 3000000);
+});
+
+test('el costo del envío sigue a la provincia: sin precio propio rige el base, y 0 es gratis', () => {
+  const pais = { costo: 800000, gratisDesde: 6000000, preciosProvincia: { Córdoba: 450000, Jujuy: 0, 'Tierra del Fuego': 1200000 } };
+  assert.equal(costoParaProvincia(pais, 'Córdoba'), 450000);
+  assert.equal(costoParaProvincia(pais, 'Santa Fe'), 800000);
+  assert.equal(costoParaProvincia(pais, 'Jujuy'), 0, 'un 0 cargado es gratis, no "usar el base"');
+  assert.equal(costoEnvio(pais, 3000000, 'Córdoba'), 450000);
+  assert.equal(costoEnvio(pais, 6000000, 'Tierra del Fuego'), 0, 'gratis desde vale sobre el precio de la provincia');
+  assert.equal(costoEnvio(pais, 3000000, ''), null, 'con tabla y sin provincia todavía no se sabe');
+  const coordinar = { costo: null, gratisDesde: null, preciosProvincia: { Córdoba: 450000 } };
+  assert.equal(costoEnvio(coordinar, 3000000, 'Córdoba'), 450000);
+  assert.equal(costoEnvio(coordinar, 3000000, 'Salta'), null, 'base a coordinar: la provincia sin precio queda a coordinar');
+  assert.equal(costoEnvio({ costo: 450000, gratisDesde: null }, 3000000, 'Salta'), 450000, 'sin tabla nada cambia');
+  assert.equal(calcularTotales(3000000, pais, null, 'Córdoba').total, 3450000);
+  assert.equal(textoCosto(pais), 'Según provincia');
+  assert.equal(textoCosto(pais, 'Jujuy'), 'Gratis');
+  assert.match(textoCosto(pais, 'Córdoba'), /4\.500,00/);
+});
+
+test('Mercado Pago en línea: que el costo se coordine depende de la provincia', () => {
+  const entrega = { id: 1, tipo: 'domicilio', nombre: 'Todo el país', costo: null, gratisDesde: null, aceptaEfectivo: false, preciosProvincia: { Córdoba: 450000 } };
+  const pagos = [{ clave: 'mercadopago', descuento: 0, enLinea: true }];
+  const campos = { nombre: 'Lucía Gómez', telefono: '351 15 123 4567', entrega: '1', pago: 'mercadopago', calle: 'Obispo Trejo 300', ciudad: 'Córdoba' };
+  assert.equal(validarCheckout({ ...campos, provincia: 'Córdoba' }, { entregas: [entrega], pagos }).errores.pago, undefined);
+  assert.match(validarCheckout({ ...campos, provincia: 'Salta' }, { entregas: [entrega], pagos }).errores.pago, /Mercado Pago/);
 });
 
 test('leerItems junta repetidos, ignora basura y pone topes', async () => {
@@ -344,4 +372,92 @@ test('Envíos y pagos: modelos para empezar, editar, pausar y no guardar formas 
   assert.match(await mal.text(), /escribí tu alias o tu CBU/);
   assert.equal((await leerAjustes(db, tiendaId)).pagoTransferencia, false);
   assert.equal((await leerAjustes(db, tiendaId)).direccion, 'Bv. San Juan 567', 'guardar pagos no toca el resto de los ajustes');
+});
+
+// ---------- Precio por provincia ----------
+
+const campo = (provincia) => `precioProvincia_${PROVINCIAS.indexOf(provincia)}`;
+
+test('validarMetodoEntrega lee el precio por provincia', () => {
+  const ok = validarMetodoEntrega({ tipo: 'domicilio', nombre: 'Todo el país', costo: '8000', [campo('Córdoba')]: '4.500', [campo('Jujuy')]: '0', [campo('Salta')]: '  ' });
+  assert.deepEqual(ok.errores, {});
+  assert.deepEqual(ok.datos.preciosProvincia, { Córdoba: 450000, Jujuy: 0 }, 'vacío usa el base; 0 es gratis');
+  const mal = validarMetodoEntrega({ tipo: 'domicilio', nombre: 'X', costo: '8000', [campo('Córdoba')]: 'abc', [campo('Chaco')]: '2000' });
+  assert.deepEqual(Object.keys(mal.errores), [campo('Córdoba')], 'solo marca el campo con problemas');
+  assert.equal(mal.formulario.preciosProvincia.Chaco, '2000', 'conserva lo escrito');
+  assert.deepEqual(validarMetodoEntrega({ tipo: 'retiro', nombre: 'Local', costo: '0', [campo('Córdoba')]: '4500' }).datos.preciosProvincia, {});
+  const coordinar = validarMetodoEntrega({ tipo: 'domicilio', nombre: 'Correo', aCoordinar: '1', gratisDesde: '60000', [campo('Córdoba')]: '4500' });
+  assert.equal(coordinar.datos.gratisDesde, 6000000, '"gratis desde" se conserva si alguna provincia tiene precio');
+});
+
+test('el precio por provincia se guarda, se edita, se limpia al pasar a retiro y se borra con la forma de entrega', async () => {
+  const { nav, tiendaId } = await tienda('porprovincia');
+  const datos = { tipo: 'domicilio', nombre: 'Todo el país', costo: '8000', activo: '1' };
+  assert.equal((await nav.enviar('/admin/pagos/entregas/nueva', { ...datos, [campo('Córdoba')]: '4500', [campo('Jujuy')]: '0' })).status, 302);
+  const [metodo] = await listarMetodosEntrega(db, tiendaId);
+  assert.deepEqual(metodo.preciosProvincia, { Córdoba: 450000, Jujuy: 0 });
+  const formulario = await (await nav.pedir(`/admin/pagos/entregas/${metodo.id}`)).text();
+  assert.match(formulario, new RegExp(`name="${campo('Córdoba')}"[^>]*value="${precioParaEditar(450000)}"`));
+  await nav.enviar(`/admin/pagos/entregas/${metodo.id}`, { ...datos, [campo('Salta')]: '6000' });
+  assert.deepEqual((await leerMetodoEntrega(db, tiendaId, metodo.id)).preciosProvincia, { Salta: 600000 }, 'editar reemplaza la tabla');
+  await nav.enviar(`/admin/pagos/entregas/${metodo.id}`, { tipo: 'retiro', nombre: 'Local', costo: '0', activo: '1', [campo('Salta')]: '6000' });
+  assert.deepEqual((await leerMetodoEntrega(db, tiendaId, metodo.id)).preciosProvincia, {}, 'un retiro no lleva tabla');
+  await nav.enviar(`/admin/pagos/entregas/${metodo.id}`, { ...datos, [campo('Salta')]: '6000' });
+  await nav.enviar(`/admin/pagos/entregas/${metodo.id}/borrar`, {});
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM metodo_entrega_provincias').get()).n, 0);
+});
+
+test('el checkout cobra el envío según la provincia elegida', async () => {
+  const { nav, tiendaId } = await tienda('porprov');
+  await configurar(nav);
+  await nav.enviar('/admin/pagos/entregas/nueva', {
+    tipo: 'domicilio', nombre: 'Correo a provincias', costo: '8000', gratisDesde: '100000', activo: '1',
+    [campo('Córdoba')]: '4500', [campo('Tierra del Fuego')]: '12000',
+  });
+  const correo = (await listarMetodosEntrega(db, tiendaId)).find((e) => e.nombre === 'Correo a provincias');
+  const pagina = (await vidriera('porprov', '/checkout?sku=BUZO-M&cantidad=1')).cuerpo;
+  assert.match(pagina, new RegExp(`data-entrega-costo="${correo.id}">Según provincia<`));
+  const datos = JSON.parse(pagina.match(/<script type="application\/json" id="datos-checkout">([^<]+)<\/script>/)[1]);
+  assert.deepEqual(datos.entregas.find((e) => e.id === String(correo.id)).preciosProvincia, { Córdoba: 450000, 'Tierra del Fuego': 1200000 });
+
+  const comprarEn = (provincia) => comprar('porprov', [
+    ['sku', 'BUZO-M'], ['cantidad', '1'], ...Object.entries(CLIENTE), ...Object.entries({ ...DIRECCION, provincia }),
+    ['entrega', String(correo.id)], ['pago', 'transferencia'],
+  ]);
+  const envioDe = async (provincia) => {
+    const respuesta = await comprarEn(provincia);
+    assert.equal(respuesta.status, 303);
+    return (await db.prepare('SELECT envio_centavos FROM pedidos WHERE token = ?').get(respuesta.location.match(/\/pedido\/([\w-]+)/)[1])).envio_centavos;
+  };
+  // Primero los rechazos: el buzo tiene stock para 3 compras, y con el carrito vacío no se llegaría a validar la provincia.
+  const sinProvincia = await comprarEn('');
+  assert.equal(sinProvincia.status, 400);
+  assert.match(sinProvincia.cuerpo, /Elegí la provincia/);
+  assert.equal((await comprarEn('Narnia')).status, 400, 'una provincia inventada se rechaza');
+  const conError = await comprar('porprov', [
+    ['sku', 'BUZO-M'], ['cantidad', '1'], ['nombre', 'Lu'], ['telefono', '12'], ...Object.entries({ ...DIRECCION, provincia: 'Córdoba' }),
+    ['entrega', String(correo.id)], ['pago', 'transferencia'],
+  ]);
+  assert.equal(conError.status, 400);
+  assert.match(conError.cuerpo, new RegExp(`data-entrega-costo="${correo.id}">\\$\\s4\\.500,00<`), 'al volver con errores muestra el costo de la provincia');
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId)).n, 0, 'los rechazos no crean pedidos');
+
+  assert.equal(await envioDe('Córdoba'), 450000);
+  assert.equal(await envioDe('Santa Fe'), 800000, 'sin precio propio rige el base');
+  assert.equal(await envioDe('Tierra del Fuego'), 1200000);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM pedidos WHERE tienda_id = ?').get(tiendaId)).n, 3);
+});
+
+test('con precios por provincia, el aviso "Gratis desde" no aparece si la compra ya llegó al monto', async () => {
+  const { nav, tiendaId } = await tienda('gratisprov');
+  await configurar(nav);
+  await nav.enviar('/admin/pagos/entregas/nueva', {
+    tipo: 'domicilio', nombre: 'Correo con tabla', costo: '8000', gratisDesde: '20000', activo: '1', [campo('Córdoba')]: '4500',
+  });
+  const correo = (await listarMetodosEntrega(db, tiendaId)).find((e) => e.nombre === 'Correo con tabla');
+  const compraChica = (await vidriera('gratisprov', '/checkout?sku=GORRA&cantidad=1')).cuerpo;
+  assert.match(compraChica, /Gratis desde \$\s20\.000,00/, 'con $5.000 todavía no llegó: se avisa');
+  const compraGrande = (await vidriera('gratisprov', '/checkout?sku=BUZO-M&cantidad=1')).cuerpo;
+  assert.match(compraGrande, new RegExp(`data-entrega-costo="${correo.id}">Según provincia<`));
+  assert.doesNotMatch(compraGrande, /Gratis desde \$\s20\.000,00/, 'con $30.000 ya llegó: no se avisa');
 });

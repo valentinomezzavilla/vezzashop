@@ -449,22 +449,32 @@ if (formProducto) {
   });
 }
 
-// ---------- Forma de entrega: costo a coordinar ----------
-// Si el costo se coordina después, los montos no se usan: se deshabilitan para que quede claro.
+// ---------- Forma de entrega: costo a coordinar y precio por provincia ----------
+// Si el costo se coordina después, el costo base no se usa: se deshabilita para que quede claro. "Gratis desde" sigue valiendo
+// si alguna provincia tiene su propio precio. La tabla de precios por provincia solo tiene sentido en un envío a domicilio.
 
 const aCoordinar = document.querySelector('[data-a-coordinar]');
 if (aCoordinar) {
-  const montos = document.querySelectorAll('[data-costo], [data-gratis-desde]');
+  const costoBase = document.querySelector('[data-costo]');
+  const gratisDesde = document.querySelector('[data-gratis-desde]');
   const tipos = document.querySelectorAll('[data-form-entrega] input[name="tipo"]');
+  const tabla = document.querySelector('[data-precios-provincia]');
+  const preciosProvincia = document.querySelectorAll('[data-precio-provincia]');
   const actualizar = () => {
-    for (const campo of montos) campo.disabled = aCoordinar.checked;
+    const tipo = document.querySelector('[data-form-entrega] input[name="tipo"]:checked');
+    const conTabla = tabla !== null && !(tipo && tipo.value === 'retiro');
+    if (tabla) tabla.hidden = !conTabla;
+    const hayPrecioPorProvincia = conTabla && [...preciosProvincia].some((campo) => campo.value.trim() !== '');
+    costoBase.disabled = aCoordinar.checked;
+    gratisDesde.disabled = aCoordinar.checked && !hayPrecioPorProvincia;
   };
   aCoordinar.addEventListener('change', actualizar);
+  for (const campo of preciosProvincia) campo.addEventListener('input', actualizar);
   // Un retiro casi siempre es gratis: si se elige y el costo está vacío, se completa con 0.
   for (const tipo of tipos) {
     tipo.addEventListener('change', () => {
-      const costo = document.querySelector('[data-costo]');
-      if (tipo.checked && tipo.value === 'retiro' && costo.value.trim() === '' && !aCoordinar.checked) costo.value = '0';
+      if (tipo.checked && tipo.value === 'retiro' && costoBase.value.trim() === '' && !aCoordinar.checked) costoBase.value = '0';
+      actualizar();
     });
   }
   actualizar();
