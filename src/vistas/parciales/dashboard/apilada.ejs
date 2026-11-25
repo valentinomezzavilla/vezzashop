@@ -1,0 +1,17 @@
+<%# Una barra dividida en partes (cada una con su color) y la leyenda con los números. Los colores nunca van solos: todo se dice con texto.
+    Datos: partes = [{ titulo, valor (para el tamaño), texto (el número), nota?, color (c1 a c6 o estado-*), url? }], descripcion. %>
+<% const total = partes.reduce((suma, p) => suma + p.valor, 0) %>
+<div class="apilada" role="img" aria-label="<%= descripcion %>">
+  <% for (const p of partes) { %><% if (p.valor > 0) { %><span class="<%= p.color %>" style="flex-grow: <%= p.valor %>" title="<%= p.titulo %>: <%= p.texto %>"></span><% } %><% } %>
+  <% if (total === 0) { %><span class="apilada-vacia"></span><% } %>
+</div>
+<ul class="leyenda">
+  <% for (const p of partes) { %>
+    <li>
+      <span class="leyenda-punto <%= p.color %>" aria-hidden="true"></span>
+      <span class="leyenda-nombre"><% if (p.url) { %><a href="<%= p.url %>"><%= p.titulo %></a><% } else { %><%= p.titulo %><% } %></span>
+      <strong><%= p.texto %></strong>
+      <% if (p.nota) { %><span class="ayuda"><%= p.nota %></span><% } %>
+    </li>
+  <% } %>
+</ul>

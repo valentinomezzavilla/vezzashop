@@ -3,6 +3,8 @@ import express from 'express';
 import multer from 'multer';
 import { verificarCsrf } from '../csrf.js';
 import { resumenTienda } from '../inicio.js';
+import { datosDashboard } from '../dashboard.js';
+import { prepararVista } from '../dashboard-vista.js';
 import {
   FILTROS,
   esFiltro,
@@ -53,7 +55,13 @@ export function rutasAdminTienda({ db, config }) {
 
   router.get('/inicio', async (req, res) => {
     const tienda = await buscarTienda(db, req.session.usuario.tiendaId);
-    res.render('admin/inicio', { resumen: await resumenTienda(db, tienda.id), tienda, limites: await limitesDeTienda(db, tienda.id) });
+    const [resumen, limites, datos] = await Promise.all([
+      resumenTienda(db, tienda.id),
+      limitesDeTienda(db, tienda.id),
+      // La card "Dashboard": el panel y el período salen de la URL (?panel=ventas&periodo=7d), y solo se calcula ese panel.
+      datosDashboard(db, tienda.id, req.query),
+    ]);
+    res.render('admin/inicio', { resumen, tienda, limites, dashboard: prepararVista(datos) });
   });
 
   // ---------- Productos ----------

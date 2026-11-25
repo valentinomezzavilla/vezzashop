@@ -12,7 +12,7 @@ es manual (link de pago de Mercado Pago que manda la tienda; ver [Qué falta](#q
 
 | Sección | Qué hace el cliente |
 |---|---|
-| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. |
+| **Inicio** | Ve el link de su tienda, el aviso de pedidos nuevos, números (visibles, ocultos, sin stock, unidades), el **Dashboard** con las estadísticas del negocio (ver más abajo), una lista de pasos para completar la tienda y alertas de productos sin stock o con pocas unidades. |
 | **Pedidos** | Ve los pedidos que llegan desde la tienda (por atender, nuevos, pagados, enviados, entregados, cancelados), busca por número, nombre, teléfono o email, y en cada uno: productos, datos del cliente, entrega, pago, el próximo paso con un botón ("Marcar como pagado", "Enviado" / "Listo para retirar", "Entregado"), WhatsApp al cliente y cancelar (devuelve el stock). |
 | **Productos** | Busca por nombre, marca o SKU; filtra (visibles, ocultos, destacados, sin stock, sin foto); oculta o destaca con un clic; crea, edita y borra productos, también varios a la vez (se marcan en la lista y se confirma viendo cuáles). |
 | **Editor de producto** | Nombre, descripción, marca, visible, destacado, categorías y variantes (hasta 3 tipos, por ejemplo Talle y Color) con SKU, precio, oferta y stock. Crea todas las combinaciones de una vez y aplica un precio o stock a todas las variantes. Hasta 10 fotos por producto, ordenables; la primera es la principal. |
@@ -26,6 +26,33 @@ Todos los campos de clave (ingreso y cambio de clave, en el panel y en la plataf
 que se escribe; `admin.js` lo agrega solo y la clave vuelve a ocultarse al enviar el formulario.
 
 Los productos **destacados** aparecen en una sección propia arriba de la portada (hasta 8).
+
+### Dashboard (en Inicio)
+
+Una card con las estadísticas del negocio, con un período a elegir (hoy, 7, 30 o 90 días, este mes, mes pasado, este año, todo, o fechas
+a elección) y seis paneles. Los links son comunes (`/admin/inicio?panel=ventas&periodo=7d#dashboard`), sin JavaScript, y cada panel calcula solo
+lo suyo. Casi todos los números se comparan con el período anterior (los mismos días de antes, el mismo tramo del mes o del año anterior).
+
+| Panel | Qué muestra |
+|---|---|
+| **Resumen** | Ventas, pedidos, ticket promedio, unidades, clientes y lo que falta confirmar; ventas por día (o por semana o mes), productos más vendidos, estado de los pedidos y formas de pago. Avisa de los pedidos que esperan hace días. |
+| **Ventas** | De dónde sale la plata (productos − descuentos + envíos), ventas por día con su tabla, pedidos por día de la semana y por hora, formas de pago y de entrega, ventas por provincia, ciudad y categoría. |
+| **Pedidos** | Recibidos, concretados, por confirmar y cancelados (con su tasa), tiempo promedio hasta entregar, pedidos según su estado, qué está demorado y cuándo llegan. |
+| **Clientes** | Clientes que compraron, nuevos y recurrentes, tasa de recompra, gasto y pedidos por cliente, clientes por provincia y los que más compran (con WhatsApp). |
+| **Productos** | Más vendidos por facturación y por unidades, variantes más vendidas, ventas por categoría, productos sin ventas y cómo está armado el catálogo. |
+| **Stock** | Unidades y valor del stock a precio de venta, qué se agota pronto (según las ventas del último mes), qué no se mueve hace 90 días y dónde está la plata en stock. |
+
+Cómo se cuenta (todo está en `src/dashboard.js`):
+
+- **Ventas** son los pedidos *pagados, enviados y entregados*. Los *nuevos* (todavía sin pago) van aparte como "por confirmar" y los *cancelados* no suman nunca.
+  El total de cada venta es el del pedido: productos − descuento de la forma de pago + envío.
+- Los días y las horas son **de Argentina** (UTC−3 todo el año): la base guarda la hora en UTC, así que un día va de las 03:00 UTC a las 03:00 UTC del siguiente.
+- Un **cliente** es un teléfono (los últimos 10 dígitos, así "351 15 123 4567" y "+54 9 351 123 4567" son la misma persona), porque el email es opcional.
+  *Nuevo* es el que hizo su primera compra concretada dentro del período; *recurrente*, el que ya había comprado antes.
+- Las **categorías** suman en la de primer nivel (lo de Buzos va en Abrigos). Lo que no tiene categoría, o ya no está en el catálogo, va a "Sin categoría".
+- Las cuentas salen de lo guardado en cada pedido (nombres, precios, forma de entrega), así que no cambian si después se edita o se borra un producto.
+- Con muchos pedidos sigue rápido: usa el índice `pedidos_por_fecha` (migración `011_estadisticas.sql`). Con 100.000 pedidos, cada panel de 30 días
+  responde en menos de 250 ms, y el de todo el historial en alrededor de 1 segundo.
 
 ## Requisitos
 
@@ -394,6 +421,8 @@ src/
   productos.js           productos desde el panel: listado, validación, guardado y fotos
   categorias.js          árbol de categorías del panel, alta, edición y borrado
   inicio.js              datos del tablero de Inicio
+  dashboard.js           estadísticas del Dashboard: períodos y consultas de ventas, pedidos, clientes, productos y stock
+  dashboard-vista.js     links de cada período y panel, y los gráficos ya armados para las vistas
   vidriera.js            consultas de la vidriera pública
   diseno.js              ajustes de diseño de cada tienda y banners
   pagos.js               formas de entrega y de pago (Envíos y pagos)
@@ -420,6 +449,7 @@ src/
   rutas/tienda.js        vidriera (catálogo, destacados, categorías, ficha, checkout y pedido)
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   util/iconos.js         íconos SVG de las vistas
+  util/grafico.js        cuentas de los gráficos de columnas (alturas y ejes); el dibujo es HTML y CSS en vistas/parciales/dashboard/
   util/vezza.js          logo y firma de Vezza (SVG de publico/vezza/ incrustado en las vistas)
   vistas/                pantallas (EJS): admin/, tienda/ y parciales/
   publico/               CSS y scripts del panel (admin.js) y de la vidriera (tienda.js)
@@ -442,6 +472,8 @@ Etapas siguientes, en orden sugerido:
 4. Dominio propio por cliente.
 5. Páginas institucionales (cambios, cómo comprar), botón de arrepentimiento, SEO, píxel de Meta y GA4.
 6. Foto por color en las variantes.
-7. Para producción: límite de intentos de login en el panel de cada tienda (el de `/plataforma` ya lo tiene), que cada dueño
+7. Visitas a la tienda y tasa de conversión en el Dashboard: hoy la vidriera no registra visitas, así que el Dashboard solo
+   cuenta lo que pasa desde el pedido en adelante.
+8. Para producción: límite de intentos de login en el panel de cada tienda (el de `/plataforma` ya lo tiene), que cada dueño
    recupere su clave solo (hoy se la genera el administrador desde `/plataforma`), cerrar otras sesiones al cambiar la clave,
    programar las copias de seguridad de la base en Coolify (pestaña Backups del recurso PostgreSQL).

@@ -8,7 +8,8 @@ import { rutasAdmin } from './rutas/admin.js';
 import { rutasTienda } from './rutas/tienda.js';
 import { rutasPlataforma } from './rutas/plataforma.js';
 import { buscarTiendaPorSlug, enlaceActualDeAnterior } from './tiendas.js';
-import { formatearPrecio } from './util/formato.js';
+import { formatearPrecio, formatearPesos, formatearNumero, formatearPorcentaje, formatearDuracion, formatearFecha, plural } from './util/formato.js';
+import { telefonoParaWhatsapp } from './pedidos.js';
 import { formatearDia } from './util/fechas.js';
 import { icono } from './util/iconos.js';
 import { vezza } from './util/vezza.js';
@@ -26,6 +27,13 @@ export function crearApp({ db, config }) {
   app.set('view engine', 'ejs');
   Object.assign(app.locals, {
     formatearPrecio,
+    formatearPesos,
+    formatearNumero,
+    formatearPorcentaje,
+    formatearDuracion,
+    formatearFecha,
+    plural,
+    telefonoParaWhatsapp,
     formatearDia,
     icono,
     vezza,

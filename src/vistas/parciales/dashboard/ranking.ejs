@@ -1,0 +1,18 @@
+<%# Lista ordenada con una barra al lado de cada renglón.
+    Datos: filas = [{ nombre, detalle?, url?, valor (texto), ancho (0 a 100), nota?, tono? ('rojo' o 'ambar'), accion? { url, etiqueta, icono } }]. %>
+<ol class="ranking">
+  <% for (const fila of filas) { %>
+    <li>
+      <div class="ranking-fila">
+        <span class="ranking-nombre">
+          <% if (fila.url) { %><a href="<%= fila.url %>"><%= fila.nombre %></a><% } else { %><%= fila.nombre %><% } %>
+          <% if (fila.detalle) { %><span class="ayuda">· <%= fila.detalle %></span><% } %>
+        </span>
+        <strong class="ranking-valor"><%= fila.valor %></strong>
+        <% if (fila.accion) { %><a class="boton boton-secundario boton-icono-chico" href="<%= fila.accion.url %>" target="_blank" rel="noopener" aria-label="<%= fila.accion.etiqueta %>" title="<%= fila.accion.etiqueta %>"><%- icono(fila.accion.icono, { tamano: 16 }) %></a><% } %>
+      </div>
+      <div class="ranking-barra" aria-hidden="true"><span<%- fila.tono ? ` class="tono-${fila.tono}"` : '' %> style="width: <%= fila.ancho %>%"></span></div>
+      <% if (fila.nota) { %><span class="ayuda"><%= fila.nota %></span><% } %>
+    </li>
+  <% } %>
+</ol>

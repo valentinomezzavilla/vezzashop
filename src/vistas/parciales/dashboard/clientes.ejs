@@ -1,0 +1,63 @@
+<%# Panel "Clientes": quiénes compran, cuántos vuelven y quiénes compran más. Un cliente es un teléfono. %>
+<% const { totales: t, cambios, periodo, clientes: c, lugares } = d %>
+<% const parte = (a, b) => (b ? a / b : 0) %>
+<% const comparado = periodo.anterior ? periodo.anterior.titulo : '' %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Clientes que compraron', valor: formatearNumero(c.activos), cambio: cambios?.clientes, comparado, nota: 'Con pedidos concretados en el período' }) %>
+  <%- include('kpi', { etiqueta: 'Clientes nuevos', valor: formatearNumero(c.nuevos), nota: 'Su primera compra fue en este período' }) %>
+  <%- include('kpi', { etiqueta: 'Clientes que volvieron', valor: formatearNumero(c.recurrentes), nota: 'Ya habían comprado antes' }) %>
+  <%- include('kpi', { etiqueta: 'Tasa de recompra', valor: c.total ? formatearPorcentaje(c.tasaRecompra) : '—', nota: `${formatearNumero(c.queVolvieron)} de ${plural(c.total, 'cliente', 'clientes')} ${c.queVolvieron === 1 ? 'compró' : 'compraron'} más de una vez` }) %>
+  <%- include('kpi', { etiqueta: 'Gasto por cliente', valor: c.activos ? formatearPesos(Math.round(t.ventas / c.activos)) : '—', nota: 'Promedio en el período' }) %>
+  <%- include('kpi', { etiqueta: 'Pedidos por cliente', valor: c.activos ? formatearNumero(Math.round((t.pedidos / c.activos) * 10) / 10) : '—', nota: 'Promedio en el período' }) %>
+</div>
+
+<div class="dash-bloques">
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Nuevos y recurrentes</h3>
+      <span class="ayuda">Clientes que compraron en el período</span>
+    </div>
+    <% if (!c.activos) { %>
+      <p class="estado-vacio-chico"><%- icono('usuario', { tamano: 18 }) %> Todavía no hay clientes que hayan comprado en este período.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Clientes nuevos y clientes que ya habían comprado', partes: [
+        { titulo: 'Nuevos', valor: c.nuevos, texto: formatearNumero(c.nuevos), nota: formatearPorcentaje(parte(c.nuevos, c.activos)), color: 'dc-1' },
+        { titulo: 'Recurrentes', valor: c.recurrentes, texto: formatearNumero(c.recurrentes), nota: formatearPorcentaje(parte(c.recurrentes, c.activos)), color: 'dc-2' },
+      ] }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Clientes por provincia</h3>
+      <span class="ayuda">Envíos a domicilio</span>
+    </div>
+    <% const porClientes = [...lugares.provincias].sort((a, b) => b.clientes - a.clientes || b.ventas - a.ventas) %>
+    <% if (!porClientes.length) { %>
+      <p class="estado-vacio-chico"><%- icono('ubicacion', { tamano: 18 }) %> Todavía no hay envíos a domicilio en este período.</p>
+    <% } else { %>
+      <% const mayor = porClientes[0].clientes %>
+      <%- include('ranking', { filas: porClientes.slice(0, 8).map((l) => ({
+        nombre: l.titulo, valor: plural(l.clientes, 'cliente', 'clientes'), ancho: Math.max(2, Math.round((l.clientes / mayor) * 100)), nota: formatearPesos(l.ventas),
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Los que más compran</h3>
+      <span class="ayuda">En el período, por lo que gastaron</span>
+    </div>
+    <% if (!c.mejores.length) { %>
+      <p class="estado-vacio-chico"><%- icono('usuario', { tamano: 18 }) %> Todavía no hay clientes que hayan comprado en este período.</p>
+    <% } else { %>
+      <% const mayor = c.mejores[0].total %>
+      <%- include('ranking', { filas: c.mejores.map((cliente) => ({
+        nombre: cliente.nombre, valor: formatearPesos(cliente.total), ancho: Math.max(2, Math.round((cliente.total / mayor) * 100)),
+        nota: `${plural(cliente.pedidos, 'pedido', 'pedidos')} · el último, el ${formatearFecha(cliente.ultima).split(',')[0]}`,
+        accion: { url: `https://wa.me/${telefonoParaWhatsapp(cliente.telefono)}`, etiqueta: `Escribirle por WhatsApp a ${cliente.nombre}`, icono: 'whatsapp' },
+      })) }) %>
+    <% } %>
+  </section>
+</div>

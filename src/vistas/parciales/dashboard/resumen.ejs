@@ -1,0 +1,88 @@
+<%# Panel "Resumen": los números principales, las ventas día por día y lo más importante de pedidos, productos y cobros. %>
+<% const { totales: t, cambios, periodo, graficos, estados, pagos, productos, demorados } = d %>
+<% const comparado = periodo.anterior ? periodo.anterior.titulo : '' %>
+<% const unidad = { dia: 'día', semana: 'semana', mes: 'mes' }[periodo.agrupar] %>
+
+<%- include('demorados', { demorados }) %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Ventas', valor: formatearPesos(t.ventas), cambio: cambios?.ventas, comparado, nota: 'Pedidos pagados, enviados y entregados' }) %>
+  <%- include('kpi', { etiqueta: 'Pedidos', valor: formatearNumero(t.pedidos), cambio: cambios?.pedidos, comparado, nota: `${formatearNumero(t.recibidos)} recibidos en total` }) %>
+  <%- include('kpi', { etiqueta: 'Ticket promedio', valor: formatearPesos(t.ticket), cambio: cambios?.ticket, comparado, nota: 'Lo que gasta cada pedido' }) %>
+  <%- include('kpi', { etiqueta: 'Unidades vendidas', valor: formatearNumero(t.unidades), cambio: cambios?.unidades, comparado, nota: t.pedidos ? `${formatearNumero(t.unidadesPorPedido)} por pedido` : '' }) %>
+  <%- include('kpi', { etiqueta: 'Clientes', valor: formatearNumero(t.clientes), cambio: cambios?.clientes, comparado, nota: 'Que compraron en el período' }) %>
+  <%- include('kpi', { etiqueta: 'Por confirmar', valor: formatearPesos(t.montoPorConfirmar), nota: `${plural(t.porConfirmar, 'pedido nuevo', 'pedidos nuevos')} sin pago confirmado` }) %>
+</div>
+
+<div class="dash-bloques">
+  <% if (d.momentos) { %>
+    <section class="dash-bloque dash-bloque-ancho">
+      <div class="dash-bloque-titulo">
+        <h3>Pedidos por hora</h3>
+        <span class="ayuda">Ventas de hoy: <%= formatearPesos(t.ventas) %></span>
+      </div>
+      <% if (!d.momentos.mejorHora) { %>
+        <p class="estado-vacio-chico"><%- icono('recibo', { tamano: 18 }) %> Todavía no llegaron pedidos hoy.</p>
+      <% } else { %>
+        <%- include('columnas', { grafico: graficos.horas, descripcion: `Pedidos de hoy por hora (hora argentina). La hora con más pedidos es de ${d.momentos.mejorHora.hora} a ${d.momentos.mejorHora.hora + 1} h.` }) %>
+      <% } %>
+    </section>
+  <% } else { %>
+    <section class="dash-bloque dash-bloque-ancho">
+      <div class="dash-bloque-titulo">
+        <h3>Ventas por <%= unidad %></h3>
+        <span class="ayuda">Total <%= formatearPesos(t.ventas) %></span>
+      </div>
+      <% if (t.pedidos === 0) { %>
+        <p class="estado-vacio-chico"><%- icono('recibo', { tamano: 18 }) %> Todavía no hay ventas en este período.</p>
+      <% } else { %>
+        <%- include('columnas', { grafico: graficos.ventas, descripcion: `Ventas por ${unidad}: ${formatearPesos(t.ventas)} en ${plural(t.pedidos, 'pedido', 'pedidos')}. Pasá el mouse por cada columna para ver el detalle.` }) %>
+      <% } %>
+    </section>
+  <% } %>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Productos más vendidos</h3>
+      <span class="ayuda">Por facturación</span>
+    </div>
+    <% if (!productos.porMonto.length) { %>
+      <p class="estado-vacio-chico"><%- icono('paquete', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <% const mayor = productos.porMonto[0].monto %>
+      <%- include('ranking', { filas: productos.porMonto.slice(0, 5).map((p) => ({
+        nombre: p.nombre, url: p.id ? `/admin/productos/${p.id}` : null, valor: formatearPesos(p.monto),
+        ancho: Math.max(2, Math.round((p.monto / mayor) * 100)), nota: plural(p.unidades, 'unidad', 'unidades'),
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Estado de los pedidos</h3>
+      <span class="ayuda"><%= plural(t.recibidos, 'pedido', 'pedidos') %></span>
+    </div>
+    <% if (!t.recibidos) { %>
+      <p class="estado-vacio-chico"><%- icono('recibo', { tamano: 18 }) %> No llegaron pedidos en este período.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Pedidos del período según su estado', partes: estados.map((e) => ({
+        titulo: e.titulo, valor: e.pedidos, texto: formatearNumero(e.pedidos), nota: formatearPorcentaje(e.porcentaje),
+        color: `dc-${e.estado}`, url: `/admin/pedidos?filtro=${e.estado}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Cómo te pagan</h3>
+      <span class="ayuda">Ventas por forma de pago</span>
+    </div>
+    <% if (!pagos.length) { %>
+      <p class="estado-vacio-chico"><%- icono('billete', { tamano: 18 }) %> Todavía no hay ventas para repartir por forma de pago.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Ventas del período por forma de pago', partes: pagos.map((p, n) => ({
+        titulo: p.titulo, valor: p.ventas, texto: formatearPesos(p.ventas), nota: `${formatearPorcentaje(p.porcentaje)} · ${plural(p.pedidos, 'pedido', 'pedidos')}`, color: `dc-${n + 1}`,
+      })) }) %>
+    <% } %>
+  </section>
+</div>

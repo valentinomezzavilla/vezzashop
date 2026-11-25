@@ -1,0 +1,94 @@
+<%# Panel "Stock": cuánto hay, cuánto vale, qué se está por acabar y qué no se mueve. No depende del período. %>
+<% const { inventario: i } = d %>
+<% const ancho = (valor, mayor) => Math.max(2, Math.round((valor / mayor) * 100)) %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Unidades en stock', valor: formatearNumero(i.unidades), nota: `En ${plural(i.variantes, 'variante', 'variantes')}` }) %>
+  <%- include('kpi', { etiqueta: 'Valor del stock', valor: formatearPesos(i.valorAPrecioDeVenta), nota: i.valorAPrecioDeLista !== i.valorAPrecioDeVenta ? `A precio de venta (${formatearPesos(i.valorAPrecioDeLista)} a precio de lista)` : 'A precio de venta' }) %>
+  <%- include('kpi', { etiqueta: 'Productos sin stock', valor: formatearNumero(i.productosSinStock), nota: `${plural(i.variantesSinStock, 'variante agotada', 'variantes agotadas')}` }) %>
+  <%- include('kpi', { etiqueta: 'Con pocas unidades', valor: formatearNumero(i.variantesConPocas), nota: `Variantes con ${i.pocasUnidades} o menos` }) %>
+</div>
+
+<div class="dash-bloques">
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Sin stock</h3>
+      <span class="ayuda"><%= i.productosSinStock > i.agotados.length ? `Los primeros ${i.agotados.length} de ${i.productosSinStock}` : plural(i.productosSinStock, 'producto', 'productos') %></span>
+    </div>
+    <% if (!i.agotados.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Ningún producto está agotado.</p>
+    <% } else { %>
+      <ul class="lista-alertas">
+        <% for (const p of i.agotados) { %>
+          <li><a href="/admin/productos/<%= p.id %>"><span><%= p.nombre %><% if (!p.visible) { %> <span class="ayuda">· oculto</span><% } %></span><%- icono('derecha', { tamano: 16 }) %></a></li>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Quedan pocas unidades</h3>
+      <span class="ayuda"><%= i.pocasUnidades %> o menos por variante</span>
+    </div>
+    <% if (!i.pocas.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Ninguna variante está por agotarse.</p>
+    <% } else { %>
+      <ul class="lista-alertas">
+        <% for (const v of i.pocas) { %>
+          <li>
+            <a href="/admin/productos/<%= v.id %>">
+              <span><%= v.nombre %><% if (v.valores) { %> <span class="ayuda">· <%= v.valores %></span><% } %></span>
+              <span class="pastilla pastilla-ambar"><%= v.stock %></span>
+            </a>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Se agotan pronto</h3>
+      <span class="ayuda">Si se vende como en los últimos <%= i.diasParaVender %> días</span>
+    </div>
+    <% if (!i.seAcaban.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Nada se agota en el próximo mes al ritmo de ventas actual.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: i.seAcaban.map((v) => ({
+        nombre: v.nombre, detalle: v.valores, url: `/admin/productos/${v.id}`, valor: v.dias === 1 ? 'Alcanza para 1 día' : `Alcanza para ${v.dias} días`,
+        ancho: Math.max(3, Math.round((v.dias / i.diasParaVender) * 100)), tono: v.dias <= 7 ? 'rojo' : v.dias <= 14 ? 'ambar' : null, nota: `Quedan ${plural(v.stock, 'unidad', 'unidades')} · se vendieron ${formatearNumero(v.unidades)} en el último mes`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Stock sin movimiento</h3>
+      <span class="ayuda">Sin ventas hace más de <%= i.dormido.dias %> días</span>
+    </div>
+    <% if (!i.dormido.lista.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Todos los productos con stock vendieron algo en los últimos <%= i.dormido.dias %> días.</p>
+    <% } else { %>
+      <p class="ayuda"><%= plural(i.dormido.total, 'producto tiene', 'productos tienen') %> stock parado por <%= formatearPesos(i.dormido.valor) %>.</p>
+      <%- include('ranking', { filas: i.dormido.lista.map((p) => ({
+        nombre: p.nombre, url: `/admin/productos/${p.id}`, valor: formatearPesos(p.valor), ancho: ancho(p.valor, i.dormido.lista[0].valor), nota: `${plural(p.unidades, 'unidad', 'unidades')} en stock`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Dónde está tu plata en stock</h3>
+      <span class="ayuda">Productos con más valor, a precio de venta</span>
+    </div>
+    <% if (!i.masStock.length) { %>
+      <p class="estado-vacio-chico"><%- icono('caja', { tamano: 18 }) %> Todavía no cargaste stock.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: i.masStock.map((p) => ({
+        nombre: p.nombre, url: `/admin/productos/${p.id}`, valor: formatearPesos(p.valor), ancho: ancho(p.valor, i.masStock[0].valor),
+        nota: `${plural(p.unidades, 'unidad', 'unidades')} · ${formatearPorcentaje(i.valorAPrecioDeVenta ? p.valor / i.valorAPrecioDeVenta : 0)} del total`,
+      })) }) %>
+    <% } %>
+  </section>
+</div>

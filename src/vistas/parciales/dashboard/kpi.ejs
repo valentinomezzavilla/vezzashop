@@ -1,0 +1,16 @@
+<%# Un número grande con su etiqueta y, si hay con qué comparar, cuánto cambió respecto del período anterior.
+    Datos: etiqueta, valor, nota (opcional), cambio (resultado de variacion() o nada), comparado (con qué se compara, para lectores de pantalla). %>
+<div class="dash-kpi">
+  <span class="dash-kpi-etiqueta"><%= etiqueta %></span>
+  <strong class="dash-kpi-valor"><%= valor %></strong>
+  <% if (locals.cambio) { %>
+    <span class="dash-cambio dash-cambio-<%= cambio.tipo %>">
+      <% if (cambio.tipo === 'sube') { %><%- icono('arriba', { tamano: 14 }) %>+<%= formatearNumero(Math.round(cambio.porcentaje * 100)) %>%
+      <% } else if (cambio.tipo === 'baja') { %><%- icono('abajo', { tamano: 14 }) %>−<%= formatearNumero(Math.round(Math.abs(cambio.porcentaje) * 100)) %>%
+      <% } else if (cambio.tipo === 'nuevo') { %>Nuevo
+      <% } else { %>Igual<% } %>
+      <span class="visualmente-oculto"> respecto de <%= comparado %></span>
+    </span>
+  <% } %>
+  <% if (locals.nota) { %><span class="ayuda"><%= nota %></span><% } %>
+</div>

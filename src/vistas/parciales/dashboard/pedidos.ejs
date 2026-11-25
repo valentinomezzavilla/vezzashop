@@ -1,0 +1,82 @@
+<%# Panel "Pedidos": cómo van los pedidos que llegan, qué está demorado y cuándo se compra. %>
+<% const { totales: t, cambios, periodo, graficos, estados, demorados, tiempo, momentos, entregas } = d %>
+<% const parte = (a, b) => (b ? a / b : 0) %>
+<% const comparado = periodo.anterior ? periodo.anterior.titulo : '' %>
+
+<%- include('demorados', { demorados }) %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Pedidos recibidos', valor: formatearNumero(t.recibidos), cambio: cambios?.recibidos, comparado, nota: 'Incluye nuevos y cancelados' }) %>
+  <%- include('kpi', { etiqueta: 'Concretados', valor: formatearNumero(t.pedidos), cambio: cambios?.pedidos, comparado, nota: t.recibidos ? `${formatearPorcentaje(t.pedidos / t.recibidos)} de los recibidos` : 'Pagados, enviados o entregados' }) %>
+  <%- include('kpi', { etiqueta: 'Por confirmar', valor: formatearNumero(t.porConfirmar), nota: `${formatearPesos(t.montoPorConfirmar)} sin pago confirmado` }) %>
+  <%- include('kpi', { etiqueta: 'Cancelados', valor: formatearNumero(t.cancelados), nota: t.recibidos ? `${formatearPorcentaje(t.tasaCancelacion)} de los recibidos · ${formatearPesos(t.montoCancelados)}` : 'Ninguno' }) %>
+  <%- include('kpi', { etiqueta: 'Tiempo hasta entregar', valor: tiempo ? formatearDuracion(tiempo.segundos) : '—', nota: tiempo ? `Promedio de ${plural(tiempo.pedidos, 'pedido entregado', 'pedidos entregados')}` : 'Todavía no hay pedidos entregados' }) %>
+  <%- include('kpi', { etiqueta: 'Unidades por pedido', valor: t.pedidos ? formatearNumero(t.unidadesPorPedido) : '—', nota: 'En los pedidos concretados' }) %>
+</div>
+
+<div class="dash-bloques">
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Pedidos según su estado</h3>
+      <span class="ayuda">Del período elegido</span>
+    </div>
+    <% if (!t.recibidos) { %>
+      <p class="estado-vacio-chico"><%- icono('recibo', { tamano: 18 }) %> No llegaron pedidos en este período.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Pedidos del período según su estado', partes: estados.map((e) => ({
+        titulo: e.titulo, valor: e.pedidos, texto: formatearNumero(e.pedidos),
+        nota: `${formatearPorcentaje(e.porcentaje)} · ${formatearPesos(e.monto)}`, color: `dc-${e.estado}`, url: `/admin/pedidos?filtro=${e.estado}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Pedidos por día de la semana</h3>
+      <% if (momentos.mejorDia) { %><span class="ayuda">Más movimiento: <%= momentos.mejorDia.nombre.toLowerCase() %></span><% } %>
+    </div>
+    <% if (!momentos.mejorDia) { %>
+      <p class="estado-vacio-chico"><%- icono('reloj', { tamano: 18 }) %> Todavía no hay pedidos para comparar.</p>
+    <% } else { %>
+      <%- include('columnas', { grafico: graficos.diasDeLaSemana, descripcion: `Pedidos por día de la semana. El día con más pedidos es el ${momentos.mejorDia.nombre.toLowerCase()}, con ${plural(momentos.mejorDia.pedidos, 'pedido', 'pedidos')}.` }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Pedidos por hora</h3>
+      <% if (momentos.mejorHora) { %><span class="ayuda">Más movimiento: de <%= momentos.mejorHora.hora %> a <%= momentos.mejorHora.hora + 1 %> h</span><% } %>
+    </div>
+    <% if (!momentos.mejorHora) { %>
+      <p class="estado-vacio-chico"><%- icono('reloj', { tamano: 18 }) %> Todavía no hay pedidos para comparar.</p>
+    <% } else { %>
+      <%- include('columnas', { grafico: graficos.horas, descripcion: `Pedidos por hora del día (hora argentina). La hora con más pedidos es de ${momentos.mejorHora.hora} a ${momentos.mejorHora.hora + 1} h.` }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Cómo reciben los pedidos</h3>
+      <span class="ayuda">Pedidos concretados</span>
+    </div>
+    <% if (!entregas.length) { %>
+      <p class="estado-vacio-chico"><%- icono('camion', { tamano: 18 }) %> Todavía no hay pedidos concretados.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Pedidos concretados por forma de entrega', partes: entregas.map((e, n) => ({
+        titulo: e.titulo, valor: e.pedidos, texto: plural(e.pedidos, 'pedido', 'pedidos'), nota: formatearPorcentaje(parte(e.pedidos, t.pedidos)), color: `dc-${n + 1}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Detalle de los concretados</h3>
+    </div>
+    <dl class="dash-datos">
+      <div><dt>Con descuento</dt><dd><%= formatearNumero(t.conDescuento) %></dd></div>
+      <div><dt>Con envío gratis</dt><dd><%= formatearNumero(t.envioGratis) %></dd></div>
+      <div><dt>Con envío a coordinar</dt><dd><%= formatearNumero(t.envioACoordinar) %></dd></div>
+      <div><dt>Unidades vendidas</dt><dd><%= formatearNumero(t.unidades) %></dd></div>
+    </dl>
+  </section>
+</div>

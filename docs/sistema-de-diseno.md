@@ -28,6 +28,15 @@ Estilo de producto profesional: superficies neutras, un solo color de marca, bor
 - **Tablas:** cada `.tabla-contenedor` es un *container*: cuando la tabla no entra, las filas pasan a tarjetas según el
   ancho real (no el de la pantalla), así también se ve bien en una notebook chica con el menú abierto.
 
+- **Gráficos y números del Dashboard** (`.dash-*`, `.grafico`, `.ranking`, `.apilada`): son HTML y CSS, sin librerías ni imágenes, así el
+  texto se lee igual en el celular y sigue al tema claro y al oscuro. Las columnas y barras van en `--primario-texto` (en oscuro
+  tiene contraste suficiente sobre la superficie; `--primario` no). Para varias series se usan en este orden `--primario-texto`,
+  `--ok-solido`, `--ambar-solido`, `--violeta`, `--texto-tenue` y `--error-solido` (`.dc-1` a `.dc-6`), y los estados de un pedido
+  usan los mismos colores que sus pastillas (`.dc-nuevo`, `.dc-pagado`...). **El color nunca va solo**: cada serie tiene su leyenda con
+  texto y cada columna su detalle (al pasar el mouse o tocarla, y en una tabla aparte). La card es un *container* (`.dashboard`): los
+  números se acomodan según su ancho real, y nada puede ensanchar la página (`overflow-x: clip`, y las grillas con `minmax(0, 1fr)`).
+  Los gráficos se arman en `src/util/grafico.js`; los parciales están en `src/vistas/parciales/dashboard/`.
+
 ## Vidriera (`src/publico/tienda.css`)
 
 Editorial y limpia: mucho blanco, las fotos mandan, siempre en modo claro.

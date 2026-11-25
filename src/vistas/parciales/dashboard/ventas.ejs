@@ -1,0 +1,141 @@
+<%# Panel "Ventas": de dónde sale la plata, cuándo y cómo se vende, y dónde. %>
+<% const { totales: t, cambios, periodo, graficos, momentos, pagos, entregas, lugares, categorias } = d %>
+<% const comparado = periodo.anterior ? periodo.anterior.titulo : '' %>
+<% const unidad = { dia: 'día', semana: 'semana', mes: 'mes' }[periodo.agrupar] %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Ventas', valor: formatearPesos(t.ventas), cambio: cambios?.ventas, comparado, nota: `${plural(t.pedidos, 'pedido', 'pedidos')}` }) %>
+  <%- include('kpi', { etiqueta: 'Productos', valor: formatearPesos(t.productos), nota: 'Lo vendido, antes de descuentos y envío' }) %>
+  <%- include('kpi', { etiqueta: 'Descuentos', valor: `−${formatearPesos(t.descuentos)}`, nota: t.conDescuento ? `En ${plural(t.conDescuento, 'pedido', 'pedidos')} (por forma de pago)` : 'Ningún pedido con descuento' }) %>
+  <%- include('kpi', { etiqueta: 'Envíos cobrados', valor: `+${formatearPesos(t.envios)}`, nota: `${formatearNumero(t.envioGratis)} gratis${t.envioACoordinar ? ` · ${formatearNumero(t.envioACoordinar)} a coordinar` : ''}` }) %>
+  <%- include('kpi', { etiqueta: 'Ticket promedio', valor: formatearPesos(t.ticket), cambio: cambios?.ticket, comparado, nota: 'Lo que gasta cada pedido' }) %>
+</div>
+
+<div class="dash-bloques">
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Ventas por <%= unidad %></h3>
+      <span class="ayuda">Total <%= formatearPesos(t.ventas) %></span>
+    </div>
+    <% if (t.pedidos === 0) { %>
+      <p class="estado-vacio-chico"><%- icono('recibo', { tamano: 18 }) %> Todavía no hay ventas en este período.</p>
+    <% } else { %>
+      <%- include('columnas', { grafico: graficos.ventas, descripcion: `Ventas por ${unidad}: ${formatearPesos(t.ventas)} en ${plural(t.pedidos, 'pedido', 'pedidos')}. El detalle está en la tabla de abajo.` }) %>
+      <details class="dash-detalle">
+        <summary>Ver el detalle por <%= unidad %></summary>
+        <div class="dash-tabla-caja">
+          <table class="dash-tabla">
+            <thead><tr><th scope="col"><%= unidad === 'día' ? 'Día' : unidad === 'semana' ? 'Semana' : 'Mes' %></th><th scope="col" class="num">Pedidos</th><th scope="col" class="num">Ventas</th></tr></thead>
+            <tbody>
+              <% for (const g of d.serie.filter((g) => g.pedidos > 0)) { %>
+                <tr><th scope="row"><%= g.nombre %></th><td class="num"><%= formatearNumero(g.pedidos) %></td><td class="num"><%= formatearPesos(g.ventas) %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Pedidos por día de la semana</h3>
+      <% if (momentos.mejorDia) { %><span class="ayuda">Más movimiento: <%= momentos.mejorDia.nombre.toLowerCase() %></span><% } %>
+    </div>
+    <% if (!momentos.mejorDia) { %>
+      <p class="estado-vacio-chico"><%- icono('reloj', { tamano: 18 }) %> Todavía no hay pedidos para comparar.</p>
+    <% } else { %>
+      <%- include('columnas', { grafico: graficos.diasDeLaSemana, descripcion: `Pedidos por día de la semana. El día con más pedidos es el ${momentos.mejorDia.nombre.toLowerCase()}, con ${plural(momentos.mejorDia.pedidos, 'pedido', 'pedidos')}.` }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Pedidos por hora</h3>
+      <% if (momentos.mejorHora) { %><span class="ayuda">Más movimiento: de <%= momentos.mejorHora.hora %> a <%= momentos.mejorHora.hora + 1 %> h</span><% } %>
+    </div>
+    <% if (!momentos.mejorHora) { %>
+      <p class="estado-vacio-chico"><%- icono('reloj', { tamano: 18 }) %> Todavía no hay pedidos para comparar.</p>
+    <% } else { %>
+      <%- include('columnas', { grafico: graficos.horas, descripcion: `Pedidos por hora del día (hora argentina). La hora con más pedidos es de ${momentos.mejorHora.hora} a ${momentos.mejorHora.hora + 1} h.` }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Formas de pago</h3>
+      <span class="ayuda">Ventas</span>
+    </div>
+    <% if (!pagos.length) { %>
+      <p class="estado-vacio-chico"><%- icono('billete', { tamano: 18 }) %> Todavía no hay ventas para repartir.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Ventas del período por forma de pago', partes: pagos.map((p, n) => ({
+        titulo: p.titulo, valor: p.ventas, texto: formatearPesos(p.ventas),
+        nota: `${formatearPorcentaje(p.porcentaje)} · ${plural(p.pedidos, 'pedido', 'pedidos')} · ticket ${formatearPesos(p.ticket)}${p.descuentos ? ` · descuentos −${formatearPesos(p.descuentos)}` : ''}`, color: `dc-${n + 1}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Formas de entrega</h3>
+      <span class="ayuda">Ventas</span>
+    </div>
+    <% if (!entregas.length) { %>
+      <p class="estado-vacio-chico"><%- icono('camion', { tamano: 18 }) %> Todavía no hay ventas para repartir.</p>
+    <% } else { %>
+      <%- include('apilada', { descripcion: 'Ventas del período por forma de entrega', partes: entregas.map((e, n) => ({
+        titulo: e.titulo, valor: e.ventas, texto: formatearPesos(e.ventas),
+        nota: `${formatearPorcentaje(e.porcentaje)} · ${plural(e.pedidos, 'pedido', 'pedidos')}${e.tipo === 'domicilio' ? ` · envíos ${formatearPesos(e.envios)}` : ''}`, color: `dc-${n + 1}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Ventas por provincia</h3>
+      <span class="ayuda">Envíos a domicilio</span>
+    </div>
+    <% if (!lugares.provincias.length) { %>
+      <p class="estado-vacio-chico"><%- icono('ubicacion', { tamano: 18 }) %> Todavía no hay envíos a domicilio en este período.</p>
+    <% } else { %>
+      <% const mayor = lugares.provincias[0].ventas %>
+      <%- include('ranking', { filas: lugares.provincias.slice(0, 8).map((l) => ({
+        nombre: l.titulo, valor: formatearPesos(l.ventas), ancho: Math.max(2, Math.round((l.ventas / mayor) * 100)),
+        nota: `${formatearPorcentaje(l.porcentaje)} · ${plural(l.pedidos, 'pedido', 'pedidos')}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Ventas por ciudad</h3>
+      <span class="ayuda">Las 10 principales</span>
+    </div>
+    <% if (!lugares.ciudades.length) { %>
+      <p class="estado-vacio-chico"><%- icono('ubicacion', { tamano: 18 }) %> Todavía no hay envíos a domicilio en este período.</p>
+    <% } else { %>
+      <% const mayor = lugares.ciudades[0].ventas %>
+      <%- include('ranking', { filas: lugares.ciudades.map((l) => ({
+        nombre: l.titulo, detalle: l.provincia, valor: formatearPesos(l.ventas), ancho: Math.max(2, Math.round((l.ventas / mayor) * 100)),
+        nota: `${formatearPorcentaje(l.porcentaje)} · ${plural(l.pedidos, 'pedido', 'pedidos')}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Ventas por categoría</h3>
+      <span class="ayuda">Un producto en dos categorías suma en las dos</span>
+    </div>
+    <% if (!categorias.length) { %>
+      <p class="estado-vacio-chico"><%- icono('carpeta', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <% const mayor = categorias[0].monto %>
+      <%- include('ranking', { filas: categorias.map((c) => ({
+        nombre: c.nombre, url: c.id ? '/admin/categorias' : null, valor: formatearPesos(c.monto), ancho: Math.max(2, Math.round((c.monto / mayor) * 100)),
+        nota: `${formatearPorcentaje(c.porcentaje)} · ${plural(c.unidades, 'unidad', 'unidades')}`,
+      })) }) %>
+    <% } %>
+  </section>
+</div>

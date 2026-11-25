@@ -1,0 +1,14 @@
+<%# Aviso con los pedidos que esperan hace días. Datos: demorados (de pedidosDemorados()). %>
+<% if (demorados.hay) { %>
+  <div class="aviso aviso-info dash-aviso" role="status">
+    <%- icono('reloj', { tamano: 18 }) %>
+    <div>
+      <strong>Pedidos esperando hace días</strong>
+      <ul class="dash-lista-aviso">
+        <% if (demorados.nuevos) { %><li><a href="/admin/pedidos?filtro=nuevo"><%= plural(demorados.nuevos, 'pedido nuevo', 'pedidos nuevos') %></a> sin confirmar el pago hace más de <%= plural(demorados.diasNuevos, 'día', 'días') %> (<%= formatearPesos(demorados.montoNuevos) %>).</li><% } %>
+        <% if (demorados.pagados) { %><li><a href="/admin/pedidos?filtro=pagado"><%= plural(demorados.pagados, 'pedido pagado', 'pedidos pagados') %></a> sin enviar hace más de <%= plural(demorados.diasPagados, 'día', 'días') %>.</li><% } %>
+        <% if (demorados.enviados) { %><li><a href="/admin/pedidos?filtro=enviado"><%= plural(demorados.enviados, 'pedido enviado', 'pedidos enviados') %></a> sin marcar como entregado hace más de <%= plural(demorados.diasEnviados, 'día', 'días') %>.</li><% } %>
+      </ul>
+    </div>
+  </div>
+<% } %>

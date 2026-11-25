@@ -1,0 +1,18 @@
+<%# Gráfico de columnas hecho con HTML y CSS (ver armarGrafico en src/util/grafico.js).
+    Datos: grafico, descripcion (el resumen del gráfico en una frase, para lectores de pantalla). El detalle va en el texto emergente de cada columna. %>
+<div class="grafico" role="img" aria-label="<%= descripcion %>" style="--eje: <%= grafico.anchoEje %>; --hueco: <%= grafico.hueco %>px">
+  <div class="grafico-ejes" aria-hidden="true">
+    <% for (const eje of grafico.ejes) { %><span style="bottom: <%= eje.posicion %>%"><%= eje.texto %></span><% } %>
+  </div>
+  <div class="grafico-area" aria-hidden="true">
+    <% for (const eje of grafico.ejes) { %><i class="grafico-linea" style="bottom: <%= eje.posicion %>%"></i><% } %>
+    <div class="grafico-columnas" style="--n: <%= grafico.columnas.length %>">
+      <% for (const c of grafico.columnas) { %>
+        <div class="columna columna-<%= c.lado %>" data-tip="<%= c.tip %>"><span style="height: <%= c.alto %>%"></span></div>
+      <% } %>
+    </div>
+  </div>
+  <div class="grafico-etiquetas" style="--n: <%= grafico.columnas.length %>" aria-hidden="true">
+    <% for (const c of grafico.columnas) { %><span><% if (c.etiqueta) { %><em<%- c.opcional ? ' class="opcional"' : '' %>><%= c.etiqueta %></em><% } %></span><% } %>
+  </div>
+</div>

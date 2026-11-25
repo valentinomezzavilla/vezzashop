@@ -1,0 +1,126 @@
+<%# Panel "Productos": qué se vende más, qué no se mueve y cómo está armado el catálogo. %>
+<% const { totales: t, periodo, vendidos, categorias, marcas, sinVentas, catalogo: c } = d %>
+<% const ancho = (valor, mayor) => Math.max(2, Math.round((valor / mayor) * 100)) %>
+<% const enlaceProducto = (p) => (p.id ? `/admin/productos/${p.id}` : null) %>
+
+<div class="dash-kpis">
+  <%- include('kpi', { etiqueta: 'Productos vendidos', valor: formatearNumero(vendidos.distintos), nota: `De ${plural(c.total, 'producto', 'productos')} en el catálogo` }) %>
+  <%- include('kpi', { etiqueta: 'Unidades vendidas', valor: formatearNumero(t.unidades), nota: t.pedidos ? `${formatearNumero(t.unidadesPorPedido)} por pedido` : 'En pedidos concretados' }) %>
+  <%- include('kpi', { etiqueta: 'Sin ventas', valor: formatearNumero(sinVentas.total), nota: 'Visibles, con stock y sin ventas en el período' }) %>
+  <%- include('kpi', { etiqueta: 'En oferta', valor: formatearNumero(c.enOferta), nota: `${formatearPorcentaje(c.total ? c.enOferta / c.total : 0)} del catálogo` }) %>
+</div>
+
+<div class="dash-bloques">
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Más vendidos por facturación</h3>
+      <span class="ayuda">Los 10 principales</span>
+    </div>
+    <% if (!vendidos.porMonto.length) { %>
+      <p class="estado-vacio-chico"><%- icono('paquete', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: vendidos.porMonto.map((p) => ({
+        nombre: p.nombre, url: enlaceProducto(p), valor: formatearPesos(p.monto), ancho: ancho(p.monto, vendidos.porMonto[0].monto),
+        nota: `${formatearPorcentaje(p.porcentaje)} · ${plural(p.unidades, 'unidad', 'unidades')}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Más vendidos por unidades</h3>
+      <span class="ayuda">Los 10 principales</span>
+    </div>
+    <% if (!vendidos.porUnidades.length) { %>
+      <p class="estado-vacio-chico"><%- icono('paquete', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: vendidos.porUnidades.map((p) => ({
+        nombre: p.nombre, url: enlaceProducto(p), valor: plural(p.unidades, 'unidad', 'unidades'), ancho: ancho(p.unidades, vendidos.porUnidades[0].unidades),
+        nota: `${formatearPorcentaje(p.porcentaje)} de las unidades · ${formatearPesos(p.monto)}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Variantes más vendidas</h3>
+      <span class="ayuda">Talle, color y demás, por facturación</span>
+    </div>
+    <% if (!vendidos.variantes.length) { %>
+      <p class="estado-vacio-chico"><%- icono('etiqueta', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: vendidos.variantes.map((v) => ({
+        nombre: v.nombre, detalle: v.detalle, url: enlaceProducto(v), valor: formatearPesos(v.monto), ancho: ancho(v.monto, vendidos.variantes[0].monto),
+        nota: plural(v.unidades, 'unidad', 'unidades'),
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Ventas por categoría</h3>
+      <span class="ayuda">Un producto en dos categorías suma en las dos</span>
+    </div>
+    <% if (!categorias.length) { %>
+      <p class="estado-vacio-chico"><%- icono('carpeta', { tamano: 18 }) %> Todavía no se vendió nada en este período.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: categorias.map((k) => ({
+        nombre: k.nombre, url: k.id ? '/admin/categorias' : null, valor: formatearPesos(k.monto), ancho: ancho(k.monto, categorias[0].monto),
+        nota: `${formatearPorcentaje(k.porcentaje)} · ${plural(k.unidades, 'unidad', 'unidades')}`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <% if (marcas.length) { %>
+    <section class="dash-bloque">
+      <div class="dash-bloque-titulo">
+        <h3>Ventas por marca</h3>
+        <span class="ayuda">Las que cargaste en tus productos</span>
+      </div>
+      <%- include('ranking', { filas: marcas.map((m) => ({
+        nombre: m.nombre, valor: formatearPesos(m.monto), ancho: ancho(m.monto, marcas[0].monto),
+        nota: `${formatearPorcentaje(m.porcentaje)} · ${plural(m.unidades, 'unidad', 'unidades')}`,
+      })) }) %>
+    </section>
+  <% } %>
+
+  <section class="dash-bloque">
+    <div class="dash-bloque-titulo">
+      <h3>Sin ventas en el período</h3>
+      <span class="ayuda"><%= sinVentas.total > sinVentas.lista.length ? `Los ${sinVentas.lista.length} con más stock, de ${sinVentas.total}` : 'Por valor del stock' %></span>
+    </div>
+    <% if (!sinVentas.lista.length) { %>
+      <p class="estado-vacio-chico"><%- icono('check', { tamano: 18 }) %> Todos los productos con stock vendieron algo en este período.</p>
+    <% } else { %>
+      <%- include('ranking', { filas: sinVentas.lista.map((p) => ({
+        nombre: p.nombre, url: `/admin/productos/${p.id}`, valor: formatearPesos(p.valor), ancho: ancho(p.valor, sinVentas.lista[0].valor),
+        nota: `${plural(p.unidades, 'unidad', 'unidades')} en stock`,
+      })) }) %>
+    <% } %>
+  </section>
+
+  <section class="dash-bloque dash-bloque-ancho">
+    <div class="dash-bloque-titulo">
+      <h3>Tu catálogo</h3>
+      <span class="ayuda">Hoy</span>
+    </div>
+    <dl class="dash-datos dash-datos-columnas">
+      <div><dt>Productos</dt><dd><%= formatearNumero(c.total) %></dd></div>
+      <div><dt>Visibles</dt><dd><a href="/admin/productos?filtro=visibles"><%= formatearNumero(c.visibles) %></a></dd></div>
+      <div><dt>Ocultos</dt><dd><a href="/admin/productos?filtro=ocultos"><%= formatearNumero(c.ocultos) %></a></dd></div>
+      <div><dt>Destacados</dt><dd><a href="/admin/productos?filtro=destacados"><%= formatearNumero(c.destacados) %></a></dd></div>
+      <div><dt>En oferta</dt><dd><%= formatearNumero(c.enOferta) %></dd></div>
+      <div><dt>Sin foto</dt><dd><a href="/admin/productos?filtro=sin-foto"><%= formatearNumero(c.sinFoto) %></a></dd></div>
+      <div><dt>Sin categoría</dt><dd><%= formatearNumero(c.sinCategoria) %></dd></div>
+      <div><dt>Variantes</dt><dd><%= formatearNumero(c.variantes) %></dd></div>
+      <div><dt>Categorías</dt><dd><a href="/admin/categorias"><%= formatearNumero(c.categorias) %></a></dd></div>
+      <div><dt>Agregados en el período</dt><dd><%= formatearNumero(c.nuevosEnElPeriodo) %></dd></div>
+      <div><dt>Precio más bajo</dt><dd><%= c.variantes ? formatearPesos(c.precioMinimo) : '—' %></dd></div>
+      <div><dt>Precio promedio</dt><dd><%= c.variantes ? formatearPesos(c.precioPromedio) : '—' %></dd></div>
+      <div><dt>Precio más alto</dt><dd><%= c.variantes ? formatearPesos(c.precioMaximo) : '—' %></dd></div>
+      <% if (limites.maxProductos !== null) { %>
+        <div><dt>Tu plan<%= limites.plan ? ` (${limites.plan.nombre})` : '' %></dt><dd><%= formatearNumero(c.total) %> de <%= formatearNumero(limites.maxProductos) %> productos</dd></div>
+      <% } %>
+    </dl>
+  </section>
+</div>
