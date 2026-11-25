@@ -9,6 +9,9 @@
   <%- include('kpi', { etiqueta: 'Descuentos', valor: `−${formatearPesos(t.descuentos)}`, nota: t.conDescuento ? `En ${plural(t.conDescuento, 'pedido', 'pedidos')} (por forma de pago)` : 'Ningún pedido con descuento' }) %>
   <%- include('kpi', { etiqueta: 'Envíos cobrados', valor: `+${formatearPesos(t.envios)}`, nota: `${formatearNumero(t.envioGratis)} gratis${t.envioACoordinar ? ` · ${formatearNumero(t.envioACoordinar)} a coordinar` : ''}` }) %>
   <%- include('kpi', { etiqueta: 'Ticket promedio', valor: formatearPesos(t.ticket), cambio: cambios?.ticket, comparado, nota: 'Lo que gasta cada pedido' }) %>
+  <% if (t.pedidosConComisionMp) { %>
+    <%- include('kpi', { etiqueta: 'Comisión de Mercado Pago', valor: `−${formatearPesos(t.comisionMp)}`, nota: `En ${plural(t.pedidosConComisionMp, 'pedido', 'pedidos')}: te llegaron ${formatearPesos(t.netoMp)}` }) %>
+  <% } %>
 </div>
 
 <div class="dash-bloques">

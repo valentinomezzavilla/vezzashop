@@ -194,6 +194,9 @@ export async function totalesDelPeriodo(db, tiendaId, rango) {
               count(*) FILTER (WHERE ${CONCRETADO} AND p.descuento_centavos > 0) AS "conDescuento",
               count(*) FILTER (WHERE ${CONCRETADO} AND p.envio_centavos IS NULL) AS "envioACoordinar",
               count(*) FILTER (WHERE ${CONCRETADO} AND p.envio_centavos = 0) AS "envioGratis",
+              coalesce(sum(p.mp_comision_centavos) FILTER (WHERE ${CONCRETADO}), 0) AS "comisionMp",
+              coalesce(sum(p.mp_neto_centavos) FILTER (WHERE ${CONCRETADO} AND p.mp_comision_centavos IS NOT NULL), 0) AS "netoMp",
+              count(*) FILTER (WHERE ${CONCRETADO} AND p.mp_comision_centavos IS NOT NULL) AS "pedidosConComisionMp",
               count(DISTINCT ${CLIENTE}) FILTER (WHERE ${CONCRETADO}) AS clientes
        FROM pedidos p WHERE ${EN_EL_PERIODO}`,
     )

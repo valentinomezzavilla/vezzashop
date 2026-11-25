@@ -462,6 +462,21 @@ test('un pedido con envío a coordinar cuenta como venta pero no suma envío', a
   assert.equal(t.productos - t.descuentos, t.ventas);
 });
 
+test('Mercado Pago: la comisión y lo que le llegó a la tienda, solo de los pedidos donde Mercado Pago lo informó', async () => {
+  const M = await tiendaConCatalogo('tienda-mp');
+  const t = M.tiendaId;
+  const conComision = await pedido(t, { items: [['REM-S', 1]], pago: 'mercadopago', entrega: 'retiro', estado: 'pagado', creado: '2026-11-15 15:00:00' }); // 10.000
+  await pedido(t, { items: [['REM-M', 1]], pago: 'mercadopago', entrega: 'retiro', estado: 'pagado', creado: '2026-11-16 15:00:00' }); // Mercado Pago todavía no informó
+  const cancelado = await pedido(t, { items: [['GOR', 1]], pago: 'mercadopago', entrega: 'retiro', estado: 'cancelado', creado: '2026-11-17 15:00:00' });
+  await db.prepare('UPDATE pedidos SET mp_comision_centavos = ?, mp_neto_centavos = ? WHERE id = ?').run(52_000, 948_000, conComision);
+  await db.prepare('UPDATE pedidos SET mp_comision_centavos = ?, mp_neto_centavos = ? WHERE id = ?').run(9_999, 1, cancelado);
+  const totales = await totalesDelPeriodo(db, t, TREINTA_DIAS);
+  assert.deepEqual([totales.pedidos, totales.ventas], [2, 2_000_000]);
+  assert.deepEqual([totales.comisionMp, totales.netoMp, totales.pedidosConComisionMp], [52_000, 948_000, 1], 'el cancelado y el que todavía no informó no suman');
+  const vacio = await totalesDelPeriodo(db, A.tiendaId, TREINTA_DIAS);
+  assert.deepEqual([vacio.comisionMp, vacio.netoMp, vacio.pedidosConComisionMp], [0, 0, 0]);
+});
+
 test('pedidos demorados: lo que espera hace días, sin importar el período', async () => {
   const E = await tiendaConCatalogo('tienda-demora');
   const t = E.tiendaId;
@@ -643,6 +658,11 @@ test('cada panel se pide por la URL y muestra lo suyo', async () => {
   assert.match(ventas, /Pedidos por día de la semana/);
   assert.match(ventas, /Formas de pago/);
   assert.match(ventas, /Ver el detalle por día/);
+  assert.doesNotMatch(ventas, /Comisión de Mercado Pago/, 'sin comisiones informadas no hay nada que mostrar');
+  await db.prepare("UPDATE pedidos SET mp_comision_centavos = 52000, mp_neto_centavos = 948000 WHERE tienda_id = ? AND estado = 'pagado' AND id = (SELECT min(id) FROM pedidos WHERE tienda_id = ? AND estado = 'pagado')").run(H.tiendaId, H.tiendaId);
+  const conMp = await pedir('panel=ventas&periodo=7d');
+  assert.match(conMp, /<span class="dash-kpi-etiqueta">Comisión de Mercado Pago<\/span>\s*<strong class="dash-kpi-valor">−\$\s520<\/strong>/);
+  assert.match(conMp, /En 1 pedido: te llegaron \$\s9\.480/);
 
   const pedidos = await pedir('panel=pedidos');
   assert.match(pedidos, /Pedidos según su estado/);

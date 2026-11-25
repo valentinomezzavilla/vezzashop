@@ -37,7 +37,7 @@ lo suyo. Casi todos los números se comparan con el período anterior (los mismo
 | Panel | Qué muestra |
 |---|---|
 | **Resumen** | Ventas, pedidos, ticket promedio, unidades, clientes y lo que falta confirmar; ventas por día (o por semana o mes), productos más vendidos, estado de los pedidos y formas de pago. Avisa de los pedidos que esperan hace días. |
-| **Ventas** | De dónde sale la plata (productos − descuentos + envíos), ventas por día con su tabla, pedidos por día de la semana y por hora, formas de pago y de entrega, ventas por provincia, ciudad y categoría. |
+| **Ventas** | De dónde sale la plata (productos − descuentos + envíos y lo que se queda Mercado Pago), ventas por día con su tabla, pedidos por día de la semana y por hora, formas de pago y de entrega, ventas por provincia, ciudad y categoría. |
 | **Pedidos** | Recibidos, concretados, por confirmar y cancelados (con su tasa), tiempo promedio hasta entregar, pedidos según su estado, qué está demorado y cuándo llegan. |
 | **Clientes** | Clientes que compraron, nuevos y recurrentes, tasa de recompra, gasto y pedidos por cliente, clientes por provincia y los que más compran (con WhatsApp). |
 | **Productos** | Más vendidos por facturación y por unidades, variantes más vendidas, ventas por categoría, productos sin ventas y cómo está armado el catálogo. |
