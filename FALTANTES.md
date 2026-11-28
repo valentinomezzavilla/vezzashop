@@ -79,6 +79,17 @@ El secreto del webhook no está en el repo, así que tampoco llamé al flujo en 
 - [ ] Que `PUT /preapproval/{id}` acepte el aumento de monto (puede tener límites de cuánto se sube de una vez; si lo rechaza, el panel lo avisa y queda para reintentar desde la ficha del cliente).
 - [ ] Que al reactivar con `start_date` el primer cobro caiga el día de siempre y no se cobre dos veces.
 
+### 7. Kit de marca y maqueta web (plan Acompañado): ponerlo en marcha
+El panel, el pedido a n8n, la entrega y el flujo de n8n (`n8n/maqueta-web.json`) están hechos y probados (ver *Kit de marca y maquetas web* en el README). Falta lo que depende de tu n8n y tu Coolify:
+- [ ] En n8n: importá `n8n/maqueta-web.json` (o pedime que lo cree desde acá), elegí en el nodo *Webhook* la credencial Header Auth con el mismo secreto que `N8N_WEBHOOK_SECRET` y en *Redactar los textos*
+      la de Google Gemini (el modelo es `models/gemini-3.5-flash-lite`, el mismo del flujo de la mesa de ayuda), y activalo.
+- [ ] Recomendado: escribí tu dominio del panel en `DOMINIO_DE_LA_PLATAFORMA` (`n8n/maqueta-pedido.js`), corré `node scripts/armar-flujo-n8n.js` y pegá el código en el nodo: así la entrega de la maqueta no puede ir a ningún otro dominio.
+- [ ] En Coolify: `N8N_MAQUETAS_URL=https://<tu n8n>/webhook/vezza-shop-maquetas` (y `N8N_MAQUETAS_SECRET` si no querés usar el mismo secreto que los mails).
+- [ ] Probalo con una tienda de plan Acompañado: subí un logo y fotos, guardá los colores, "Armar mi maqueta" y esperá menos de un minuto. Si el resumen debajo de la vista previa dice "Textos de ejemplo" en vez de
+      "Textos redactados con IA", Gemini no contestó (o contestó en otro formato): mirá esa ejecución en n8n y mandame lo que devolvió el nodo.
+- [ ] Mirá cómo queda: el diseño de la maqueta es la plantilla de `n8n/maqueta-armar.js` (hay cuatro estilos). Si querés otro look, se cambia ahí y se vuelve a armar el flujo.
+- [ ] Decidí si querés que al cliente le llegue un mail cuando su maqueta está lista (hoy solo la ve en el panel) y si querés que pueda **aplicar los colores de la maqueta a su tienda** con un botón.
+
 ## Otras cosas a tener en cuenta
 - Los pedidos con Mercado Pago **reservan el stock hasta que la tienda cancela** uno sin pagar (no se cancelan solos), y los reembolsos se hacen desde Mercado Pago: quedó anotado en "Qué falta" del README.
 - Que el dominio propio se agregue solo en Coolify (hoy lo hacés a mano) y un mail cuando un cliente lo pide son mejoras posibles; no las hice porque dependen de tu Coolify.

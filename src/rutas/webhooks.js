@@ -1,11 +1,12 @@
 // Avisos (webhooks) que manda Mercado Pago: cuando cambia una suscripción a un plan o se cobra un mes (/mercadopago), y cuando se paga un pedido
-// de una tienda (/mercadopago/tienda/:id).
+// de una tienda (/mercadopago/tienda/:id). Y la entrega de las maquetas web que arma n8n (/maquetas/:id).
 // Dos reglas: el contenido del aviso no se usa para nada más que saber qué mirar (el estado real se consulta a la API de Mercado Pago), y
 // el de las suscripciones además tiene que venir firmado. Así, nadie puede activar una cuenta ni dar por pago un pedido con un POST armado a mano.
 import express from 'express';
 import { verificarFirma } from '../mercadopago.js';
 import { procesarCobro, sincronizarSuscripcion } from '../suscripciones.js';
 import { avisoDePago } from '../cobros-mp.js';
+import { entregarMaqueta } from '../maquetas.js';
 import { buscarTienda } from '../tiendas.js';
 import { urlPanel, urlPublicaDeTienda } from '../util/dominios.js';
 import { crearLimite } from '../util/limite.js';
@@ -36,6 +37,24 @@ export function rutasWebhooks({ servicios, config, db = null, notificar = async 
       return res.status(500).end();
     }
     res.status(200).end();
+  });
+
+  // Entrega de las maquetas web (plan Acompañado): el flujo de n8n que las genera manda acá el resultado de un pedido, con el token que
+  // recibió en el aviso (ver maquetas.js). El token es de ese pedido solo: no hay una clave general que sirva para entregar cualquier maqueta.
+  // Cuerpo: { token, estado: 'generando' | 'lista' | 'error', html?, resumen?, error? }. Responde JSON.
+  const limiteEntregas = crearLimite({ maximo: 120, ventanaMs: 60_000 });
+  router.post('/maquetas/:id', express.json({ limit: '1mb' }), async (req, res) => {
+    if (!db || !/^\d{1,9}$/.test(req.params.id)) return res.status(404).json({ error: 'No existe' });
+    if (!limiteEntregas.puede(req.ip)) return res.status(429).json({ error: 'Demasiados intentos' });
+    limiteEntregas.registrar(req.ip);
+    const { status, ...cuerpo } = await entregarMaqueta(db, Number(req.params.id), req.body && typeof req.body === 'object' ? req.body : {});
+    res.status(status).json(cuerpo);
+  });
+  // Un JSON mal armado o demasiado grande es un error de quien lo mandó, no del servidor.
+  router.use('/maquetas', (error, req, res, next) => {
+    if (error.type === 'entity.too.large') return res.status(413).json({ error: 'El cuerpo es demasiado grande' });
+    if (error.type === 'entity.parse.failed' || error.status === 400) return res.status(400).json({ error: 'El cuerpo tiene que ser un JSON válido' });
+    next(error);
   });
 
   router.post('/mercadopago', express.json({ limit: '100kb' }), async (req, res) => {

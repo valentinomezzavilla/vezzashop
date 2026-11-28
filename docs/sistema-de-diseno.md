@@ -39,6 +39,12 @@ Estilo de producto profesional: superficies neutras, un solo color de marca, bor
   Los gráficos se arman en `src/util/grafico.js`; los parciales están en `src/vistas/parciales/dashboard/` y la página, en `admin/dashboard.ejs`.
 - **Card que lleva a otra pantalla** (`.dashboard-acceso`, la del Dashboard en el Inicio): el título es el único link y se estira con `::after`
   para que toda la card sea clickeable (sin links anidados); el foco se ve en la card entera (`:has(a:focus-visible)`).
+  La card de Diseño que lleva al kit de marca (`.marca-acceso`, `parciales/marca-acceso.ejs`) reusa el mismo patrón y solo cambia la grilla.
+- **Kit de marca y maqueta** (`.marca-*`, `.maqueta-*`; `admin/marca.ejs` y `admin/maqueta.ejs`): los archivos del kit son una grilla de tarjetas (`.marca-archivos`) con la imagen sobre un
+  fondo ajedrezado, para que se vean los logos transparentes, y su nombre con elipsis; los colores usan `.selector-color` y las opciones de estilo, `.opcion-tipo`. Lo bloqueado por el plan usa
+  `.nivel-bloqueado` como en Diseño. La maqueta se ve en un `<iframe sandbox="">` (`.maqueta-iframe`, siempre sobre fondo blanco: es otra página con sus propios colores) con un selector
+  de tamaño (computadora o celular) hecho solo con CSS (`:has(input:checked)`), y mientras se genera hay un bloque de espera con `role="status"`; `admin.js` lo consulta y recarga la página
+  cuando termina (sin JavaScript queda el botón "Actualizar"). El estado nunca va solo en color: lleva su texto (*Generando*, *Lista*, *Con problemas*).
 
 ## Vidriera (`src/publico/tienda.css`)
 

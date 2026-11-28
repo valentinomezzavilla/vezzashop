@@ -256,7 +256,7 @@ lo que el plan no incluye aparece **bloqueado** (con el nivel que lo trae) y arr
 | Nivel | Qué suma |
 | --- | --- |
 | **Esencial** | Lo que ya existía: logo, color principal, franja, tipografía y esquinas, cabecera y menú, catálogo (orden, tamaño de tarjetas, sin stock, categorías), sobre la tienda, contacto, banners. |
-| **Acompañado** | **Colores** de fondo, texto, tarjetas y cabecera (el texto tiene que leerse: se exige un contraste mínimo de 4,5 a 1 y, si solo se cambia el fondo, el texto se ajusta solo); **logo** a la izquierda, al centro o a la derecha; cabecera fija o que se va con el scroll; **portada** con las secciones que se quieren (banners, **ofertas** —los productos con precio promocional— y destacados) en el orden que se elija, y banners dentro de la página o de punta a punta; **tarjetas de producto** sin marco, con borde o con sombra, foto vertical, cuadrada o apaisada y texto a la izquierda o centrado; **pie** claro, oscuro, del color de la marca o de otro color. |
+| **Acompañado** | **Colores** de fondo, texto, tarjetas y cabecera (el texto tiene que leerse: se exige un contraste mínimo de 4,5 a 1 y, si solo se cambia el fondo, el texto se ajusta solo); **logo** a la izquierda, al centro o a la derecha; cabecera fija o que se va con el scroll; **portada** con las secciones que se quieren (banners, **ofertas** —los productos con precio promocional— y destacados) en el orden que se elija, y banners dentro de la página o de punta a punta; **tarjetas de producto** sin marco, con borde o con sombra, foto vertical, cuadrada o apaisada y texto a la izquierda o centrado; **pie** claro, oscuro, del color de la marca o de otro color; y el **kit de marca con maqueta web** (ver [Kit de marca y maquetas web](#kit-de-marca-y-maquetas-web-plan-acompañado)). |
 | **A medida** | **CSS propio** (hasta 20.000 caracteres; sin `<`, `@import`, `expression()`, `javascript:` ni `url()` que no sean https o rutas de la tienda), **tipografías de Google Fonts** a elección para títulos y texto, **ancho de la página** (angosto, normal, ancho, todo el ancho), **dominio propio** y **códigos de seguimiento** (píxeles, analítica) en la cabecera y el pie, que carga quien administra la plataforma desde la ficha del cliente. |
 
 El nivel se aplica **al leer**: si un cliente baja de plan, lo que había elegido de más queda guardado pero la vidriera deja de aplicarlo, y vuelve si sube.
@@ -519,6 +519,86 @@ reales que arma la app), así que si se cambia un aviso, el test avisa si el nod
 `pago_recibido` lleva `urlCuenta`, el link para completar el formulario. Un flujo mínimo: *Webhook* (POST, Header Auth) → *Switch* por
 `evento` → un nodo *Send Email* (Gmail o SMTP) para cada uno → *Respond to Webhook* con 200.
 
+### Kit de marca y maquetas web (plan Acompañado)
+
+Los clientes con diseño **Acompañado** (o más) tienen en **Diseño** una card que lleva a `/admin/marca`, con dos pestañas. Con un plan que no lo incluye la pantalla se ve
+bloqueada (explica qué es y desde qué plan está) y nada se guarda ni se pide, aunque se arme el pedido a mano.
+
+- **Kit de marca.** Suben sus **logos y fotos** (JPG, PNG o WEBP de hasta 5 MB; hasta 12 archivos en total y 6 por vez; cada uno se convierte a WebP con miniaturas, como las demás imágenes,
+  y los SVG no se aceptan), eligen los **colores** de su marca (el principal, y si quieren un secundario y uno de acento) y cuentan en pocas palabras cómo es: **rubro**, **estilo**
+  (moderno, elegante, cálido o audaz), **sobre la marca** y **marcas o páginas que les gusten**. Nada de esto cambia la vidriera: es el material de la maqueta.
+- **Maqueta web.** Piden "Armar mi maqueta", esperan unos segundos (la página se actualiza sola) y la ven en una vista previa, en tamaño de computadora o de celular, o en pantalla completa.
+  Estados: *generando*, *lista* y *con problemas* (con el motivo, para pedir otra). Se guardan las últimas 5 y se pueden ver o borrar. Es una **maqueta**: no cambia la tienda real.
+
+Límites: una maqueta en camino por tienda (la base rechaza el segundo pedido aunque lleguen a la vez), **3 cada 24 horas** (cuentan las que llegaron a n8n; las que no pudo recibir, no),
+y una que n8n nunca entrega pasa a *con problemas* a los 15 minutos. Hace falta al menos un logo o una foto en el kit (o el logo que ya tiene la tienda en Diseño).
+
+La plataforma **no arma la maqueta**: se la pide a un flujo de **n8n**, que redacta los textos con Gemini y arma la página con la marca de la tienda. Configurá:
+
+```
+N8N_MAQUETAS_URL=https://tu-n8n/webhook/vezza-shop-maquetas   # la URL de producción del webhook del flujo "VEZZA Shop · Maquetas web"
+N8N_MAQUETAS_SECRET=...                                       # opcional: sin él se usa N8N_WEBHOOK_SECRET
+```
+
+Sin `N8N_MAQUETAS_URL` el kit se puede completar, pero "Armar mi maqueta" queda deshabilitado con un aviso. Si n8n no recibe el pedido (caído, error), el pedido se descarta, no cuenta
+para el tope del día y el cliente puede volver a intentarlo.
+
+**Pedido a n8n.** `POST` a `N8N_MAQUETAS_URL` con el secreto en `X-Webhook-Secret` (igual que los mails). n8n tiene que contestar `2xx` enseguida (la plataforma espera 8 segundos) y entregar el
+resultado después. Lleva links absolutos que n8n y la IA pueden abrir:
+
+```json
+{
+  "evento": "maqueta_solicitada",
+  "maqueta": { "id": 12, "token": "…", "respuesta": "https://<panel>/webhooks/maquetas/12" },
+  "tienda": { "nombre": "Aurora", "url": "https://aurora.vezzashop.com" },
+  "marca": { "colores": { "principal": "#7a3b1d", "secundario": "#f4e6dc", "acento": null }, "rubro": "…", "estilo": "calido", "descripcion": "…", "referencias": "…" },
+  "archivos": [{ "tipo": "logo", "nombre": "logo.png", "url": "https://<panel>/subidas/3/<uuid>.webp", "miniatura": "https://<panel>/subidas/3/<uuid>-m.webp" }],
+  "logoTienda": "https://…" ,
+  "catalogo": { "categorias": ["Velas"], "productos": [{ "nombre": "Vela de lavanda", "precio": "$ 12.500", "foto": "https://…-m.webp" }] }
+}
+```
+
+Las imágenes del kit se sirven como las demás de la tienda: por una dirección con nombre al azar y sin sesión, porque n8n y el navegador de quien mira la maqueta tienen que poder abrirlas (quitar un archivo del kit
+lo borra, y las maquetas que ya lo usaban lo muestran roto). **A Gemini solo le llegan textos de la marca** (nombre de la tienda, rubro, estilo, descripción, referencias, colores y los nombres de las categorías y de algunos
+productos): ni imágenes, ni links, ni el token.
+
+**Entrega.** n8n manda el resultado a `maqueta.respuesta` (`POST /webhooks/maquetas/:id`, JSON) con el `token` de ese pedido: `{ token, estado: "generando" | "lista" | "error", html, resumen, error }`.
+Responde `200 { ok: true }` (con `repetida: true` si es el mismo resultado otra vez, por ejemplo un reintento), `400` mal armado, `401` token que no corresponde (o pedido que no existe: no se puede
+averiguar cuáles existen), `409` si la maqueta ya estaba resuelta con otro estado, `413` si pesa más de 1 MB, `422` si el HTML no sirve (la maqueta pasa a *con problemas*) y `429` por demasiados intentos.
+
+Cómo se cuida (`src/maquetas.js`):
+
+- **Token por pedido.** Se genera al azar, viaja una sola vez (en el pedido a n8n) y en la base queda solo su SHA-256. No hay una clave general que sirva para entregar cualquier maqueta: quien no recibió
+  el pedido no puede completarlo, y una maqueta resuelta no se pisa.
+- **El HTML de afuera nunca se confía.** `limpiarHtml()` lo deja solo con una lista de lo permitido: sin `<script>`, formularios, frames, eventos (`onclick`…), `javascript:`, `@import` ni `url()` que no sean
+  imágenes https o de la plataforma; los links solo pueden ser anclas (`#…`), los `<link>` solo de Google Fonts, y siempre queda un documento completo en UTF-8. Lo que no entiende, lo descarta o lo escapa.
+- **Se muestra aislada.** En un `<iframe sandbox="">` (sin scripts, formularios ni nada) cuyo contenido se sirve con su propia política: `default-src 'none'`, imágenes solo de la plataforma, estilos y tipografías de Google Fonts,
+  `form-action 'none'`, `base-uri 'none'`, `frame-ancestors 'self'` y `sandbox`. Solo la ve la tienda dueña (con sesión), y solo mientras su plan lo incluya.
+
+**El flujo de n8n** está en el repo, para importarlo y para probarlo:
+
+| Archivo | Qué es |
+| --- | --- |
+| `n8n/maqueta-web.json` | El flujo "VEZZA Shop · Maquetas web", listo para importar (*Workflows → Import from file*). Lo arma `node scripts/armar-flujo-n8n.js` a partir de los dos archivos siguientes. |
+| `n8n/maqueta-pedido.js` | Nodo *Code* "Validar y armar el pedido": revisa el pedido (la entrega solo puede ir a `https://<dominio>/webhooks/maquetas/<id>`, nunca a una IP ni a `localhost`) y arma lo que se le pide a la IA, que son solo los datos de la marca: ni el token ni ningún link. |
+| `n8n/maqueta-armar.js` | Nodo *Code* "Armar la maqueta": la plantilla de la página (portada con el logo, las fotos y los colores de la marca, categorías, productos, valores, "sobre", galería y pie), con los textos de la IA. |
+
+Recorrido: *Webhook* (Header Auth) → *Validar y armar el pedido* → *¿Pedido válido?* → **Responder 202** (enseguida, así la IA no hace esperar a la plataforma) → **Gemini** *Redactar los textos* →
+*Armar la maqueta* → *Entregar la maqueta* (con 3 reintentos; si falla, avisa el flujo de errores). **La IA solo escribe los textos**: el diseño es la plantilla, así la maqueta siempre se ve bien, se lee bien
+(los colores se ajustan para cumplir contraste 4,5 a 1) y nada de lo que diga la IA puede meter código; si Gemini falla o contesta cualquier cosa, la maqueta sale igual con textos de ejemplo
+(el resumen dice si hubo IA). El estilo elegido define las tipografías (Poppins e Inter, Playfair Display y Lato, Nunito o Montserrat) y las formas; si no eligió, se deduce del rubro.
+
+Para ponerlo en marcha:
+
+1. Importá `n8n/maqueta-web.json` y elegí las credenciales: en el nodo *Webhook*, la de *Header Auth* con el nombre `X-Webhook-Secret` y el mismo valor que `N8N_WEBHOOK_SECRET`; en *Redactar los textos*, la de Google Gemini
+   (el modelo está en `scripts/armar-flujo-n8n.js`, `MODELO_DE_GEMINI`).
+2. Recomendado: en `n8n/maqueta-pedido.js` escribí tu dominio del panel en `DOMINIO_DE_LA_PLATAFORMA` y corré `node scripts/armar-flujo-n8n.js`, así la entrega no puede ir a ningún otro lado.
+3. Activá el flujo y poné su URL de producción en `N8N_MAQUETAS_URL`.
+
+Para cambiar cómo se ve la maqueta (o lo que se le pide a la IA) se edita el archivo del nodo, se corre `node scripts/armar-flujo-n8n.js` y se pega en n8n (o se vuelve a importar). Lo prueba `test/kit-de-marca.test.js`
+(el panel, el pedido a un n8n de mentira, la entrega y la limpieza del HTML con entradas hostiles) y `test/n8n-maqueta.test.js` (los dos nodos con los pedidos reales de la plataforma, el contraste de cualquier paleta,
+que la maqueta pase la limpieza sin perder nada, la entrega de punta a punta y que `n8n/maqueta-web.json` esté al día).
+
 ## Logo de Vezza
 
 La firma "Desarrollado por VEZZA" aparece en la pantalla de ingreso y en el menú de la plataforma (donde además es el
@@ -674,6 +754,8 @@ src/
   cambios-de-plan.js     cambios en un plan con clientes: qué cambió, aumentos con excepciones (precio fijo), Mercado Pago y avisos
   mercadopago.js         cliente de la API de Mercado Pago y validación de la firma de los webhooks
   notificaciones.js      avisos a n8n (el flujo que manda los mails de alta)
+  marca.js               kit de marca (plan Acompañado): colores y datos de la marca, y los logos y fotos que sube el cliente
+  maquetas.js            maquetas web: pedido a n8n con su token, entrega, límites, y la limpieza del HTML que entrega n8n
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
   estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
   limites.js             topes del plan de cada tienda, uso y estado de cobro
@@ -696,7 +778,8 @@ src/
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   rutas/suscribirse.js   alta pública: elegir plan, pagar y crear la cuenta (/suscribirse)
   rutas/admin-suscripcion.js  panel /admin: la suscripción del cliente a su plan
-  rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago y /webhooks/mercadopago/tienda/:id)
+  rutas/admin-marca.js   panel /admin: kit de marca y maqueta web (plan Acompañado)
+  rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago y /webhooks/mercadopago/tienda/:id) y la entrega de las maquetas (/webhooks/maquetas/:id)
   util/iconos.js         íconos SVG de las vistas
   util/grafico.js        cuentas de los gráficos de columnas (alturas y ejes); el dibujo es HTML y CSS en vistas/parciales/dashboard/
   util/vezza.js          logo y firma de Vezza (SVG de publico/vezza/ incrustado en las vistas)
@@ -706,6 +789,8 @@ scripts/crear-tienda.js
 scripts/crear-superadmin.js
 scripts/cargar-planes.js
 scripts/migrar-imagenes.js
+scripts/armar-flujo-n8n.js   arma n8n/maqueta-web.json a partir del código de los nodos
+n8n/                     lo que vive en n8n: el nodo de los mails y el flujo de las maquetas web (nodos Code y flujo importable)
 test/                    tests (node:test)
 ```
 

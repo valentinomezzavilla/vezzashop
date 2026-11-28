@@ -1,0 +1,16 @@
+<%# La card de Diseño que lleva al kit de marca y a la maqueta web (plan Acompañado). Usa el mismo patrón que la del Dashboard en el Inicio
+    (.dashboard-acceso): el título es el link y se estira para que toda la card lleve ahí. Con un plan que no lo incluye, lleva a la misma
+    pantalla, que explica qué es y desde qué plan está. Recibe: puede (si el plan de la tienda lo incluye). %>
+<section class="tarjeta dashboard-acceso marca-acceso" aria-labelledby="marca-acceso-titulo">
+  <div class="dashboard-acceso-texto">
+    <span class="dashboard-acceso-icono" aria-hidden="true"><%- icono('paleta', { tamano: 22 }) %></span>
+    <div>
+      <h2 id="marca-acceso-titulo"><a class="dashboard-acceso-enlace" href="/admin/marca">Kit de marca y maqueta web</a> <span class="pastilla pastilla-nivel">Plan Acompañado</span></h2>
+      <p class="texto-suave">Subí tu logo, tus fotos y los colores de tu marca, y armamos una maqueta de cómo podría verse tu tienda.</p>
+    </div>
+  </div>
+  <span class="dashboard-acceso-ir" aria-hidden="true">
+    <% if (puede) { %>Armar mi maqueta<% } else { %><%- icono('candado', { tamano: 15 }) %> Ver qué incluye<% } %>
+    <%- icono('derecha', { tamano: 16 }) %>
+  </span>
+</section>

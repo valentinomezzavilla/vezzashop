@@ -1,0 +1,197 @@
+<%#
+  El kit de marca (plan Acompañado): los archivos, los colores y los datos de la marca que se usan para armar la maqueta (ver src/marca.js).
+  Recibe: plan, valores (lo guardado, o lo enviado si el formulario volvió con errores), errores, archivos, logoTienda, tipos, estilos, colores,
+  limites, generacion ({ puede, razon, restantes, maximo }) y ultima (la última maqueta pedida, o null).
+%>
+<%- include('../parciales/cabecera', { titulo: 'Kit de marca' }) %>
+<%- include('../parciales/marca-encabezado', { pestania: 'kit', ultima: locals.ultima ?? null }) %>
+
+<% if (!plan.puede) { %>
+  <%- include('../parciales/marca-bloqueo', { plan }) %>
+<% } else { %>
+<%
+  const err = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
+  const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  // Si el formulario volvió con errores, `valores` es lo que se envió (puede faltar algún campo); si no, lo guardado.
+  const volvio = valores._csrf !== undefined;
+  const esColor = (texto) => /^#[0-9a-f]{6}$/i.test(texto ?? '');
+  const colorOpcional = (campo, defecto) => {
+    const propio = volvio ? Boolean(valores[`${campo}Propio`]) : esColor(valores[campo]);
+    return `
+      <div class="campo color-opcional">
+        <label class="casilla"><input type="checkbox" name="${campo}Propio" value="1"${propio ? ' checked' : ''} data-color-propio> Usar ${colores[campo].titulo.toLowerCase()}</label>
+        <div class="selector-color">
+          <input id="${campo}" type="color" name="${campo}" value="${esColor(valores[campo]) ? valores[campo] : defecto}" aria-label="${colores[campo].titulo}" data-color-opcional data-marca-color${invalido(campo)}>
+          <code data-marca-hex>${esColor(valores[campo]) ? valores[campo] : defecto}</code>
+        </div>
+        <span class="ayuda">${colores[campo].ayuda}</span>
+        ${include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` })}
+      </div>`;
+  };
+  const estiloActual = Object.hasOwn(estilos, valores.estilo) ? valores.estilo : '';
+  const lleno = archivos.length >= limites.maxArchivos;
+%>
+
+<% if (Object.keys(errores).length) { %>
+  <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>
+<% } %>
+
+<section class="ajuste" id="archivos">
+  <div class="ajuste-intro">
+    <h2>Tus archivos</h2>
+    <p class="texto-suave">Tu logo y fotos que muestren tu marca. La maqueta se arma con esto.</p>
+    <p class="ayuda"><strong><%= archivos.length %></strong> de <%= limites.maxArchivos %> archivos</p>
+  </div>
+  <div class="tarjeta ajuste-campos">
+    <% if (archivos.length === 0) { %>
+      <p class="marca-vacio"><%- icono('imagen', { tamano: 20 }) %> Todavía no subiste nada.<% if (logoTienda) { %> Mientras tanto, usamos el logo que ya tiene tu tienda.<% } %></p>
+    <% } else { %>
+      <ul class="marca-archivos">
+        <% for (const archivo of archivos) { %>
+          <li class="marca-archivo">
+            <img src="<%= archivo.miniatura %>" alt="<%= tipos[archivo.tipo].titulo %>: <%= archivo.nombre %>" loading="lazy">
+            <div class="marca-archivo-pie">
+              <span class="pastilla"><%= tipos[archivo.tipo].titulo %></span>
+              <span class="marca-archivo-nombre" title="<%= archivo.nombre %>"><%= archivo.nombre %></span>
+              <form method="post" action="/admin/marca/archivos/<%= archivo.id %>/borrar" data-un-solo-envio>
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="boton-icono" type="submit" aria-label="Quitar <%= archivo.nombre %> del kit"><%- icono('cerrar', { tamano: 16 }) %></button>
+              </form>
+            </div>
+          </li>
+        <% } %>
+      </ul>
+    <% } %>
+
+    <% if (lleno) { %>
+      <p class="ayuda">Llegaste al máximo de <%= limites.maxArchivos %> archivos. Quitá alguno para subir otros.</p>
+    <% } else { %>
+      <form method="post" action="/admin/marca/archivos" enctype="multipart/form-data" class="marca-subir" data-un-solo-envio>
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <fieldset class="tipos-entrega">
+          <legend class="etiqueta">¿Qué vas a subir?</legend>
+          <% for (const [clave, tipo] of Object.entries(tipos)) { %>
+            <label class="opcion-tipo">
+              <input type="radio" name="tipo" value="<%= clave %>"<%= clave === 'logo' ? ' checked' : '' %>>
+              <span><strong><%= tipo.plural %></strong></span>
+              <span class="ayuda"><%= tipo.ayuda %></span>
+            </label>
+          <% } %>
+        </fieldset>
+        <div class="acciones">
+          <label class="boton boton-secundario">
+            <%- icono('subir', { tamano: 16 }) %> <span data-nombre-archivo>Elegir imágenes</span>
+            <input class="visualmente-oculto" type="file" name="archivos" multiple required accept="image/png,image/jpeg,image/webp" aria-describedby="ayuda-archivos">
+          </label>
+          <button class="boton" type="submit">Subir</button>
+        </div>
+        <span class="ayuda" id="ayuda-archivos">PNG, JPG o WEBP de hasta <%= limites.megas %> MB cada una, hasta <%= limites.maxPorEnvio %> por vez. Los logos con fondo transparente se ven mejor.</span>
+      </form>
+    <% } %>
+  </div>
+</section>
+
+<form method="post" action="/admin/marca" class="ajustes" id="form-marca">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <section class="ajuste" id="colores">
+    <div class="ajuste-intro">
+      <h2>Colores de tu marca</h2>
+      <p class="texto-suave">Los colores que te identifican. La maqueta los usa en los fondos, los botones y los detalles.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="campo">
+        <label for="colorPrincipal"><%= colores.colorPrincipal.titulo %></label>
+        <div class="selector-color">
+          <input id="colorPrincipal" type="color" name="colorPrincipal" value="<%= esColor(valores.colorPrincipal) ? valores.colorPrincipal : '#1a1a1a' %>" data-marca-color<%- invalido('colorPrincipal') %>>
+          <code data-marca-hex><%= esColor(valores.colorPrincipal) ? valores.colorPrincipal : '#1a1a1a' %></code>
+        </div>
+        <span class="ayuda"><%= colores.colorPrincipal.ayuda %> Empieza con el color principal de tu tienda.</span>
+        <%- err('colorPrincipal') %>
+      </div>
+      <div class="ajuste-campos-dos">
+        <%- colorOpcional('colorSecundario', '#e7e5e4') %>
+        <%- colorOpcional('colorAcento', '#f59e0b') %>
+      </div>
+    </div>
+  </section>
+
+  <section class="ajuste" id="marca">
+    <div class="ajuste-intro">
+      <h2>Tu marca en pocas palabras</h2>
+      <p class="texto-suave">Cuanto más nos cuentes, más se parece la maqueta a tu marca. Todo esto es opcional.</p>
+    </div>
+    <div class="tarjeta ajuste-campos">
+      <div class="campo">
+        <label for="rubro">Rubro</label>
+        <input id="rubro" type="text" name="rubro" value="<%= valores.rubro ?? '' %>" maxlength="<%= limites.largos.rubro %>" placeholder="Ropa de mujer, cosmética natural, ferretería…"<%- invalido('rubro') %>>
+        <%- err('rubro') %>
+      </div>
+
+      <fieldset class="tipos-entrega tipos-varios">
+        <legend class="etiqueta">Estilo</legend>
+        <label class="opcion-tipo opcion-ancha">
+          <input type="radio" name="estilo" value=""<%= estiloActual === '' ? ' checked' : '' %>>
+          <span><strong>Que lo elijan por mí</strong></span>
+          <span class="ayuda">Según tu rubro y tus colores.</span>
+        </label>
+        <% for (const [clave, estilo] of Object.entries(estilos)) { %>
+          <label class="opcion-tipo">
+            <input type="radio" name="estilo" value="<%= clave %>"<%= estiloActual === clave ? ' checked' : '' %>>
+            <span><strong><%= estilo.titulo %></strong></span>
+            <span class="ayuda"><%= estilo.ayuda %></span>
+          </label>
+        <% } %>
+        <%- err('estilo') %>
+      </fieldset>
+
+      <div class="campo">
+        <label for="descripcion">Sobre tu marca</label>
+        <textarea id="descripcion" name="descripcion" rows="5" maxlength="<%= limites.largos.descripcion %>" placeholder="Qué vendés, a quién, qué te diferencia, qué querés transmitir…" aria-describedby="ayuda-descripcion"<%- invalido('descripcion') %>><%= valores.descripcion ?? '' %></textarea>
+        <span class="ayuda" id="ayuda-descripcion">Hasta <%= limites.largos.descripcion %> caracteres.</span>
+        <%- err('descripcion') %>
+      </div>
+
+      <div class="campo">
+        <label for="referencias">Marcas o páginas que te gusten <span class="opcional">(opcional)</span></label>
+        <textarea id="referencias" name="referencias" rows="3" maxlength="<%= limites.largos.referencias %>" placeholder="Nombres o links de tiendas que te inspiren, y qué te gusta de cada una." aria-describedby="ayuda-referencias"<%- invalido('referencias') %>><%= valores.referencias ?? '' %></textarea>
+        <span class="ayuda" id="ayuda-referencias">Son una guía: no las visitamos ni las copiamos.</span>
+        <%- err('referencias') %>
+      </div>
+    </div>
+  </section>
+
+  <div class="barra-guardar">
+    <span class="ayuda" data-sin-guardar hidden><%- icono('alerta', { tamano: 16 }) %> Tenés cambios sin guardar</span>
+    <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar kit</button>
+  </div>
+</form>
+
+<section class="ajuste" id="generar">
+  <div class="ajuste-intro">
+    <h2>Armar la maqueta</h2>
+    <p class="texto-suave">Con tus archivos, tus colores y lo que nos contaste, armamos una vista previa de tu tienda. No cambia nada de tu tienda real.</p>
+  </div>
+  <div class="tarjeta ajuste-campos marca-generar">
+    <% if (generacion.razon === 'no-configurada') { %>
+      <p class="aviso aviso-error"><%- icono('alerta', { tamano: 18 }) %><span>Por ahora no podemos armar maquetas.<%= locals.contactoPlataforma ? ` Contactanos: ${contactoPlataforma}.` : '' %></span></p>
+    <% } else if (generacion.razon === 'sin-material') { %>
+      <p class="ayuda">Subí al menos un logo o una foto para poder armar la maqueta.</p>
+    <% } else if (generacion.razon === 'en-curso') { %>
+      <p class="ayuda">Ya tenés una maqueta en camino. <a href="/admin/marca/maqueta">Ver cómo va</a>.</p>
+    <% } else if (generacion.razon === 'limite') { %>
+      <p class="ayuda">Ya pediste <%= generacion.maximo %> maquetas en las últimas 24 horas. Probá de nuevo más tarde.</p>
+    <% } else { %>
+      <p class="ayuda">Se arma con lo que está <strong>guardado</strong> en tu kit: guardalo antes de pedirla. Hoy podés pedir <%= generacion.restantes %> más.</p>
+    <% } %>
+    <div class="acciones">
+      <form method="post" action="/admin/marca/maqueta" data-un-solo-envio>
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="boton" type="submit"<%= generacion.puede ? '' : ' disabled' %>><%- icono('paleta', { tamano: 18 }) %> Armar mi maqueta</button>
+      </form>
+      <% if (locals.ultima) { %><a class="boton boton-secundario" href="/admin/marca/maqueta">Ver mis maquetas</a><% } %>
+    </div>
+  </div>
+</section>
+<% } %>
+<%- include('../parciales/pie') %>

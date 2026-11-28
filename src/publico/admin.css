@@ -1917,3 +1917,58 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
     transition-duration: 0s !important;
   }
 }
+
+/* ---------- Kit de marca y maqueta web (plan Acompañado) ---------- */
+/* La card de Diseño que lleva acá reusa .dashboard-acceso: solo cambia la grilla (dos columnas en vez de tres). */
+.marca-acceso { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 1080px) { .marca-acceso { grid-template-columns: minmax(0, 1fr); } }
+.marca-acceso h2 .pastilla { margin-left: .35rem; font-size: .75rem; letter-spacing: 0; }
+
+.marca-pestanias { width: fit-content; margin-bottom: 1.25rem; }
+.marca-bloqueo { display: grid; gap: 1rem; }
+.marca-bloqueo > * { margin: 0; }
+.marca-bloqueo h2 { font-size: 1.05rem; }
+.marca-pasos { display: grid; gap: .6rem; padding-left: 1.25rem; color: var(--texto-suave); }
+
+/* Los archivos del kit: una grilla de tarjetas con la imagen (con fondo ajedrezado, para ver los logos transparentes) y su nombre. */
+.marca-vacio { display: flex; gap: .6rem; align-items: center; margin: 0; padding: 1rem; border: 1px dashed var(--borde-fuerte); border-radius: 10px; color: var(--texto-suave); }
+.marca-vacio .icono { flex-shrink: 0; color: var(--texto-tenue); }
+.marca-archivos { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; margin: 0; padding: 0; }
+.marca-archivo { min-width: 0; overflow: hidden; border: 1px solid var(--borde); border-radius: 10px; background: var(--superficie-solida); }
+/* El ajedrezado es claro en los dos temas: los logos se hacen pensando en un fondo claro y en oscuro no se verían. */
+.marca-archivo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: conic-gradient(#e9e9ec 25%, #fff 0 50%, #e9e9ec 0 75%, #fff 0) 0 0 / 16px 16px; }
+.marca-archivo-pie { display: flex; gap: .4rem; align-items: center; min-width: 0; padding: .35rem .4rem .35rem .6rem; border-top: 1px solid var(--borde); }
+.marca-archivo-pie form { flex-shrink: 0; margin: 0 0 0 auto; }
+.marca-archivo-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto-tenue); font-size: .75rem; }
+.opcion-ancha { grid-column: 1 / -1; }
+.marca-subir { display: grid; gap: .9rem; padding-top: 1.1rem; border-top: 1px solid var(--borde); }
+.marca-subir:first-child { padding-top: 0; border-top: 0; }
+.marca-generar { align-content: start; }
+.marca-generar .acciones form, .maqueta-acciones form { margin: 0; }
+
+/* La maqueta: su estado, la vista previa dentro de un iframe aislado (la CSP y el sandbox los pone el servidor) y las anteriores. */
+.maqueta-actual { display: grid; gap: 1rem; }
+.maqueta-actual > * { margin: 0; }
+.maqueta-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.maqueta-cabecera h2 { font-size: 1.05rem; }
+.maqueta-cabecera .ayuda { margin: .25rem 0 0; }
+.maqueta-espera { display: flex; flex-wrap: wrap; align-items: center; gap: .85rem 1rem; padding: 1.25rem; border-radius: 12px; background: var(--primario-suave); }
+.maqueta-espera > div { flex: 1 1 16rem; display: grid; gap: .15rem; }
+.maqueta-espera p { margin: 0; }
+.maqueta-giro { flex-shrink: 0; width: 24px; height: 24px; border: 3px solid color-mix(in srgb, var(--primario) 25%, transparent); border-top-color: var(--primario); border-radius: 50%; animation: maqueta-giro 1s linear infinite; }
+@keyframes maqueta-giro { to { transform: rotate(360deg); } }
+.maqueta-marco { display: grid; gap: .6rem; min-width: 0; }
+.maqueta-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.maqueta-dispositivos { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
+.maqueta-iframe { display: block; width: 100%; height: min(78vh, 780px); min-height: 420px; margin-inline: auto; border: 1px solid var(--borde-fuerte); border-radius: 12px; background: #fff; transition: width var(--rapido); }
+.maqueta-marco:has(input[value="celular"]:checked) .maqueta-iframe { width: min(100%, 390px); }
+.maqueta-resumen { color: var(--texto-suave); }
+.maqueta-error { display: flex; gap: .75rem; align-items: flex-start; padding: 1rem; border-radius: 12px; background: var(--error-fondo); color: var(--error); }
+.maqueta-error .icono { flex-shrink: 0; margin-top: .1rem; }
+.maqueta-error p { margin: .15rem 0 0; color: inherit; }
+.maqueta-historial { list-style: none; margin: 0; padding: .25rem 1rem; }
+.maqueta-historial li { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; padding: .6rem 0; }
+.maqueta-historial li + li { border-top: 1px solid var(--borde); }
+.maqueta-historial li[aria-current] .maqueta-historial-fecha { font-weight: 600; }
+.maqueta-historial .acciones-fila { align-items: center; margin-left: auto; }
+.maqueta-historial .acciones-fila form { margin: 0; }

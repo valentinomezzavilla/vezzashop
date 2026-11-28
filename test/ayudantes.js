@@ -22,6 +22,11 @@ export function crearNavegador(base) {
       const i = par.indexOf('=');
       cookies.set(par.slice(0, i), par.slice(i + 1));
     }
+    // express-session manda los encabezados de una respuesta y todo su cuerpo menos el último byte antes de terminar de guardar la sesión, y ese
+    // byte sale cuando el guardado terminó. Con una redirección, fetch ya devolvió la respuesta, pero la sesión (el ingreso, el aviso que se va a
+    // mostrar) todavía puede no estar guardada: en una base de verdad (con varias conexiones) el pedido que sigue podía llegar antes y leer la
+    // sesión vieja. Leer el cuerpo entero asegura que ya se guardó.
+    if (respuesta.status >= 300 && respuesta.status < 400) await respuesta.clone().arrayBuffer();
     return respuesta;
   }
   async function csrfDe(ruta) {

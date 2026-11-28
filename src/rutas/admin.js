@@ -6,6 +6,7 @@ import { urlPublicaDeTienda } from '../util/dominios.js';
 import { rutasAdminTienda } from './admin-tienda.js';
 import { rutasAdminPedidos } from './admin-pedidos.js';
 import { rutasAdminSuscripcion } from './admin-suscripcion.js';
+import { rutasAdminMarca } from './admin-marca.js';
 import { contarPedidosNuevos } from '../pedidos.js';
 import { tokenCsrf, verificarCsrf } from '../csrf.js';
 import { plural } from '../util/formato.js';
@@ -85,7 +86,7 @@ const regenerarSesion = (req) =>
 
 // servicios: las suscripciones con Mercado Pago (ver suscripciones.js); null si no están configuradas.
 // notificar: el aviso por mail a n8n (notificaciones.js), para los pedidos; sin N8N_WEBHOOK_URL no manda nada.
-export function rutasAdmin({ db, config, servicios = null, notificar = async () => false }) {
+export function rutasAdmin({ db, config, servicios = null, notificar = async () => false, notificarMaquetas = async () => false }) {
   const router = express.Router();
   // permitirLinksLocales solo lo activan los tests (el servidor de fotos de prueba está en 127.0.0.1).
   const descargar = crearDescargador({ permitirDireccion: config.permitirLinksLocales ? () => true : esDireccionPublica });
@@ -217,6 +218,7 @@ export function rutasAdmin({ db, config, servicios = null, notificar = async () 
   router.use(rutasAdminTienda({ db, config, servicios }));
   router.use(rutasAdminPedidos({ db, config, notificar }));
   router.use(rutasAdminSuscripcion({ db, config, servicios }));
+  router.use(rutasAdminMarca({ db, config, notificarMaquetas }));
 
   router.get('/importar', (req, res) => res.render('admin/importar', { error: null }));
 

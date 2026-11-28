@@ -1,0 +1,111 @@
+<%#
+  La maqueta web (plan Acompañado): el estado de la última maqueta pedida, su vista previa y las anteriores (ver src/maquetas.js).
+  Recibe: plan, maquetas (la más nueva primero), actual (la que se está viendo), ultima (la más nueva) y generacion ({ puede, razon, restantes, maximo }).
+%>
+<%- include('../parciales/cabecera', { titulo: 'Maqueta web' }) %>
+<%- include('../parciales/marca-encabezado', { pestania: 'maqueta', ultima: locals.ultima ?? null }) %>
+
+<% if (!plan.puede) { %>
+  <%- include('../parciales/marca-bloqueo', { plan }) %>
+<% } else if (!actual) { %>
+  <section class="tarjeta estado-vacio">
+    <%- icono('paleta', { tamano: 32 }) %>
+    <h2>Todavía no pediste ninguna maqueta</h2>
+    <p class="texto-suave">Completá tu kit de marca y pedila: suele tardar menos de un minuto.</p>
+    <a class="boton" href="/admin/marca">Ir al kit de marca</a>
+  </section>
+<% } else { %>
+<%
+  const clasePastilla = { pendiente: 'pastilla-nuevo', generando: 'pastilla-nuevo', lista: 'pastilla-ok', error: 'pastilla-cancelado' };
+  // Para quien espera, "en cola" y "generando" son lo mismo.
+  const titulos = { pendiente: 'Generando', generando: 'Generando', lista: 'Lista', error: 'Con problemas' };
+%>
+<section class="tarjeta maqueta-actual" aria-labelledby="maqueta-titulo">
+  <div class="maqueta-cabecera">
+    <div>
+      <h2 id="maqueta-titulo">Maqueta del <%= formatearFecha(actual.creadoEn) %></h2>
+      <p class="ayuda"><span class="pastilla <%= clasePastilla[actual.estado] %>"><%= titulos[actual.estado] %></span></p>
+    </div>
+    <% if (actual.estado === 'lista') { %>
+      <a class="boton boton-secundario boton-chico" href="/admin/marca/maqueta/<%= actual.id %>/vista" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Abrir en pantalla completa</a>
+    <% } %>
+  </div>
+
+  <% if (actual.enCurso) { %>
+    <div class="maqueta-espera" role="status" aria-live="polite" data-maqueta-espera="<%= actual.id %>">
+      <span class="maqueta-giro" aria-hidden="true"></span>
+      <div>
+        <strong>Estamos armando tu maqueta…</strong>
+        <p class="ayuda">Suele tardar menos de un minuto. Esta página se actualiza sola cuando está lista.</p>
+      </div>
+      <a class="boton boton-secundario boton-chico" href="/admin/marca/maqueta<%= actual.id === ultima.id ? '' : `?ver=${actual.id}` %>"><%- icono('refrescar', { tamano: 16 }) %> Actualizar</a>
+    </div>
+  <% } else if (actual.estado === 'lista') { %>
+    <div class="maqueta-marco">
+      <div class="maqueta-barra">
+        <div class="maqueta-dispositivos" role="radiogroup" aria-label="Tamaño de la vista previa">
+          <label class="casilla"><input type="radio" name="dispositivo" value="compu" checked> Computadora</label>
+          <label class="casilla"><input type="radio" name="dispositivo" value="celular"> Celular</label>
+        </div>
+      </div>
+      <iframe class="maqueta-iframe" src="/admin/marca/maqueta/<%= actual.id %>/vista" sandbox="" title="Vista previa de la maqueta de tu tienda" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </div>
+    <% if (actual.resumen) { %><p class="maqueta-resumen"><%= actual.resumen %></p><% } %>
+    <p class="ayuda">Es una maqueta: muestra cómo podría verse tu tienda, pero no cambia nada de tu tienda real. Los textos son de ejemplo y los productos son algunos de los tuyos.</p>
+  <% } else { %>
+    <div class="maqueta-error" role="alert">
+      <%- icono('alerta', { tamano: 20 }) %>
+      <div>
+        <strong>No pudimos armar esta maqueta.</strong>
+        <p class="ayuda"><%= actual.error || 'Probá de nuevo en unos minutos.' %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="acciones maqueta-acciones">
+    <form method="post" action="/admin/marca/maqueta" data-un-solo-envio>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="boton" type="submit"<%= generacion.puede ? '' : ' disabled' %>><%- icono('paleta', { tamano: 18 }) %> Armar otra maqueta</button>
+    </form>
+    <a class="boton boton-secundario" href="/admin/marca">Cambiar mi kit de marca</a>
+  </div>
+  <% if (generacion.razon === 'limite') { %>
+    <p class="ayuda">Ya pediste <%= generacion.maximo %> maquetas en las últimas 24 horas. Probá de nuevo más tarde.</p>
+  <% } else if (generacion.razon === 'no-configurada') { %>
+    <p class="ayuda">Por ahora no podemos armar maquetas nuevas.<%= locals.contactoPlataforma ? ` Contactanos: ${contactoPlataforma}.` : '' %></p>
+  <% } else if (generacion.razon === 'en-curso') { %>
+    <p class="ayuda">Podés pedir otra cuando termine esta.</p>
+  <% } else if (generacion.razon === 'sin-material') { %>
+    <p class="ayuda">Subí al menos un logo o una foto en tu <a href="/admin/marca">kit de marca</a> para pedir otra.</p>
+  <% } else { %>
+    <p class="ayuda">Hoy podés pedir <%= generacion.restantes %> más.</p>
+  <% } %>
+</section>
+
+<% if (maquetas.length > 1) { %>
+  <section class="ajuste" id="anteriores">
+    <div class="ajuste-intro">
+      <h2>Tus maquetas</h2>
+      <p class="texto-suave">Guardamos las últimas <%= maxGuardadas %>.</p>
+    </div>
+    <ul class="tarjeta maqueta-historial">
+      <% for (const m of maquetas) { %>
+        <li<%- m.id === actual.id ? ' aria-current="true"' : '' %>>
+          <span class="maqueta-historial-fecha"><%= formatearFecha(m.creadoEn) %></span>
+          <span class="pastilla <%= clasePastilla[m.estado] %>"><%= titulos[m.estado] %></span>
+          <span class="acciones-fila">
+            <% if (m.id !== actual.id) { %><a class="boton boton-fantasma boton-chico" href="/admin/marca/maqueta?ver=<%= m.id %>">Ver</a><% } else { %><span class="ayuda">Viendo</span><% } %>
+            <% if (!m.enCurso) { %>
+              <form method="post" action="/admin/marca/maqueta/<%= m.id %>/borrar" data-un-solo-envio>
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="boton-icono" type="submit" aria-label="Borrar la maqueta del <%= formatearFecha(m.creadoEn) %>"><%- icono('basura', { tamano: 16 }) %></button>
+              </form>
+            <% } %>
+          </span>
+        </li>
+      <% } %>
+    </ul>
+  </section>
+<% } %>
+<% } %>
+<%- include('../parciales/pie') %>

@@ -87,6 +87,8 @@ export function crearApp({ db, config }) {
 
   // El aviso por mail a n8n (alta de cuentas, cambios de plan, pedidos): sin N8N_WEBHOOK_URL no manda nada, pero siempre existe.
   const notificar = crearNotificador(config.n8n);
+  // El pedido de maquetas web (plan Acompañado) va a su propio flujo de n8n, con su propio webhook (N8N_MAQUETAS_URL).
+  const notificarMaquetas = crearNotificador(config.maquetas);
 
   // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:
   // la vidriera no las usa y así las visitas no crean sesiones.
@@ -158,7 +160,7 @@ export function crearApp({ db, config }) {
     });
 
   // Tiendas: 8 horas desde que ingresan.
-  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config, servicios, notificar }));
+  app.use('/admin', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasAdmin({ db, config, servicios, notificar, notificarMaquetas }));
   // Alta de cuentas nuevas desde la landing. Usa la misma sesión que /admin: al completar el formulario, el cliente queda adentro del panel.
   if (servicios) app.use('/suscribirse', sesion({ name: 'sesion', path: '/', maxAge: OCHO_HORAS_MS }), rutasSuscribirse({ servicios, config }));
   else app.use('/suscribirse', (req, res) => res.redirect('/'));

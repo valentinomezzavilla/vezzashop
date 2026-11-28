@@ -693,3 +693,32 @@ document.addEventListener('input', (evento) => {
   const casilla = evento.target.closest('.color-opcional')?.querySelector('[data-color-propio]');
   if (casilla && !casilla.checked) casilla.checked = true;
 });
+
+// ---------- Kit de marca: el color elegido muestra su código ----------
+
+for (const entrada of document.querySelectorAll('input[type="color"][data-marca-color]')) {
+  const codigo = entrada.closest('.selector-color')?.querySelector('[data-marca-hex]');
+  entrada.addEventListener('input', () => {
+    if (codigo) codigo.textContent = entrada.value;
+  });
+}
+
+// ---------- Maqueta web: mientras se arma, la página pregunta cómo va y se recarga sola cuando termina ----------
+// Sin JavaScript queda el botón "Actualizar". La maqueta no tiene formularios con cambios sin guardar, así que recargar no pierde nada.
+{
+  const espera = document.querySelector('[data-maqueta-espera]');
+  if (espera) {
+    let intentos = 0;
+    const consultar = async () => {
+      intentos += 1;
+      try {
+        const respuesta = await fetch(`/admin/marca/maqueta/${espera.dataset.maquetaEspera}/estado`, { headers: { accept: 'application/json' }, cache: 'no-store' });
+        if (respuesta.ok && !(await respuesta.json()).enCurso) return location.reload();
+      } catch {
+        // sin conexión por un momento: se vuelve a preguntar
+      }
+      if (intentos < 300) setTimeout(consultar, intentos < 10 ? 2500 : 6000);
+    };
+    setTimeout(consultar, 2500);
+  }
+}

@@ -1,0 +1,12 @@
+<%# Arriba del kit de marca y de la maqueta: el título y las dos pestañas. Recibe: pestania ('kit' o 'maqueta') y ultima (la última maqueta pedida, o null). %>
+<header class="encabezado">
+  <div>
+    <h1>Kit de marca <span class="pastilla pastilla-nivel">Plan Acompañado</span></h1>
+    <p class="texto-suave">Subí el material de tu marca y armamos una maqueta de cómo podría verse tu tienda.</p>
+  </div>
+  <a class="boton boton-secundario" href="/admin/diseno"><%- icono('izquierda', { tamano: 16 }) %> Volver a Diseño</a>
+</header>
+<nav class="pestanias marca-pestanias" aria-label="Secciones del kit de marca">
+  <a href="/admin/marca"<%- pestania === 'kit' ? ' class="activa" aria-current="page"' : '' %>>Kit de marca</a>
+  <a href="/admin/marca/maqueta"<%- pestania === 'maqueta' ? ' class="activa" aria-current="page"' : '' %>>Maqueta web<% if (locals.ultima && ultima.enCurso) { %> <span class="pestania-cuenta">Generando</span><% } %></a>
+</nav>

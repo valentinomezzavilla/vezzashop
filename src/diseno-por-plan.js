@@ -35,6 +35,7 @@ export const NIVELES = {
       'Tarjetas de producto con borde o sombra, y la proporción de la foto',
       'Pie de página claro, oscuro o de tu color',
       'Banners a ancho completo',
+      'Kit de marca: subís tu logo, fotos y colores y armamos una maqueta de tu tienda',
     ],
     resumen: 'Más controles de diseño: colores, portada y tarjetas',
   },
