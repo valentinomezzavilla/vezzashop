@@ -1,9 +1,33 @@
 <%#
   La maqueta web (función del plan): el estado de la última maqueta pedida, su vista previa y las anteriores (ver src/maquetas.js).
-  Recibe: plan, maquetas (la más nueva primero), actual (la que se está viendo), ultima (la más nueva) y generacion ({ puede, razon, restantes, maximo }).
+  Recibe: plan, maquetas (la más nueva primero), actual (la que se está viendo), ultima (la más nueva), generacion ({ puede, razon, restantes, maximo }) y
+  uso (la última vez que se usó una maqueta en la tienda, o null: ver src/usar-maqueta.js).
 %>
 <%- include('../parciales/cabecera', { titulo: 'Maqueta web' }) %>
 <%- include('../parciales/marca-encabezado', { pestania: 'maqueta', ultima: locals.ultima ?? null }) %>
+
+<% if (plan.puede.kit_de_marca && locals.uso) { %>
+  <%# Lo último que se llevó a la tienda y el botón para volver a lo de antes (no pisa lo que se cambió después). %>
+  <section class="tarjeta maqueta-usada" aria-labelledby="maqueta-usada-titulo">
+    <div>
+      <h2 id="maqueta-usada-titulo">Usaste una maqueta en tu tienda</h2>
+      <p class="ayuda">El <%= formatearFecha(uso.usadaEn) %> llevaste a tu tienda:</p>
+      <ul class="maqueta-usada-lista">
+        <% for (const cambio of uso.cambios) { %>
+          <li><strong><%= cambio.titulo %></strong><% if (cambio.detalle) { %>: <span class="texto-suave"><%= cambio.detalle %></span><% } %></li>
+        <% } %>
+      </ul>
+      <p class="ayuda">Si no te convence, volvés a lo que tenías. Lo que hayas cambiado después de usar la maqueta no se toca.</p>
+    </div>
+    <div class="maqueta-usada-acciones">
+      <% if (locals.urlMiTienda) { %><a class="boton boton-secundario" href="<%= urlMiTienda %>" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Ver mi tienda</a><% } %>
+      <form method="post" action="/admin/marca/maqueta/deshacer" data-un-solo-envio>
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="boton boton-secundario" type="submit"><%- icono('refrescar', { tamano: 16 }) %> Deshacer</button>
+      </form>
+    </div>
+  </section>
+<% } %>
 
 <% if (!plan.puede.kit_de_marca) { %>
   <%- include('../parciales/marca-bloqueo', { plan }) %>
@@ -27,7 +51,10 @@
       <p class="ayuda"><span class="pastilla <%= clasePastilla[actual.estado] %>"><%= titulos[actual.estado] %></span></p>
     </div>
     <% if (actual.estado === 'lista') { %>
-      <a class="boton boton-secundario boton-chico" href="/admin/marca/maqueta/<%= actual.id %>/vista" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Abrir en pantalla completa</a>
+      <div class="maqueta-cabecera-acciones">
+        <a class="boton" href="/admin/marca/maqueta/<%= actual.id %>/usar"><%- icono('check', { tamano: 16 }) %> Usar en mi tienda</a>
+        <a class="boton boton-secundario boton-chico" href="/admin/marca/maqueta/<%= actual.id %>/vista" target="_blank" rel="noopener"><%- icono('externo', { tamano: 16 }) %> Abrir en pantalla completa</a>
+      </div>
     <% } %>
   </div>
 
@@ -51,7 +78,7 @@
       <iframe class="maqueta-iframe" src="/admin/marca/maqueta/<%= actual.id %>/vista" sandbox="" title="Vista previa de la maqueta de tu tienda" loading="lazy" referrerpolicy="no-referrer"></iframe>
     </div>
     <% if (actual.resumen) { %><p class="maqueta-resumen"><%= actual.resumen %></p><% } %>
-    <p class="ayuda">Es una maqueta: muestra cómo podría verse tu tienda, pero no cambia nada de tu tienda real. Los textos son de ejemplo y los productos son algunos de los tuyos.</p>
+    <p class="ayuda">Es una maqueta: muestra cómo podría verse tu tienda y no cambia nada de tu tienda real hasta que toques <strong>Usar en mi tienda</strong>, que antes te muestra qué se cambiaría y te deja elegir. Los productos son algunos de los tuyos; los textos los redacta una IA (o son de ejemplo: lo dice el resumen de arriba) y conviene revisarlos.</p>
   <% } else { %>
     <div class="maqueta-error" role="alert">
       <%- icono('alerta', { tamano: 20 }) %>

@@ -1,0 +1,18 @@
+<%#
+  Un lado de un cambio de "usar la maqueta en la tienda": lo que hay ahora o lo que quedaría (ver src/usar-maqueta.js).
+  Recibe: item (de proponerUso) y lado ('ahora' o 'nuevo').
+%>
+<% const valor = item[lado]; const hex = /^#[0-9a-f]{6}$/i.test(valor ?? '') ? valor : null; %>
+<% if (item.tipo === 'color') { %>
+  <% if (hex) { %><span class="muestra-color" style="background: <%= hex %>" aria-hidden="true"></span> <code><%= hex %></code><% } else { %><span class="texto-suave">Sin color</span><% } %>
+<% } else if (item.tipo === 'imagen') { %>
+  <% if (valor) { %><img class="usar-imagen" src="<%= valor %>" alt="<%= lado === 'ahora' ? 'El logo que tenés ahora' : 'El logo de tu kit de marca' %>"><% } else { %><span class="texto-suave">Sin logo</span><% } %>
+<% } else if (item.tipo === 'banner') { %>
+  <% if (lado === 'nuevo') { %>
+    <img class="usar-imagen usar-imagen-ancha" src="<%= valor %>" alt="Tu primera foto del kit de marca">
+  <% } else { %>
+    <span class="texto-suave"><%= valor.cantidad === 0 ? 'Sin banners' : plural(valor.cantidad, 'banner', 'banners') %> (tu plan permite hasta <%= valor.maximo %>)</span>
+  <% } %>
+<% } else { %>
+  <% if (valor) { %><q class="usar-texto"><%= valor %></q><% } else { %><span class="texto-suave">Vacío</span><% } %>
+<% } %>

@@ -1969,6 +1969,39 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
 .marca-generar { align-content: start; }
 .marca-generar .acciones form, .maqueta-acciones form { margin: 0; }
 
+/* Usar la maqueta en la tienda: lo último que se llevó (con su botón de deshacer) y la pantalla donde se elige qué llevar. */
+.maqueta-cabecera-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.maqueta-usada { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem 1.5rem; margin-bottom: 1.25rem; }
+.maqueta-usada > div:first-child { flex: 1 1 22rem; display: grid; gap: .4rem; }
+.maqueta-usada > div > * { margin: 0; }
+.maqueta-usada h2 { font-size: 1.05rem; }
+.maqueta-usada-lista { padding-left: 1.1rem; display: grid; gap: .2rem; font-size: .9063rem; overflow-wrap: anywhere; }
+.maqueta-usada-acciones { display: flex; flex-wrap: wrap; gap: .5rem; }
+.maqueta-usada-acciones form { margin: 0; }
+.usar-maqueta { display: grid; gap: 1.25rem; }
+.usar-maqueta > * { margin: 0; }
+.usar-intro { display: grid; gap: .4rem; }
+.usar-intro > * { margin: 0; }
+.usar-intro h2 { font-size: 1.05rem; }
+.usar-lista { list-style: none; display: grid; gap: .75rem; margin: 0 0 1.25rem; padding: 0; }
+.usar-item { display: grid; gap: .4rem; padding: .9rem 1rem; border: 1px solid var(--borde-fuerte); border-radius: 12px; background: var(--campo); }
+.usar-item > * { margin: 0; }
+.usar-item:has(input:checked) { border-color: var(--primario); background: var(--primario-suave); }
+.usar-item-no { background: transparent; border-style: dashed; }
+.usar-item-no .usar-casilla { color: var(--texto-tenue); }
+.usar-casilla { justify-self: start; }
+.usar-cambio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .75rem; margin-top: .25rem; }
+.usar-lado { display: grid; gap: .3rem; justify-items: start; min-width: 0; overflow-wrap: anywhere; font-size: .9063rem; }
+.usar-etiqueta { font-size: .6875rem; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; color: var(--texto-tenue); }
+.usar-flecha { color: var(--texto-tenue); font-size: 1.25rem; }
+.usar-texto { quotes: "“" "”"; }
+.usar-imagen { max-width: 100%; max-height: 56px; width: auto; border-radius: 6px; background: var(--superficie-hover); object-fit: contain; }
+.usar-imagen-ancha { max-height: 72px; }
+.usar-motivo { display: flex; gap: .4rem; align-items: flex-start; }
+.usar-motivo .icono { flex-shrink: 0; margin-top: .15rem; }
+.muestra-color { display: inline-block; width: 1.25rem; height: 1.25rem; border-radius: 6px; border: 1px solid var(--borde-fuerte); vertical-align: middle; }
+@media (max-width: 560px) { .usar-cambio { grid-template-columns: minmax(0, 1fr); } .usar-flecha { transform: rotate(90deg); justify-self: start; } }
+
 /* La maqueta: su estado, la vista previa dentro de un iframe aislado (la CSP y el sandbox los pone el servidor) y las anteriores. */
 .maqueta-actual { display: grid; gap: 1rem; }
 .maqueta-actual > * { margin: 0; }

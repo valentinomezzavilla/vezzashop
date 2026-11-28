@@ -366,11 +366,13 @@ export function listarBanners(db, tiendaId) {
     .all(tiendaId);
 }
 
+// Devuelve el id del banner nuevo.
 export async function agregarBanner(db, tiendaId, { imagen, imagenMovil, enlace, textoAlternativo }) {
-  await db.prepare(
+  const { rows } = await db.prepare(
     `INSERT INTO banners (tienda_id, imagen, imagen_movil, enlace, texto_alternativo, orden)
-     VALUES (?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM banners WHERE tienda_id = ?))`,
+     VALUES (?, ?, ?, ?, ?, (SELECT coalesce(max(orden), 0) + 1 FROM banners WHERE tienda_id = ?)) RETURNING id`,
   ).run(tiendaId, imagen, imagenMovil, enlace, textoAlternativo, tiendaId);
+  return rows[0].id;
 }
 
 // Intercambia el banner con el anterior (-1) o el siguiente (+1).

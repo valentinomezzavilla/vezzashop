@@ -18,6 +18,10 @@ export const MINUTOS_DE_ESPERA = 15;
 export const MAX_HTML = 300_000;
 const LARGO_RESUMEN = 300;
 
+// Los textos que escribe la IA para una maqueta y el largo máximo de cada uno (los mismos que usa el flujo de n8n). `valores` son tres de {titulo, texto}.
+export const TEXTOS_DE_MAQUETA = { anuncio: 70, eslogan: 60, bajada: 140, boton: 24, sobreTitulo: 50, sobreTexto: 260, cierre: 70 };
+const LARGOS_DE_VALOR = { titulo: 28, texto: 90 };
+
 export const ESTADOS = {
   pendiente: { titulo: 'Generando', enCurso: true },
   generando: { titulo: 'Generando', enCurso: true },
@@ -56,6 +60,59 @@ export async function listarMaquetas(db, tiendaId) {
   return (await db.prepare(`SELECT ${COLUMNAS} FROM maquetas WHERE tienda_id = ? ORDER BY id DESC`).all(tiendaId)).map(conDatos);
 }
 
+// Los textos que la IA escribió para la maqueta, ya validados, o null si no hay (la maqueta es de antes, o salió con textos de ejemplo).
+export function limpiarTextos(entrada) {
+  if (!entrada || typeof entrada !== 'object' || Array.isArray(entrada)) return null;
+  const textos = {};
+  for (const [clave, max] of Object.entries(TEXTOS_DE_MAQUETA)) {
+    const valor = typeof entrada[clave] === 'string' ? unaLinea(entrada[clave], max) : '';
+    if (valor) textos[clave] = valor;
+  }
+  if (Array.isArray(entrada.valores)) {
+    const valores = entrada.valores.slice(0, 3).map((v) => ({
+      titulo: typeof v?.titulo === 'string' ? unaLinea(v.titulo, LARGOS_DE_VALOR.titulo) : '',
+      texto: typeof v?.texto === 'string' ? unaLinea(v.texto, LARGOS_DE_VALOR.texto) : '',
+    }));
+    if (valores.some((v) => v.titulo || v.texto)) textos.valores = valores;
+  }
+  return Object.keys(textos).length > 0 ? textos : null;
+}
+
+// Lo que tenía el kit de marca cuando se pidió la maqueta: el color principal y el nombre del archivo del logo y de la primera foto, que son los que
+// usa el flujo de n8n. Se guarda con el pedido para poder llevar a la tienda lo que se ve en esa maqueta (ver usar-maqueta.js).
+export function instantaneaDelKit({ marca, archivos }) {
+  return {
+    colorPrincipal: marca.colorPrincipal || '',
+    logo: archivos.find((a) => a.tipo === 'logo')?.archivo ?? null,
+    foto: archivos.find((a) => a.tipo === 'foto')?.archivo ?? null,
+  };
+}
+const ARCHIVO_DEL_KIT = /^[\w-]{1,80}\.webp$/;
+function kitGuardado(texto) {
+  let crudo;
+  try {
+    crudo = JSON.parse(texto);
+  } catch {
+    return null;
+  }
+  if (!crudo || typeof crudo !== 'object') return null;
+  const archivo = (valor) => (typeof valor === 'string' && ARCHIVO_DEL_KIT.test(valor) ? valor : null);
+  return { colorPrincipal: /^#[0-9a-f]{6}$/.test(String(crudo.colorPrincipal)) ? crudo.colorPrincipal : '', logo: archivo(crudo.logo), foto: archivo(crudo.foto) };
+}
+
+// Lo que hace falta para llevar una maqueta lista a la tienda: sus textos y el kit de cuando se pidió (null si no se guardaron).
+export async function datosParaUsar(db, tiendaId, id) {
+  const fila = await db.prepare('SELECT estado, textos, kit FROM maquetas WHERE id = ? AND tienda_id = ?').get(id, tiendaId);
+  if (!fila || fila.estado !== 'lista') return null;
+  let textos = null;
+  try {
+    textos = fila.textos ? limpiarTextos(JSON.parse(fila.textos)) : null;
+  } catch {
+    textos = null;
+  }
+  return { textos, kit: fila.kit ? kitGuardado(fila.kit) : null };
+}
+
 export async function htmlDeMaqueta(db, tiendaId, id) {
   const fila = await db.prepare("SELECT html FROM maquetas WHERE id = ? AND tienda_id = ? AND estado = 'lista'").get(id, tiendaId);
   return fila?.html ?? null;
@@ -75,7 +132,8 @@ export async function vencerPendientes(db, tiendaId, ahora = new Date()) {
 }
 
 // Crea el pedido. Devuelve { id, token } o { error: 'en-curso' | 'limite' }. El token en claro solo existe acá: se lo llevan al aviso a n8n.
-export async function pedirMaqueta(db, tiendaId, ahora = new Date()) {
+// `kit` (instantaneaDelKit) queda guardado con el pedido, para poder usar esa maqueta en la tienda tal como se vio.
+export async function pedirMaqueta(db, tiendaId, ahora = new Date(), kit = null) {
   await vencerPendientes(db, tiendaId, ahora);
   if (await db.prepare("SELECT 1 FROM maquetas WHERE tienda_id = ? AND estado IN ('pendiente', 'generando')").get(tiendaId)) return { error: 'en-curso' };
   if ((await pedidasEnElDia(db, tiendaId, ahora)) >= MAX_POR_DIA) return { error: 'limite' };
@@ -84,8 +142,8 @@ export async function pedirMaqueta(db, tiendaId, ahora = new Date()) {
   let id;
   try {
     const { rows } = await db
-      .prepare('INSERT INTO maquetas (tienda_id, token_hash, creado_en, actualizado_en) VALUES (?, ?, ?, ?) RETURNING id')
-      .run(tiendaId, hashDeToken(token), comoTexto(ahora), comoTexto(ahora));
+      .prepare('INSERT INTO maquetas (tienda_id, token_hash, creado_en, actualizado_en, kit) VALUES (?, ?, ?, ?, ?) RETURNING id')
+      .run(tiendaId, hashDeToken(token), comoTexto(ahora), comoTexto(ahora), kit ? JSON.stringify(kit) : '');
     id = rows[0].id;
   } catch (error) {
     if (error.code === '23505') return { error: 'en-curso' }; // dos pedidos a la vez: la base solo deja pasar uno
@@ -117,7 +175,8 @@ export async function borrarMaqueta(db, tiendaId, id) {
 
 // ---------- Entrega (lo que manda n8n) ----------
 
-// cuerpo: { token, estado: 'generando' | 'lista' | 'error', html?, resumen?, error? }.
+// cuerpo: { token, estado: 'generando' | 'lista' | 'error', html?, resumen?, textos?, error? }. `textos` son los que escribió la IA (limpiarTextos): n8n
+// solo los manda cuando de verdad los redactó la IA, no cuando salió con textos de ejemplo.
 // Devuelve { status, ...} para responderle a n8n: 200 listo, 400 mal armado, 401 token que no corresponde, 409 ya estaba resuelta, 422 HTML inválido.
 export async function entregarMaqueta(db, id, cuerpo, ahora = new Date()) {
   const fila = await db.prepare('SELECT estado, token_hash AS "tokenHash" FROM maquetas WHERE id = ?').get(id);
@@ -140,9 +199,10 @@ export async function entregarMaqueta(db, id, cuerpo, ahora = new Date()) {
         .run('La maqueta que se generó no se pudo mostrar. Probá de nuevo.', momento, id);
       return { status: 422, error: 'El HTML no es válido o es demasiado grande' };
     }
+    const textos = limpiarTextos(cuerpo.textos);
     cambios = await db
-      .prepare("UPDATE maquetas SET estado = 'lista', html = ?, resumen = ?, error = '', actualizado_en = ? WHERE id = ? AND estado IN ('pendiente', 'generando')")
-      .run(html, unaLinea(cuerpo.resumen, LARGO_RESUMEN), momento, id);
+      .prepare("UPDATE maquetas SET estado = 'lista', html = ?, resumen = ?, textos = ?, error = '', actualizado_en = ? WHERE id = ? AND estado IN ('pendiente', 'generando')")
+      .run(html, unaLinea(cuerpo.resumen, LARGO_RESUMEN), textos ? JSON.stringify(textos) : '', momento, id);
   } else {
     const motivo = unaLinea(cuerpo.error, LARGO_RESUMEN) || 'No pudimos generar la maqueta. Probá de nuevo.';
     cambios = await db

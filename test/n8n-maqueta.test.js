@@ -7,7 +7,7 @@ import path from 'node:path';
 import { abrirBase } from '../src/db.js';
 import { crearTienda } from '../src/tiendas.js';
 import { contraste } from '../src/diseno-por-plan.js';
-import { armarPedido, entregarMaqueta, limpiarHtml, pedirMaqueta } from '../src/maquetas.js';
+import { armarPedido, datosParaUsar, entregarMaqueta, limpiarHtml, pedirMaqueta } from '../src/maquetas.js';
 import { ARCHIVO_DEL_FLUJO, MODELO_DE_GEMINI, flujoDesdeElRepo, textoDelFlujo } from '../scripts/armar-flujo-n8n.js';
 
 const leer = (nombre) => readFileSync(path.join(import.meta.dirname, '..', 'n8n', nombre), 'utf8');
@@ -239,6 +239,7 @@ test('la maqueta se arma con los textos de la IA, venga como venga la respuesta'
     assert.ok(salida.html.includes('<h1>Aromas que hacen hogar</h1>') && salida.html.includes('Tandas pequeñas, aromas que quedan'), `usa los textos de la IA: ${nombre}`);
     assert.ok(salida.html.includes('Ingredientes naturales') && salida.html.includes('Aurora · Aromas que hacen hogar'));
     assert.ok(salida.resumen.endsWith('Textos redactados con IA.'), nombre);
+    assert.deepEqual(salida.textos, IA, `entrega los textos para que el cliente pueda llevarlos a su tienda: ${nombre}`);
     assert.equal(salida.error, undefined);
   }
 });
@@ -258,6 +259,7 @@ test('si la IA no contesta o contesta cualquier cosa, la maqueta sale igual con 
     assert.ok(salida.html.includes('<h1>Aurora Velas &amp; Aromas</h1>'), `el título es el nombre de la tienda: ${nombre}`);
     assert.ok(salida.html.includes('Velas de soja hechas a mano.'), 'y la bajada sale de lo que contó el cliente');
     assert.ok(salida.resumen.endsWith('Textos de ejemplo.'), nombre);
+    assert.equal(salida.textos, undefined, `los textos de ejemplo no se entregan: no sirven para una tienda real (${nombre})`);
   }
 });
 
@@ -273,7 +275,10 @@ test('de lo que escribe la IA solo valen los textos, recortados a su largo; y nu
     valores: [{ titulo: '<b>uno</b>', texto: 'x'.repeat(500) }, 'texto suelto', null, { titulo: 'cuarto que sobra', texto: 'x' }],
     cierre: null,
   };
-  const { html } = correrArmar(pedido, hostil);
+  const { html, textos } = correrArmar(pedido, hostil);
+  // Lo que se entrega a la plataforma también son solo textos y ya recortados.
+  assert.ok(Object.entries(textos).every(([clave, valor]) => clave === 'valores' || typeof valor === 'string'), 'todo texto');
+  assert.ok(textos.eslogan.length <= 60 && textos.bajada !== '12345' && textos.boton !== '[object Object]' && textos.valores.length === 3 && textos.valores.every((v) => v.texto.length <= 90));
   assert.ok(!/<script|<iframe|<img[^>]*onerror/i.test(html), 'ningún tag de la IA llega como tag');
   assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;') && html.includes('&lt;b&gt;uno&lt;/b&gt;'), 'se muestra como texto');
   const desescapar = (t) => t.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
@@ -403,13 +408,15 @@ test('el pedido, los dos nodos y la entrega a la plataforma, de punta a punta', 
     assert.equal(entrega.respuesta, `${BASE}/webhooks/maquetas/${pedido.id}`, 'n8n entrega a la dirección del pedido');
 
     // Lo que n8n le manda a la plataforma: el cuerpo del nodo "Entregar la maqueta".
-    const cuerpoDeLaEntrega = JSON.parse(JSON.stringify({ token: entrega.token, estado: entrega.estado, html: entrega.html, resumen: entrega.resumen, error: entrega.error }));
+    const cuerpoDeLaEntrega = JSON.parse(JSON.stringify({ token: entrega.token, estado: entrega.estado, html: entrega.html, resumen: entrega.resumen, textos: entrega.textos, error: entrega.error }));
     assert.equal((await entregarMaqueta(db, pedido.id, { ...cuerpoDeLaEntrega, token: 'otro-token-que-no-es-el-del-pedido-aaaaaaaa' })).status, 401);
     assert.deepEqual(await entregarMaqueta(db, pedido.id, cuerpoDeLaEntrega), { status: 200, ok: true });
     const fila = await db.prepare('SELECT estado, html, resumen FROM maquetas WHERE id = ?').get(pedido.id);
     assert.equal(fila.estado, 'lista');
     assert.ok(fila.html.includes('<h1>Aromas que hacen hogar</h1>') && fila.html.includes('--p:#336699'));
     assert.ok(fila.resumen.startsWith('Colores #336699. Estilo moderno'));
+    // Los textos de la IA quedan guardados como datos, para poder llevarlos a la tienda (ver usar-maqueta.js).
+    assert.deepEqual((await datosParaUsar(db, tienda.id, pedido.id)).textos, IA);
   } finally {
     await db.cerrar();
   }
@@ -461,7 +468,7 @@ test('el flujo de n8n: conexiones completas, responde enseguida, la IA no frena 
   // La entrega: al link del pedido, con el token, y con reintentos.
   const entrega = porNombre.get('Entregar la maqueta');
   assert.equal(entrega.parameters.url, '={{ $json.respuesta }}');
-  assert.match(entrega.parameters.jsonBody, /token: \$json\.token, estado: \$json\.estado, html: \$json\.html/);
+  assert.match(entrega.parameters.jsonBody, /token: \$json\.token, estado: \$json\.estado, html: \$json\.html, resumen: \$json\.resumen, textos: \$json\.textos/);
   assert.equal(entrega.retryOnFail, true);
   assert.ok(entrega.maxTries >= 2);
 

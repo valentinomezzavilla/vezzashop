@@ -53,6 +53,12 @@ Estilo de producto profesional: superficies neutras, un solo color de marca, bor
   solo color: lleva el texto "Incluido" / "No incluido" para lectores de pantalla). En el formulario de un plan de `/plataforma`, las funciones son una grilla de casillas (`.funciones-plan`,
   `.funcion-plan`: la tarjeta entera es la casilla y se resalta al tildarla) y los puntos de partida son botones comunes (`type="button"`, `data-funciones-preset`) que `admin.js` usa para tildarlas.
 
+- **Usar la maqueta en la tienda** (`admin/maqueta-usar.ejs`, `parciales/usar-valor.ejs`, la tarjeta `.maqueta-usada` de `admin/maqueta.ejs`): la pantalla de confirmación es una lista de tarjetas (`.usar-lista` > `.usar-item`),
+  una por cambio, con la casilla y el título arriba y, abajo, el cambio como **Ahora → Con la maqueta** (`.usar-cambio`: tres columnas, y en celular una sola con la flecha girada hacia abajo). La tarjeta se resalta cuando su casilla está
+  tildada (`:has(input:checked)`); la que no se puede va con borde punteado (`.usar-item-no`), sin casilla activa y con su motivo en `.usar-motivo` (con el ícono de alerta, nunca solo color). Los valores se muestran según su tipo:
+  color (muestra `.muestra-color` + el código), imagen (`.usar-imagen`, de alto máximo 56 px), texto entre comillas (`.usar-texto`) y la cantidad de banners. Lo último que se llevó se ve arriba de la maqueta como una tarjeta
+  con su botón **Deshacer** (`.maqueta-usada`), y el botón **Usar en mi tienda** va junto a "Abrir en pantalla completa" (`.maqueta-cabecera-acciones`).
+
 ## Vidriera (`src/publico/tienda.css`)
 
 Editorial y limpia: mucho blanco, las fotos mandan, siempre en modo claro.

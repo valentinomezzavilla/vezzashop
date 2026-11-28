@@ -1,0 +1,48 @@
+<%#
+  Usar una maqueta en la tienda: cada cambio como "ahora → nuevo" y una casilla para elegir cuáles (ver src/usar-maqueta.js). Todavía no se cambió nada:
+  los cambios se hacen recién cuando se confirma. Recibe: plan, maquetaId, propuesta ({ items, hayAplicables }) y ultima (la última maqueta pedida).
+%>
+<%- include('../parciales/cabecera', { titulo: 'Usar la maqueta en mi tienda' }) %>
+<%- include('../parciales/marca-encabezado', { pestania: 'maqueta', ultima: locals.ultima ?? null }) %>
+
+<section class="tarjeta usar-maqueta" aria-labelledby="usar-titulo">
+  <div class="usar-intro">
+    <h2 id="usar-titulo">Usar esta maqueta en tu tienda</h2>
+    <p class="texto-suave">Elegí qué querés llevar a tu tienda real. Todavía no se cambió nada: lo hacemos cuando confirmes. Los textos los redactó una IA, así que conviene leerlos antes. Después podés ajustar todo desde <a href="/admin/diseno">Diseño</a>, o volver a lo que tenías con <strong>Deshacer</strong>.</p>
+  </div>
+
+  <form method="post" action="/admin/marca/maqueta/<%= maquetaId %>/usar" data-un-solo-envio>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <ul class="usar-lista">
+      <% for (const item of propuesta.items) { %>
+        <li class="usar-item<%= item.aplicable ? '' : ' usar-item-no' %>">
+          <label class="casilla usar-casilla">
+            <input type="checkbox" name="items" value="<%= item.clave %>"<%= item.aplicable ? ' checked' : ' disabled' %>>
+            <strong><%= item.titulo %></strong>
+          </label>
+          <p class="ayuda"><%= item.ayuda %></p>
+          <% if (item.aplicable) { %>
+            <div class="usar-cambio">
+              <div class="usar-lado"><span class="usar-etiqueta">Ahora</span><%- include('../parciales/usar-valor', { item, lado: 'ahora' }) %></div>
+              <span class="usar-flecha" aria-hidden="true">→</span>
+              <div class="usar-lado"><span class="usar-etiqueta">Con la maqueta</span><%- include('../parciales/usar-valor', { item, lado: 'nuevo' }) %></div>
+            </div>
+          <% } else { %>
+            <p class="ayuda usar-motivo"><%- icono('alerta', { tamano: 14 }) %> <span><%= item.motivo %></span></p>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+
+    <div class="acciones">
+      <% if (propuesta.hayAplicables) { %>
+        <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Usar en mi tienda</button>
+      <% } %>
+      <a class="boton boton-secundario" href="/admin/marca/maqueta?ver=<%= maquetaId %>"><%= propuesta.hayAplicables ? 'Cancelar' : 'Volver a la maqueta' %></a>
+    </div>
+    <% if (!propuesta.hayAplicables) { %>
+      <p class="ayuda">No hay nada para llevar a tu tienda con esta maqueta. Si completás tu kit de marca y pedís otra, vas a poder usarla.</p>
+    <% } %>
+  </form>
+</section>
+<%- include('../parciales/pie') %>

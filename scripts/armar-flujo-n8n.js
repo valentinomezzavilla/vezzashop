@@ -33,7 +33,7 @@ const NOTA_DEL_FLUJO = [
   '3. **Responder 202**: le contesta enseguida a la plataforma (la IA tarda más que lo que espera) y el resto sigue por su cuenta.',
   '4. **Redactar los textos**: Gemini escribe los textos de la maqueta. Si falla, la maqueta sale igual con textos de ejemplo.',
   '5. **Armar la maqueta**: el diseño es una plantilla propia con los colores, el logo, las fotos y los productos de la tienda.',
-  '6. **Entregar la maqueta**: la manda a la plataforma con el token de ese pedido. Si no llega, la plataforma la da por fallida a los 15 minutos.',
+  '6. **Entregar la maqueta**: la manda a la plataforma con el token de ese pedido (y, si los redactó la IA, con los textos, para que el cliente pueda usarlos en su tienda). Si no llega, la plataforma la da por fallida a los 15 minutos.',
   '',
   'El código de los dos nodos Code vive en el repo (`n8n/maqueta-pedido.js` y `n8n/maqueta-armar.js`) y este flujo se arma con `node scripts/armar-flujo-n8n.js`.',
 ].join('\n');
@@ -145,7 +145,7 @@ export function armarFlujo({ pedido, armar }) {
           sendBody: true,
           contentType: 'json',
           specifyBody: 'json',
-          jsonBody: '={{ JSON.stringify({ token: $json.token, estado: $json.estado, html: $json.html, resumen: $json.resumen, error: $json.error }) }}',
+          jsonBody: '={{ JSON.stringify({ token: $json.token, estado: $json.estado, html: $json.html, resumen: $json.resumen, textos: $json.textos, error: $json.error }) }}',
           options: { timeout: 20000 },
         },
       },

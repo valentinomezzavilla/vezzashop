@@ -550,7 +550,13 @@ bloqueada (explica qué es y qué planes la incluyen) y nada se guarda ni se pid
   y los SVG no se aceptan), eligen los **colores** de su marca (el principal, y si quieren un secundario y uno de acento) y cuentan en pocas palabras cómo es: **rubro**, **estilo**
   (moderno, elegante, cálido o audaz), **sobre la marca** y **marcas o páginas que les gusten**. Nada de esto cambia la vidriera: es el material de la maqueta.
 - **Maqueta web.** Piden "Armar mi maqueta", esperan unos segundos (la página se actualiza sola) y la ven en una vista previa, en tamaño de computadora o de celular, o en pantalla completa.
-  Estados: *generando*, *lista* y *con problemas* (con el motivo, para pedir otra). Se guardan las últimas 5 y se pueden ver o borrar. Es una **maqueta**: no cambia la tienda real.
+  Estados: *generando*, *lista* y *con problemas* (con el motivo, para pedir otra). Se guardan las últimas 5 y se pueden ver o borrar. Es una **maqueta**: no cambia la tienda real hasta que el cliente toca *Usar en mi tienda*.
+- **Usar en mi tienda.** Con una maqueta lista, el botón lleva a una pantalla que muestra cada cambio como **ahora → nuevo**, con una casilla por cada uno (todo tildado de entrada), y recién al confirmar se hace.
+  Se puede llevar: el **color principal** del kit, el **logo** del kit (se copia como el logo de la tienda), el texto de la **franja de anuncios**, el **Sobre la tienda** (la descripción) y un **banner de bienvenida** con la
+  primera foto del kit (se suma a los que ya hay: no reemplaza ninguno, y solo si el plan deja lugar). Los textos son los que escribió la IA, así que la pantalla pide leerlos antes.
+  Lo que no se puede (la maqueta no guardó sus textos, el kit no tiene logo, el plan no tiene lugar para otro banner...) sale sin casilla y con el motivo. No toca nada más del diseño: ni colores de fondo, ni portada, ni CSS.
+- **Deshacer.** Después de usar una maqueta, la página de la maqueta muestra qué se llevó y un botón **Deshacer** que vuelve a lo de antes. No pisa lo que el cliente cambió después (si cambió la franja desde Diseño,
+  la franja se queda como está y se lo avisa), saca el banner que se sumó y se queda con el logo de antes. Solo se deshace **lo último**: usar otra maqueta reemplaza a la anterior (lo ya puesto queda puesto).
 
 Límites: una maqueta en camino por tienda (la base rechaza el segundo pedido aunque lleguen a la vez), **3 cada 24 horas** (cuentan las que llegaron a n8n; las que no pudo recibir, no),
 y una que n8n nunca entrega pasa a *con problemas* a los 15 minutos. Hace falta al menos un logo o una foto en el kit (o el logo que ya tiene la tienda en Diseño).
@@ -585,9 +591,15 @@ Las imágenes del kit se sirven como las demás de la tienda: por una dirección
 lo borra, y las maquetas que ya lo usaban lo muestran roto). **A Gemini solo le llegan textos de la marca** (nombre de la tienda, rubro, estilo, descripción, referencias, colores y los nombres de las categorías y de algunos
 productos): ni imágenes, ni links, ni el token.
 
-**Entrega.** n8n manda el resultado a `maqueta.respuesta` (`POST /webhooks/maquetas/:id`, JSON) con el `token` de ese pedido: `{ token, estado: "generando" | "lista" | "error", html, resumen, error }`.
+**Entrega.** n8n manda el resultado a `maqueta.respuesta` (`POST /webhooks/maquetas/:id`, JSON) con el `token` de ese pedido: `{ token, estado: "generando" | "lista" | "error", html, resumen, textos, error }`. `textos` (opcional) son los que escribió la IA
+(`anuncio`, `eslogan`, `bajada`, `boton`, `sobreTitulo`, `sobreTexto`, `valores` y `cierre`): el flujo los manda solo cuando de verdad los redactó la IA (los de ejemplo no sirven para una tienda real) y la plataforma los valida y los
+recorta a su largo antes de guardarlos; con ellos, el cliente puede llevar el anuncio y el "Sobre la tienda" a su tienda.
 Responde `200 { ok: true }` (con `repetida: true` si es el mismo resultado otra vez, por ejemplo un reintento), `400` mal armado, `401` token que no corresponde (o pedido que no existe: no se puede
 averiguar cuáles existen), `409` si la maqueta ya estaba resuelta con otro estado, `413` si pesa más de 1 MB, `422` si el HTML no sirve (la maqueta pasa a *con problemas*) y `429` por demasiados intentos.
+
+Lo que se lleva a la tienda (`src/usar-maqueta.js`) sale siempre de lo que la plataforma ya sabe de esa maqueta (el kit de cuando se pidió, guardado con el pedido, y sus textos), nunca de lo que mande el navegador: el formulario
+solo dice cuáles de los cinco cambios quiere, y se ignora lo que no es uno de ellos o no se puede. Todo se aplica junto, en una transacción y con la tienda bloqueada; las imágenes se copian antes (si una falla, no se cambió nada) y
+lo de antes queda anotado (`maqueta_usada`, una fila por tienda) para poder deshacerlo.
 
 Cómo se cuida (`src/maquetas.js`):
 
@@ -778,7 +790,8 @@ src/
   mercadopago.js         cliente de la API de Mercado Pago y validación de la firma de los webhooks
   notificaciones.js      avisos a n8n (el flujo que manda los mails de alta)
   marca.js               kit de marca (función del plan): colores y datos de la marca, y los logos y fotos que sube el cliente
-  maquetas.js            maquetas web: pedido a n8n con su token, entrega, límites, y la limpieza del HTML que entrega n8n
+  maquetas.js            maquetas web: pedido a n8n con su token, entrega (el HTML y los textos de la IA), límites, y la limpieza del HTML que entrega n8n
+  usar-maqueta.js        llevar una maqueta a la tienda real (color, logo, franja, sobre la tienda, banner) y deshacerlo
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
   estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
   limites.js             topes del plan de cada tienda, uso y estado de cobro

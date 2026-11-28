@@ -91,13 +91,18 @@ El panel, el pedido a n8n, la entrega y el flujo de n8n (`n8n/maqueta-web.json`)
       (`models/gemini-3.5-flash-lite`) y *VEZZA · Alerta de errores* como flujo de errores. Lo probé activo, con un secreto temporal que ya borré (y borré también las ejecuciones de prueba): un pedido inválido
       responde 400 con sus errores; uno válido, 202 en menos de un segundo, y después Gemini redacta los textos (con tildes y ñ), la plantilla arma la maqueta y la entrega sale con el cuerpo que espera la plataforma.
       Lo único que no pude ver es la entrega exitosa, porque apunté a un dominio de prueba que no existe: eso se ve cuando la plataforma nueva esté en producción.
-- [ ] **Activar el flujo** cuando subas la plataforma nueva (no lo dejé activo porque hasta entonces nadie lo llama).
+- [x] **Activar el flujo**: ya lo activaste vos. Después le sumé que **entregue los textos de la IA como datos** (para "Usar en mi tienda"): lo probé primero en un flujo de prueba aparte (que borré, con sus ejecuciones) y
+      recién ahí le apliqué el cambio al flujo real, que sigue activo y con sus credenciales; solo cambié tres cosas: el final del nodo *Armar la maqueta*, el cuerpo del nodo *Entregar la maqueta* y la nota del flujo.
+      Funciona en cualquier orden: si el flujo ya manda `textos` y la plataforma todavía no es la nueva, ignora ese campo.
 - [ ] Recomendado: escribí tu dominio del panel en `DOMINIO_DE_LA_PLATAFORMA` (`n8n/maqueta-pedido.js`), corré `node scripts/armar-flujo-n8n.js` y pegá el código en el nodo: así la entrega de la maqueta no puede ir a ningún otro dominio.
 - [ ] En Coolify: `N8N_MAQUETAS_URL=https://<tu n8n>/webhook/vezza-shop-maquetas` (y `N8N_MAQUETAS_SECRET` si no querés usar el mismo secreto que los mails).
 - [ ] Probalo con una tienda cuyo plan incluya el kit de marca (por ejemplo, Acompañado): subí un logo y fotos, guardá los colores, "Armar mi maqueta" y esperá menos de un minuto. Si el resumen debajo de la vista previa dice "Textos de ejemplo" en vez de
       "Textos redactados con IA", Gemini no contestó (o contestó en otro formato): mirá esa ejecución en n8n y mandame lo que devolvió el nodo.
 - [ ] Mirá cómo queda: el diseño de la maqueta es la plantilla de `n8n/maqueta-armar.js` (hay cuatro estilos). Si querés otro look, se cambia ahí y se vuelve a armar el flujo.
-- [ ] Decidí si querés que al cliente le llegue un mail cuando su maqueta está lista (hoy solo la ve en el panel) y si querés que pueda **aplicar los colores de la maqueta a su tienda** con un botón.
+- [x] El cliente ya puede **usar la maqueta en su tienda** con un botón (color principal, logo, franja de anuncios, "Sobre la tienda" y un banner), eligiendo qué llevar, y **deshacerlo**.
+- [ ] Probalo de punta a punta cuando la plataforma nueva esté publicada: pedí una maqueta, abrí **Usar en mi tienda**, mirá que los textos que aparecen son los de la maqueta (si dice que no guardó los textos, la maqueta es de antes: pedí
+      una nueva), aplicá, mirá la tienda y probá **Deshacer**. Si querés confirmar que n8n manda los textos, mirá la última ejecución de *VEZZA Shop · Maquetas web*: el nodo *Armar la maqueta* tiene que devolver `textos`.
+- [ ] Decidí si querés que al cliente le llegue un mail cuando su maqueta está lista (hoy solo la ve en el panel).
 
 ## Otras cosas a tener en cuenta
 - Los pedidos con Mercado Pago **reservan el stock hasta que la tienda cancela** uno sin pagar (no se cancelan solos), y los reembolsos se hacen desde Mercado Pago: quedó anotado en "Qué falta" del README.

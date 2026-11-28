@@ -3,7 +3,8 @@
 // sus colores, su logo, sus fotos, sus categorías y algunos de sus productos. Los textos los escribe la IA; el diseño es una plantilla propia, así
 // la maqueta siempre se ve bien y nada de lo que diga la IA puede meter código. Si Gemini no contestó, o contestó cualquier cosa, usa textos de
 // ejemplo: la maqueta sale igual.
-// Devuelve lo que se le entrega a VEZZA Shop: { respuesta, token, estado: 'lista', html, resumen } o, si algo falla, { respuesta, token, estado: 'error', error }.
+// Devuelve lo que se le entrega a VEZZA Shop: { respuesta, token, estado: 'lista', html, resumen, textos? } o, si algo falla, { respuesta, token, estado: 'error', error }.
+// `textos` (los que escribió la IA, para que el cliente pueda llevarlos a su tienda) va solo cuando de verdad los redactó la IA: los de ejemplo no se mandan.
 const pedido = $('Validar y armar el pedido').first().json.pedido;
 const salidaIA = (($input.all()[0] || {}).json) || {};
 
@@ -259,7 +260,7 @@ try {
   const colores = [pedido.colores.principal, pedido.colores.secundario, pedido.colores.acento].filter(Boolean).join(' · ');
   const { titulos, texto } = ESTILOS[estilo];
   const resumen = `Colores ${colores}. Estilo ${ESTILOS[estilo].nombre.toLowerCase()} (${titulos === texto ? titulos : `${titulos} y ${texto}`}). ${conIA ? 'Textos redactados con IA' : 'Textos de ejemplo'}.`;
-  return [{ json: { respuesta: pedido.respuesta, token: pedido.token, estado: 'lista', html, resumen } }];
+  return [{ json: { respuesta: pedido.respuesta, token: pedido.token, estado: 'lista', html, resumen, ...(conIA ? { textos } : {}) } }];
 } catch (error) {
   return [{ json: { respuesta: pedido.respuesta, token: pedido.token, estado: 'error', error: 'No pudimos armar la maqueta. Probá de nuevo.' } }];
 }

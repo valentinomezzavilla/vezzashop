@@ -30,16 +30,22 @@ import {
   catalogoDeMuestra,
   descartarPedido,
   htmlDeMaqueta,
+  instantaneaDelKit,
   leerMaqueta,
   listarMaquetas,
   pedidasEnElDia,
   pedirMaqueta,
   vencerPendientes,
 } from '../maquetas.js';
+import { ITEMS, deshacerUso, esItem, leerUso, proponerUso, usarMaqueta } from '../usar-maqueta.js';
 import { urlPanel, urlPublicaDeTienda } from '../util/dominios.js';
 import { plural } from '../util/formato.js';
 
 const MEGAS = TAMANO_MAXIMO_IMAGEN / 1024 / 1024;
+
+// "a", "a y b", "a, b y c"
+const enLista = (partes) => (partes.length <= 1 ? partes.join('') : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`);
+const titulos = (claves) => claves.map((clave) => ITEMS[clave].titulo.toLowerCase());
 
 // La maqueta es HTML que armó otro sistema: se muestra con la política más cerrada que existe. Sin scripts, sin formularios, sin conexiones;
 // solo estilos, las tipografías de Google Fonts y las imágenes de la propia plataforma (las que n8n pone con el link completo del dominio del
@@ -177,6 +183,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
       maquetas,
       actual,
       ultima: maquetas[0] ?? null,
+      uso: await leerUso(db, tiendaId),
       maxGuardadas: MAX_GUARDADAS,
       generacion: await estadoDeGeneracion(tiendaId, { archivos, logoTienda: urlImagen(tiendaId, ajustes.logo), ultima: maquetas[0] ?? null }),
     });
@@ -220,7 +227,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
       const logoTienda = urlImagen(tiendaId, ajustes.logo);
       if (archivos.length === 0 && !logoTienda) return volver(req, res, 'error', 'Subí al menos un logo o una foto para poder armar la maqueta.');
 
-      const pedido = await pedirMaqueta(db, tiendaId);
+      const pedido = await pedirMaqueta(db, tiendaId, new Date(), instantaneaDelKit({ marca, archivos }));
       if (pedido.error === 'en-curso') return volver(req, res, 'error', 'Ya hay una maqueta en camino. Esperá a que termine para pedir otra.', aMaqueta);
       if (pedido.error === 'limite') return volver(req, res, 'error', `Podés pedir hasta ${MAX_POR_DIA} maquetas cada 24 horas. Probá de nuevo más tarde.`, aMaqueta);
 
@@ -242,6 +249,47 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
         return volver(req, res, 'error', 'No pudimos pedir la maqueta en este momento. Probá de nuevo en unos minutos.', aMaqueta);
       }
       volver(req, res, 'ok', 'Pedimos tu maqueta. Suele tardar menos de un minuto: la ves acá apenas esté lista.', aMaqueta);
+    }),
+  );
+
+  // ---------- Usar la maqueta en la tienda (ver usar-maqueta.js) ----------
+
+  const idDeMaqueta = (valor) => (/^\d{1,9}$/.test(valor) ? Number(valor) : null);
+
+  // La pantalla de confirmación: cada cambio como "ahora → nuevo", con una casilla para elegir cuáles. No cambia nada.
+  router.get('/marca/maqueta/:id/usar', async (req, res) => {
+    const { tiendaId } = req.session.usuario;
+    const plan = await planDe(tiendaId);
+    if (!plan.puede.kit_de_marca) return res.redirect('/admin/marca/maqueta'); // ahí se ve el aviso de que el plan no lo incluye
+    const id = idDeMaqueta(req.params.id);
+    const propuesta = id ? await proponerUso({ db, tiendaId, maquetaId: id }) : null;
+    if (!propuesta) return volver(req, res, 'error', 'Esa maqueta no existe o todavía no está lista.', '/admin/marca/maqueta');
+    res.render('admin/maqueta-usar', { seccionActual: 'diseno', plan, maquetaId: id, propuesta, ultima: (await listarMaquetas(db, tiendaId))[0] ?? null });
+  });
+
+  router.post('/marca/maqueta/:id/usar', verificarCsrf, (req, res) =>
+    conPlan(req, res, async () => {
+      const { tiendaId } = req.session.usuario;
+      const id = idDeMaqueta(req.params.id);
+      const elegidos = [].concat(req.body.items ?? []).filter(esItem);
+      const resultado = id ? await usarMaqueta({ db, dirSubidas: config.dirSubidas, tiendaId, maquetaId: id, elegidos }) : { error: 'no-existe' };
+      if (resultado.error === 'no-existe') return volver(req, res, 'error', 'Esa maqueta no existe o todavía no está lista.', '/admin/marca/maqueta');
+      if (resultado.error === 'nada') return volver(req, res, 'error', 'No hay nada para cambiar: tildá al menos uno de los cambios que se pueden hacer.', `/admin/marca/maqueta/${id}/usar`);
+      if (resultado.error === 'archivo') return volver(req, res, 'error', 'No pudimos leer una de las imágenes de tu kit de marca. Probá subirla de nuevo.', `/admin/marca/maqueta/${id}/usar`);
+      const aparte = resultado.omitidos.length > 0 ? ` No pudimos sumar ${enLista(titulos(resultado.omitidos.map((o) => o.clave)))}: ${resultado.omitidos[0].motivo}` : '';
+      volver(req, res, 'ok', `Listo: llevamos a tu tienda ${enLista(titulos(resultado.aplicados))}. Mirá cómo quedó y, si no te convence, podés deshacerlo desde acá.${aparte}`, '/admin/marca/maqueta');
+    }),
+  );
+
+  // Vuelve a lo de antes de la última vez que se usó una maqueta, sin pisar lo que el cliente cambió después.
+  router.post('/marca/maqueta/deshacer', verificarCsrf, (req, res) =>
+    conPlan(req, res, async () => {
+      const resultado = await deshacerUso({ db, dirSubidas: config.dirSubidas, tiendaId: req.session.usuario.tiendaId });
+      if (resultado.error) return volver(req, res, 'error', 'No hay nada para deshacer.', '/admin/marca/maqueta');
+      const cambiados = resultado.omitidos.filter((o) => o.motivo === 'lo cambiaste después').map((o) => o.clave);
+      const dejados = cambiados.length > 0 ? ` No tocamos ${enLista(titulos(cambiados))} porque lo cambiaste después.` : '';
+      const texto = resultado.deshechos.length > 0 ? `Listo, volvimos a lo que tenías: ${enLista(titulos(resultado.deshechos))}.${dejados}` : `No cambiamos nada.${dejados || ' Eso ya no estaba en tu tienda.'}`;
+      volver(req, res, 'ok', texto, '/admin/marca/maqueta');
     }),
   );
 
