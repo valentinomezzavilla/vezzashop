@@ -540,6 +540,7 @@ N8N_MAQUETAS_URL=https://tu-n8n/webhook/vezza-shop-maquetas   # la URL de produc
 N8N_MAQUETAS_SECRET=...                                       # opcional: sin él se usa N8N_WEBHOOK_SECRET
 ```
 
+La dirección tiene que empezar con `https://` y no llevar comillas ni espacios (si lleva comillas o el nombre de la variable de más, se limpian; si igual no es una dirección, se avisa en el log al arrancar y la función queda apagada).
 Sin `N8N_MAQUETAS_URL` el kit se puede completar, pero "Armar mi maqueta" queda deshabilitado con un aviso. Si n8n no recibe el pedido (caído, error), el pedido se descarta, no cuenta
 para el tope del día y el cliente puede volver a intentarlo.
 

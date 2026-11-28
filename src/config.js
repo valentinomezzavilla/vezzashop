@@ -89,10 +89,32 @@ function leerMercadoPagoTiendas(env) {
   };
 }
 
+// Una dirección que se carga por variable de entorno puede llegar con espacios, con las comillas del archivo .env (Docker y Coolify las dejan como
+// parte del valor) o con "NOMBRE=" pegado adelante: se limpia todo eso. Si lo que queda no es una dirección http(s), se avisa en el log con lo que
+// llegó (para poder corregirlo) y se la ignora: la función queda apagada en vez de fallar en cada aviso con un "Failed to parse URL".
+// Devuelve la dirección, o '' si no hay o no sirve.
+function leerDireccion(env, nombre) {
+  let valor = String(env[nombre] ?? '').trim();
+  valor = valor.replace(new RegExp(`^${nombre}\\s*=\\s*`), '').trim();
+  valor = valor.replace(/^(["'])([\s\S]*)\1$/, '$2').trim();
+  if (!valor) return '';
+  try {
+    const { protocol } = new URL(valor);
+    if (protocol === 'https:' || protocol === 'http:') return valor;
+  } catch {
+    // no es una dirección: se avisa abajo
+  }
+  console.error(
+    `${nombre} no es una dirección válida y se ignora (valor recibido: ${JSON.stringify(valor.slice(0, 80))}). ` +
+      'Tiene que empezar con https:// (por ejemplo https://tu-n8n/webhook/...), sin comillas ni espacios.',
+  );
+  return '';
+}
+
 // Los mails de la plataforma (alta de cuenta, pago recibido) los manda un flujo de n8n al que se le avisa por webhook.
 // Sin N8N_WEBHOOK_URL no se manda ningún mail. Devuelve null o { url, secreto }.
 function leerN8n(env) {
-  const url = (env.N8N_WEBHOOK_URL ?? '').trim();
+  const url = leerDireccion(env, 'N8N_WEBHOOK_URL');
   return url ? { url, secreto: (env.N8N_WEBHOOK_SECRET ?? '').trim() } : null;
 }
 
@@ -100,6 +122,6 @@ function leerN8n(env) {
 // Usa el mismo secreto que los mails (N8N_WEBHOOK_SECRET) salvo que se defina N8N_MAQUETAS_SECRET. Sin la URL, el kit de marca se puede
 // completar pero no se puede pedir la maqueta. Devuelve null o { url, secreto }.
 function leerMaquetas(env) {
-  const url = (env.N8N_MAQUETAS_URL ?? '').trim();
+  const url = leerDireccion(env, 'N8N_MAQUETAS_URL');
   return url ? { url, secreto: (env.N8N_MAQUETAS_SECRET ?? env.N8N_WEBHOOK_SECRET ?? '').trim() } : null;
 }
