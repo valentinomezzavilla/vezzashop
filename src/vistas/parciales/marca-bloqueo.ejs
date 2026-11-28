@@ -1,10 +1,6 @@
-<%# El kit de marca y la maqueta cuando el plan de la tienda no los incluye (son del plan Acompañado). Recibe: plan = { nivel, niveles, ... }. %>
+<%# El kit de marca y la maqueta cuando el plan de la tienda no los incluye (es la función "Kit de marca y maqueta web" del plan). Recibe: plan (de planDeDiseno). %>
 <section class="tarjeta marca-bloqueo" aria-labelledby="marca-bloqueo-titulo">
-  <div class="nivel-bloqueado" role="note">
-    <%- icono('candado', { tamano: 18 }) %>
-    <span>Disponible desde el plan <strong><%= plan.niveles.acompanado.titulo %></strong>. Tu plan incluye el diseño <%= plan.niveles[plan.nivel].titulo %>.<%= locals.pagosActivos ? '' : (locals.contactoPlataforma ? ` Para cambiar de plan, contactanos: ${contactoPlataforma}.` : ' Contactanos para cambiar de plan.') %></span>
-    <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
-  </div>
+  <%- include('plan-bloqueo', { plan, funcion: 'kit_de_marca' }) %>
   <h2 id="marca-bloqueo-titulo">¿Cómo funciona?</h2>
   <ol class="marca-pasos">
     <li><strong>Subís el material de tu marca:</strong> tu logo, fotos y los colores que te identifican.</li>

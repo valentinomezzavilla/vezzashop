@@ -39,7 +39,7 @@ export function rutasWebhooks({ servicios, config, db = null, notificar = async 
     res.status(200).end();
   });
 
-  // Entrega de las maquetas web (plan Acompañado): el flujo de n8n que las genera manda acá el resultado de un pedido, con el token que
+  // Entrega de las maquetas web (función del plan): el flujo de n8n que las genera manda acá el resultado de un pedido, con el token que
   // recibió en el aviso (ver maquetas.js). El token es de ese pedido solo: no hay una clave general que sirva para entregar cualquier maqueta.
   // Cuerpo: { token, estado: 'generando' | 'lista' | 'error', html?, resumen?, error? }. Responde JSON.
   const limiteEntregas = crearLimite({ maximo: 120, ventanaMs: 60_000 });

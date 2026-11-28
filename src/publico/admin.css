@@ -1742,28 +1742,51 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
 .mp-datos .boton { justify-self: start; }
 
 /* Diseño por plan: el nivel del plan, las secciones bloqueadas y las opciones propias de cada nivel. */
-.pastilla-nivel { margin-left: .5rem; vertical-align: middle; background: var(--primario-suave); color: var(--primario-texto); font-weight: 600; }
 .nivel-resumen { display: grid; gap: .75rem; margin-bottom: 1.5rem; }
 .nivel-resumen > * { margin: 0; }
 .nivel-resumen-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; }
 .nivel-resumen h2 { font-size: 1.05rem; }
 .nivel-detalle > summary { cursor: pointer; font-weight: 500; }
-.niveles-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: .85rem; }
-.nivel-columna { padding: 1rem; border: 1px solid var(--borde); border-radius: 12px; }
-.nivel-columna h3 { margin: 0 0 .2rem; font-size: .95rem; }
-.nivel-columna ul { margin: .6rem 0 0; padding-left: 1.1rem; display: grid; gap: .3rem; font-size: .875rem; }
-.nivel-actual { border-color: var(--primario); background: var(--primario-suave); }
 .nivel-bloqueado { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .75rem 1rem; border-radius: 10px; background: var(--primario-suave); }
 .nivel-bloqueado .icono { flex-shrink: 0; color: var(--primario-texto); }
 .nivel-bloqueado span { flex: 1 1 14rem; }
 .bloqueable { display: grid; gap: 1.25rem; margin: 0; padding: 0; border: 0; min-width: 0; }
-.ajuste-bloqueado .bloqueable { opacity: .5; }
+.ajuste-bloqueado .bloqueable, .funcion-bloqueada .bloqueable { opacity: .5; }
+/* Cada función de diseño del plan es un bloque propio: si el plan no la incluye, queda bloqueada sola, aunque haya otras en la misma sección. */
+.funcion-bloque { display: grid; gap: 1rem; }
+.funcion-bloque + .funcion-bloque { padding-top: 1.25rem; border-top: 1px solid var(--borde); }
+.funcion-titulo { margin: 0; font-size: .95rem; }
+/* Tabla de qué incluye cada plan: las casillas centradas y el plan del cliente resaltado. */
+.tabla-comparacion th:not(:first-child), .tabla-comparacion td { text-align: center; }
+.tabla-comparacion td .icono { color: var(--primario-texto); vertical-align: middle; }
+.tabla-comparacion .nivel-actual { background: var(--primario-suave); }
 .portada-secciones { list-style: none; display: grid; gap: .5rem; margin: .5rem 0 0; padding: 0; }
 .portada-seccion { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem 1rem; align-items: center; padding: .7rem .9rem; border: 1px solid var(--borde); border-radius: 10px; }
 .portada-seccion .ayuda { grid-column: 1; }
 .portada-orden { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: .5rem; font-size: .8125rem; color: var(--texto-tenue); }
 .color-opcional input[type="color"] { width: 4.5rem; height: 2.5rem; padding: 2px; cursor: pointer; }
 .codigo-css { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8125rem; line-height: 1.5; tab-size: 2; white-space: pre; overflow: auto; }
+/* Planes (plataforma): lo que incluye el diseño de un plan armado a gusto puede ser largo: baja de renglón en vez de ensanchar la tabla.
+   (Con poco lugar, cada fila es una tarjeta y ya baja de renglón sola.) */
+@container (min-width: 821px) {
+  .tabla-planes td[data-etiqueta="Diseño"], .tabla-planes td[data-etiqueta="Antes"], .tabla-planes td[data-etiqueta="Después"] { white-space: normal; min-width: 9rem; max-width: 20rem; }
+}
+/* Planes (plataforma): las funciones de diseño que incluye un plan, una casilla por función. */
+.funciones-plan { display: grid; gap: .75rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.funciones-plan > legend { padding: 0; margin-bottom: .25rem; }
+.funciones-plan > p { margin: 0; }
+.funciones-base > summary { cursor: pointer; font-size: .875rem; font-weight: 500; }
+.funciones-base ul { margin: .5rem 0 0; padding-left: 1.1rem; display: grid; gap: .25rem; font-size: .875rem; color: var(--texto-suave); }
+.puntos-de-partida { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.funciones-plan-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .5rem; }
+.funcion-plan { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .15rem .65rem; align-items: start; padding: .7rem .85rem; border: 1px solid var(--borde-fuerte); border-radius: 10px; background: var(--campo); cursor: pointer; transition: border-color var(--rapido), background-color var(--rapido); }
+.funcion-plan input { grid-row: 1 / span 2; width: 16px; height: 16px; margin: .2rem 0 0; accent-color: var(--primario); cursor: pointer; }
+.funcion-plan strong { font-weight: 500; }
+.funcion-plan .ayuda { grid-column: 2; }
+.funcion-plan:hover { border-color: var(--borde-hover); }
+.funcion-plan:has(input:checked) { border-color: var(--primario); background: var(--primario-suave); }
+.funcion-plan:has(input:focus-visible) { box-shadow: var(--foco); }
+.formulario-subtitulo { margin: 1rem 0 0; font-size: 1.05rem; }
 /* Dominio propio: el registro DNS que hay que cargar (tipo, nombre y valor) en una fila. */
 .dominio-registros { display: grid; gap: .75rem; }
 .dominio-registros > p { margin: 0; }
@@ -1918,7 +1941,7 @@ fieldset.campo legend { padding: 0; margin-bottom: .4rem; }
   }
 }
 
-/* ---------- Kit de marca y maqueta web (plan Acompañado) ---------- */
+/* ---------- Kit de marca y maqueta web (función del plan) ---------- */
 /* La card de Diseño que lleva acá reusa .dashboard-acceso: solo cambia la grilla (dos columnas en vez de tres). */
 .marca-acceso { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 1080px) { .marca-acceso { grid-template-columns: minmax(0, 1fr); } }

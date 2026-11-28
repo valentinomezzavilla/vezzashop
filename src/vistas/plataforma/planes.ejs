@@ -5,7 +5,7 @@
 <header class="encabezado">
   <div>
     <h1>Planes</h1>
-    <p class="texto-suave">Cada cliente tiene un plan. Los topes se aplican en su panel: al llegar, no puede cargar más y le avisamos que amplíe.</p>
+    <p class="texto-suave">Cada cliente tiene un plan. Los topes se aplican en su panel: al llegar, no puede cargar más y le avisamos que amplíe. Tocá un plan para editar sus topes, las funciones de diseño que incluye y los textos de su tarjeta en la web.</p>
   </div>
   <div class="acciones">
     <a class="boton" href="/plataforma/planes/nuevo"><%- icono('mas', { tamano: 18 }) %> Nuevo plan</a>
@@ -35,6 +35,7 @@
               <span class="celda-producto-textos">
                 <span class="celda-producto-nombre"><%= p.nombre %></span>
                 <% if (!p.activo) { %><span class="pastilla pastilla-ambar">Pausado</span><% } %>
+                <% if (p.destacado) { %><span class="pastilla pastilla-ok">Recomendado</span><% } %>
               </span>
             </a>
           </td>
@@ -42,7 +43,7 @@
           <td data-etiqueta="Productos"><%= tope(p.maxProductos) %></td>
           <td data-etiqueta="Fotos por producto"><%= tope(p.maxFotos) %></td>
           <td data-etiqueta="Banners"><%= tope(p.maxBanners) %></td>
-          <td data-etiqueta="Diseño"><%= niveles[p.nivelDiseno]?.titulo ?? '—' %></td>
+          <td data-etiqueta="Diseño"><%= p.disenoPersonalizado ? 'Personalizado' : p.disenoNombre %><% if (p.disenoPersonalizado) { %><span class="celda-nota ayuda"><%= p.disenoResumen %></span><% } %></td>
           <td data-etiqueta="Prueba"><%= p.diasPrueba ? plural(p.diasPrueba, 'día', 'días') : '—' %><% if (p.suspenderAlVencer) { %><span class="celda-nota ayuda">cierra al vencer</span><% } %></td>
           <td data-etiqueta="Clientes" class="numero"><%= Number(p.clientes) %></td>
           <td class="celda-acciones">

@@ -1,11 +1,11 @@
 <%#
-  La maqueta web (plan Acompañado): el estado de la última maqueta pedida, su vista previa y las anteriores (ver src/maquetas.js).
+  La maqueta web (función del plan): el estado de la última maqueta pedida, su vista previa y las anteriores (ver src/maquetas.js).
   Recibe: plan, maquetas (la más nueva primero), actual (la que se está viendo), ultima (la más nueva) y generacion ({ puede, razon, restantes, maximo }).
 %>
 <%- include('../parciales/cabecera', { titulo: 'Maqueta web' }) %>
 <%- include('../parciales/marca-encabezado', { pestania: 'maqueta', ultima: locals.ultima ?? null }) %>
 
-<% if (!plan.puede) { %>
+<% if (!plan.puede.kit_de_marca) { %>
   <%- include('../parciales/marca-bloqueo', { plan }) %>
 <% } else if (!actual) { %>
   <section class="tarjeta estado-vacio">

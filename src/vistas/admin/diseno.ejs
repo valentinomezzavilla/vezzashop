@@ -32,7 +32,7 @@
 </header>
 
 <%- include('diseno-plan-resumen', { plan }) %>
-<%- include('../parciales/marca-acceso', { puede: plan.puede.acompanado }) %>
+<%- include('../parciales/marca-acceso', { puede: plan.puede.kit_de_marca }) %>
 
 <% if (Object.keys(errores).length) { %>
   <p class="aviso aviso-error" role="alert"><%- icono('alerta', { tamano: 18 }) %><span>Hay campos para revisar. Todavía no se guardó nada.</span></p>

@@ -1,12 +1,12 @@
 <%#
-  El kit de marca (plan Acompañado): los archivos, los colores y los datos de la marca que se usan para armar la maqueta (ver src/marca.js).
+  El kit de marca (función del plan): los archivos, los colores y los datos de la marca que se usan para armar la maqueta (ver src/marca.js).
   Recibe: plan, valores (lo guardado, o lo enviado si el formulario volvió con errores), errores, archivos, logoTienda, tipos, estilos, colores,
   limites, generacion ({ puede, razon, restantes, maximo }) y ultima (la última maqueta pedida, o null).
 %>
 <%- include('../parciales/cabecera', { titulo: 'Kit de marca' }) %>
 <%- include('../parciales/marca-encabezado', { pestania: 'kit', ultima: locals.ultima ?? null }) %>
 
-<% if (!plan.puede) { %>
+<% if (!plan.puede.kit_de_marca) { %>
   <%- include('../parciales/marca-bloqueo', { plan }) %>
 <% } else { %>
 <%

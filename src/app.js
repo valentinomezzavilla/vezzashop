@@ -87,7 +87,7 @@ export function crearApp({ db, config }) {
 
   // El aviso por mail a n8n (alta de cuentas, cambios de plan, pedidos): sin N8N_WEBHOOK_URL no manda nada, pero siempre existe.
   const notificar = crearNotificador(config.n8n);
-  // El pedido de maquetas web (plan Acompañado) va a su propio flujo de n8n, con su propio webhook (N8N_MAQUETAS_URL).
+  // El pedido de maquetas web (función del plan) va a su propio flujo de n8n, con su propio webhook (N8N_MAQUETAS_URL).
   const notificarMaquetas = crearNotificador(config.maquetas);
 
   // Si el host es el subdominio de una tienda, responde su vidriera. Va antes de las sesiones:

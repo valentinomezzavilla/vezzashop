@@ -694,6 +694,17 @@ document.addEventListener('input', (evento) => {
   if (casilla && !casilla.checked) casilla.checked = true;
 });
 
+// ---------- Planes (plataforma): los botones de punto de partida tildan las funciones de diseño de ese nivel ----------
+// Sin JavaScript se tildan a mano: los botones solo ahorran el trabajo.
+
+for (const boton of document.querySelectorAll('[data-funciones-preset]')) {
+  boton.addEventListener('click', () => {
+    const elegidas = new Set(boton.dataset.funcionesPreset.split(',').filter(Boolean));
+    for (const casilla of document.querySelectorAll('input[name="funciones"]')) casilla.checked = elegidas.has(casilla.value);
+    document.querySelector('[data-funciones-preset-aviso]')?.removeAttribute('hidden');
+  });
+}
+
 // ---------- Kit de marca: el color elegido muestra su código ----------
 
 for (const entrada of document.querySelectorAll('input[type="color"][data-marca-color]')) {

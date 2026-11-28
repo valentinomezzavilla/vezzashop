@@ -12,7 +12,7 @@ import { editarPlan, leerPlan } from './plataforma.js';
 import { precioDe } from './landing.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
-import { NIVELES } from './diseno-por-plan.js';
+import { nombreDeDiseno } from './diseno-por-plan.js';
 import { diasEntre, formatearDiaLargo, hoy } from './util/fechas.js';
 
 const NUMERO = new Intl.NumberFormat('es-AR', { useGrouping: 'always' });
@@ -29,10 +29,14 @@ const CAMPOS = [
   { campo: 'maxProductos', etiqueta: 'Productos', afecta: true, formato: (n) => (n === null ? 'Sin tope' : `Hasta ${NUMERO.format(n)}`) },
   { campo: 'maxFotos', etiqueta: 'Fotos por producto', afecta: true, formato: (n) => `Hasta ${n ?? MAX_FOTOS}` },
   { campo: 'maxBanners', etiqueta: 'Banners de la portada', afecta: true, formato: (n) => `Hasta ${n ?? MAX_BANNERS}` },
-  { campo: 'nivelDiseno', etiqueta: 'Diseño de la tienda', afecta: true, formato: (n) => NIVELES[n]?.titulo ?? NIVELES.esencial.titulo },
+  { campo: 'funciones', etiqueta: 'Diseño de la tienda', afecta: true, formato: (funciones) => nombreDeDiseno(funciones ?? []) },
   { campo: 'suspenderAlVencer', etiqueta: 'Si no se paga a tiempo', afecta: true, formato: (v) => (v ? 'La tienda se cierra al vencer' : 'Solo se avisa del vencimiento') },
   { campo: 'nombre', etiqueta: 'Nombre del plan', afecta: false, formato: String },
   { campo: 'diasPrueba', etiqueta: 'Días de prueba', afecta: false, formato: (n) => (n ? `${n} días` : 'Sin prueba') },
+  // Lo que se lee en la tarjeta del plan: se guarda sin más, a los clientes no les cambia nada.
+  { campo: 'descripcion', etiqueta: 'Descripción en la tarjeta', afecta: false, formato: (texto) => texto || 'La de siempre' },
+  { campo: 'caracteristicas', etiqueta: 'Lista de la tarjeta', afecta: false, formato: (lineas) => (lineas?.length ? lineas.join(' · ') : 'La de siempre') },
+  { campo: 'destacado', etiqueta: 'Recomendado', afecta: false, formato: (valor) => (valor ? 'Sí' : 'No') },
 ];
 
 // Qué cambió entre el plan guardado (`antes`, de leerPlan) y los datos nuevos (`despues`, de validarPlan).

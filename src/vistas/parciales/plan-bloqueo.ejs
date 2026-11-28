@@ -1,0 +1,13 @@
+<%#
+  El aviso de algo que el plan de la tienda no incluye: qué es, qué planes sí lo incluyen y cómo pedir el cambio.
+  Recibe: plan (de planDeDiseno en src/plataforma.js) y funcion (la clave de la función, por ejemplo "colores").
+%>
+<%
+  const nombres = plan.incluyen[funcion] ?? [];
+  const quienes = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}` : (nombres[0] ?? '');
+%>
+<div class="nivel-bloqueado" role="note">
+  <%- icono('candado', { tamano: 18 }) %>
+  <span>Tu plan<%= plan.nombre ? ` ${plan.nombre}` : '' %> no incluye <strong><%= plan.catalogo[funcion].titulo %></strong>.<%= nombres.length ? ` Lo ${nombres.length > 1 ? 'incluyen los planes' : 'incluye el plan'} ${quienes}.` : ' Por ahora no lo incluye ninguno de los planes que se ofrecen.' %><%= locals.pagosActivos ? '' : (locals.contactoPlataforma ? ` Para cambiar de plan, contactanos: ${contactoPlataforma}.` : ' Contactanos para cambiar de plan.') %></span>
+  <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
+</div>

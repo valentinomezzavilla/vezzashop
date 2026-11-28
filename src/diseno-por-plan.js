@@ -1,71 +1,177 @@
-// Diseño por plan: qué puede personalizar cada tienda de su vidriera según el nivel de diseño de su plan.
-//  - esencial:   lo de siempre (identidad, tipografía, esquinas, cabecera y menú, catálogo, banners).
-//  - acompanado: suma colores, posición del logo, portada ordenable, estilo de las tarjetas y del pie, banners a ancho completo.
-//  - a_medida:   suma CSS propio, tipografías de Google Fonts a elección, ancho de la página y dominio propio.
-// El nivel se aplica AL LEER (aplicarNivel): si un cliente baja de plan, lo que eligió de más queda guardado pero la vidriera deja de
+// Diseño por plan: qué puede personalizar cada tienda de su vidriera según las funciones de diseño que incluye su plan.
+//  - Lo básico lo tienen todos los planes: identidad (logo, color principal, franja de anuncios), tipografía, esquinas, cabecera y menú,
+//    catálogo y banners (hasta el tope del plan).
+//  - Cada función de diseño (FUNCIONES) la tilda quien administra la plataforma en cada plan, en /plataforma/planes. Los tres niveles de antes
+//    (Esencial, Acompañado y A medida) quedaron como puntos de partida para armar un plan (PRESETS).
+// Las funciones se aplican AL LEER (aplicarFunciones): si un cliente baja de plan, lo que eligió de más queda guardado pero la vidriera deja de
 // aplicarlo, y vuelve si el cliente sube de nuevo. Todos los valores por defecto reproducen la vidriera de siempre.
 // Este archivo no depende de diseno.js (que lo importa): son las opciones, sus validaciones y el estilo que generan.
 
-// ---------- Niveles ----------
+// ---------- Funciones de diseño ----------
 
-export const NIVELES = {
-  esencial: {
-    titulo: 'Esencial',
-    orden: 1,
-    lema: 'Tu marca en una tienda lista para vender',
-    incluye: [
-      'Logo, color principal y franja de anuncios',
-      'Tipografía y esquinas a elección',
-      'Cabecera y menú de categorías',
-      'Catálogo: orden, tamaño de las tarjetas y productos sin stock',
-      'Sobre la tienda, contacto y redes',
-      'Banners de bienvenida',
-    ],
-    resumen: 'Diseño de tu tienda: Esencial',
+// El catálogo, en el orden en que se muestran. `ajustes`: los ajustes de la vidriera que desbloquea (los que no son ajustes, como el dominio propio,
+// se usan en otras pantallas). `corto`: cómo se nombra dentro de una lista ("colores, portada y tarjetas").
+export const FUNCIONES = {
+  colores: {
+    titulo: 'Colores de la tienda',
+    corto: 'colores',
+    ayuda: 'El fondo, el texto, las tarjetas y la cabecera de otro color. El texto siempre tiene que leerse bien: si los colores se confunden, se avisa.',
+    ajustes: ['colorFondo', 'colorTexto', 'colorTarjetas', 'colorCabecera'],
   },
-  acompanado: {
-    titulo: 'Acompañado',
-    orden: 2,
-    lema: 'Más control sobre cómo se ve tu tienda',
-    incluye: [
-      'Todo lo del plan Esencial',
-      'Colores de fondo, texto, tarjetas, cabecera y pie',
-      'Logo a la izquierda, al centro o a la derecha',
-      'Portada a tu gusto: qué secciones se ven y en qué orden (banners, ofertas, destacados)',
-      'Tarjetas de producto con borde o sombra, y la proporción de la foto',
-      'Pie de página claro, oscuro o de tu color',
-      'Banners a ancho completo',
-      'Kit de marca: subís tu logo, fotos y colores y armamos una maqueta de tu tienda',
-    ],
-    resumen: 'Más controles de diseño: colores, portada y tarjetas',
+  logo_cabecera: {
+    titulo: 'Logo y cabecera',
+    corto: 'logo y cabecera',
+    ayuda: 'El logo a la izquierda, al centro o a la derecha, y la cabecera fija o que se va con el scroll.',
+    ajustes: ['logoPosicion', 'cabeceraFija'],
   },
-  a_medida: {
-    titulo: 'A medida',
-    orden: 3,
-    lema: 'Tu tienda, 100 % personalizable',
-    incluye: [
-      'Todo lo del plan Acompañado',
-      'CSS propio para cambiar lo que quieras',
-      'Cualquier tipografía de Google Fonts',
-      'Ancho de la página a elección',
-      'Dominio propio (tutienda.com)',
-      'Códigos de seguimiento (píxeles) cargados por nosotros',
-    ],
-    resumen: 'Diseño 100 % a medida y dominio propio',
+  portada: {
+    titulo: 'Portada personalizable',
+    corto: 'portada',
+    ayuda: 'Qué secciones se ven arriba (banners, ofertas, destacados) y en qué orden, y los banners de punta a punta.',
+    ajustes: ['portadaSecciones', 'bannersAncho'],
+  },
+  tarjetas: {
+    titulo: 'Tarjetas de producto',
+    corto: 'tarjetas',
+    ayuda: 'Sin marco, con borde o con sombra; foto vertical, cuadrada o apaisada; texto a la izquierda o centrado.',
+    ajustes: ['tarjetaEstilo', 'tarjetaFoto', 'tarjetaTexto'],
+  },
+  pie: {
+    titulo: 'Pie de página',
+    corto: 'pie',
+    ayuda: 'Claro, oscuro, del color de la marca o de otro color.',
+    ajustes: ['pieEstilo', 'colorPie'],
+  },
+  fuentes: {
+    titulo: 'Tipografías a elección',
+    corto: 'tipografías',
+    ayuda: 'Cualquier tipografía de Google Fonts para los títulos y para el texto.',
+    ajustes: ['fuenteTitulos', 'fuenteTexto'],
+  },
+  ancho: {
+    titulo: 'Ancho de la página',
+    corto: 'ancho de la página',
+    ayuda: 'Angosto, normal, ancho o todo el ancho de la pantalla.',
+    ajustes: ['anchoPagina'],
+  },
+  css: {
+    titulo: 'CSS propio',
+    corto: 'CSS propio',
+    ayuda: 'Hasta 20.000 caracteres de CSS para cambiar lo que quiera. Es para quien sabe: puede desarmar el diseño.',
+    ajustes: ['cssPropio'],
+  },
+  dominio: {
+    titulo: 'Dominio propio',
+    corto: 'dominio propio',
+    ayuda: 'La tienda se ve en su propio dominio (mitienda.com). El cliente lo pide desde Cuenta y lo activás vos desde su ficha.',
+    ajustes: [],
+  },
+  codigos: {
+    titulo: 'Códigos de seguimiento',
+    corto: 'códigos de seguimiento',
+    ayuda: 'Píxeles y analítica en la cabecera y el pie de la tienda. Los cargás vos desde la ficha del cliente.',
+    ajustes: [],
+  },
+  kit_de_marca: {
+    titulo: 'Kit de marca y maqueta web',
+    corto: 'kit de marca',
+    ayuda: 'Sube su logo, sus fotos y sus colores y se arma una maqueta de cómo podría verse su tienda (con n8n).',
+    ajustes: [],
   },
 };
-export const esNivel = (valor) => typeof valor === 'string' && Object.hasOwn(NIVELES, valor);
-// ¿El nivel `nivel` incluye lo que pide `requerido`?
-export const incluyeNivel = (nivel, requerido) => (NIVELES[nivel]?.orden ?? 0) >= (NIVELES[requerido]?.orden ?? Infinity);
+export const CLAVES_DE_FUNCIONES = Object.keys(FUNCIONES);
+export const esFuncion = (valor) => typeof valor === 'string' && Object.hasOwn(FUNCIONES, valor);
 
-// El nivel de diseño de una tienda (el de su plan) y el nombre del plan. Sin plan (o con un plan que no tiene nivel) vale como a_medida: nada cambia para ella.
-export async function datosDeNivel(db, tiendaId) {
-  const fila = await db
-    .prepare('SELECT p.nivel_diseno AS nivel, p.nombre AS plan FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id WHERE t.id = ?')
-    .get(tiendaId);
-  return { nivel: esNivel(fila?.nivel) ? fila.nivel : 'a_medida', planNombre: fila?.plan ?? null };
+// Lo que tienen todos los planes, sin tildar nada.
+export const BASE_DEL_DISENO = [
+  'Logo, color principal y franja de anuncios',
+  'Tipografía y esquinas a elección',
+  'Cabecera y menú de categorías',
+  'Catálogo: orden, tamaño de las tarjetas y productos sin stock',
+  'Sobre la tienda, contacto y redes',
+  'Banners de bienvenida (hasta el tope del plan)',
+];
+
+// Los tres niveles de siempre, como punto de partida para armar un plan: al elegirlos se tildan sus funciones, que después se cambian a gusto.
+// `resumen`: la línea de diseño de la tarjeta del plan cuando tiene justo esas funciones.
+export const PRESETS = {
+  esencial: { titulo: 'Esencial', lema: 'Tu marca en una tienda lista para vender', resumen: 'Diseño de tu tienda: Esencial', funciones: [] },
+  acompanado: {
+    titulo: 'Acompañado',
+    lema: 'Más control sobre cómo se ve tu tienda',
+    resumen: 'Más controles de diseño: colores, portada y tarjetas',
+    funciones: ['colores', 'logo_cabecera', 'portada', 'tarjetas', 'pie', 'kit_de_marca'],
+  },
+  a_medida: { titulo: 'A medida', lema: 'Tu tienda, 100 % personalizable', resumen: 'Diseño 100 % a medida y dominio propio', funciones: [...CLAVES_DE_FUNCIONES] },
+};
+export const esPreset = (valor) => typeof valor === 'string' && Object.hasOwn(PRESETS, valor);
+export const funcionesDePreset = (clave) => [...(PRESETS[clave]?.funciones ?? [])];
+
+// "colores,pie" -> ['colores', 'pie']: solo las que existen, sin repetidas y en el orden del catálogo.
+export function funcionesDeTexto(texto) {
+  const pedidas = new Set(String(texto ?? '').split(',').map((parte) => parte.trim()));
+  return CLAVES_DE_FUNCIONES.filter((clave) => pedidas.has(clave));
 }
-export const nivelDeTienda = async (db, tiendaId) => (await datosDeNivel(db, tiendaId)).nivel;
+export const textoDeFunciones = (funciones) => CLAVES_DE_FUNCIONES.filter((clave) => (funciones ?? []).includes(clave)).join(',');
+export const tieneFuncion = (funciones, clave) => (funciones ?? []).includes(clave);
+// Las funciones elegidas, ya ordenadas y sin repetidas (para guardar o comparar).
+export const normalizarFunciones = (funciones) => CLAVES_DE_FUNCIONES.filter((clave) => (funciones ?? []).includes(clave));
+
+// El punto de partida con justo estas funciones (esencial, acompanado o a_medida), o null si el plan se armó a gusto.
+export function presetDeFunciones(funciones) {
+  const texto = textoDeFunciones(funciones);
+  return Object.keys(PRESETS).find((clave) => textoDeFunciones(PRESETS[clave].funciones) === texto) ?? null;
+}
+
+const enLista = (partes) => (partes.length <= 1 ? partes.join('') : `${partes.slice(0, -1).join(', ')} y ${partes.at(-1)}`);
+
+// Qué incluye un plan en pocas palabras: "Lo básico", "colores, portada y tarjetas" o "Todo".
+export function resumenDeFunciones(funciones) {
+  const tiene = normalizarFunciones(funciones);
+  if (tiene.length === 0) return 'Lo básico';
+  if (tiene.length === CLAVES_DE_FUNCIONES.length) return 'Todo';
+  return enLista(tiene.map((clave) => FUNCIONES[clave].corto));
+}
+
+// El diseño de un plan para las listas y los avisos a los clientes: el nombre del punto de partida si coincide ("Acompañado") o lo que incluye.
+export function nombreDeDiseno(funciones) {
+  const preset = presetDeFunciones(funciones);
+  return preset ? PRESETS[preset].titulo : resumenDeFunciones(funciones);
+}
+
+// La línea de diseño de la tarjeta del plan (landing y suscripción), cuando el plan no tiene escrita su propia lista.
+export function lineaDeDiseno(funciones) {
+  const preset = presetDeFunciones(funciones);
+  if (preset) return PRESETS[preset].resumen;
+  const tiene = normalizarFunciones(funciones);
+  if (tiene.length > 6) return `Diseño muy personalizable: ${tiene.slice(0, 4).map((clave) => FUNCIONES[clave].corto).join(', ')} y más`;
+  return `Más controles de diseño: ${enLista(tiene.map((clave) => FUNCIONES[clave].corto))}`;
+}
+
+// Las funciones de diseño del plan de una tienda y el nombre del plan. Sin plan, todas: nada cambia para ella.
+export async function datosDeDiseno(db, tiendaId) {
+  const fila = await db
+    .prepare('SELECT p.funciones AS funciones, p.nombre AS plan FROM tiendas t LEFT JOIN planes p ON p.id = t.plan_id WHERE t.id = ?')
+    .get(tiendaId);
+  return { funciones: fila?.plan == null ? [...CLAVES_DE_FUNCIONES] : funcionesDeTexto(fila.funciones), planNombre: fila?.plan ?? null };
+}
+export const funcionesDeTienda = async (db, tiendaId) => (await datosDeDiseno(db, tiendaId)).funciones;
+
+// El plan de una tienda tal como lo necesitan las pantallas del panel: qué funciones tiene, cuáles no y qué planes (los que hoy se ofrecen)
+// las incluyen, para decirle al cliente a cuál pasar. `ofrecidos`: [{ id, nombre, precioCentavos, funciones }], del más barato al más caro.
+export function armarPlanDeDiseno({ funciones, planNombre }, ofrecidos = []) {
+  return {
+    nombre: planNombre,
+    funciones,
+    diseno: nombreDeDiseno(funciones),
+    resumen: resumenDeFunciones(funciones),
+    puede: Object.fromEntries(CLAVES_DE_FUNCIONES.map((clave) => [clave, funciones.includes(clave)])),
+    incluyen: Object.fromEntries(CLAVES_DE_FUNCIONES.map((clave) => [clave, ofrecidos.filter((plan) => plan.funciones.includes(clave)).map((plan) => plan.nombre)])),
+    ofrecidos,
+    catalogo: FUNCIONES,
+    base: BASE_DEL_DISENO,
+  };
+}
 
 // ---------- Opciones ----------
 
@@ -173,32 +279,16 @@ export const COLUMNAS_AVANZADAS = {
   anchoPagina: 'ancho_pagina',
 };
 
-// Desde qué nivel está disponible cada ajuste.
-export const NIVEL_DE_AJUSTE = {
-  colorFondo: 'acompanado',
-  colorTexto: 'acompanado',
-  colorTarjetas: 'acompanado',
-  colorCabecera: 'acompanado',
-  colorPie: 'acompanado',
-  logoPosicion: 'acompanado',
-  cabeceraFija: 'acompanado',
-  pieEstilo: 'acompanado',
-  portadaSecciones: 'acompanado',
-  tarjetaEstilo: 'acompanado',
-  tarjetaFoto: 'acompanado',
-  tarjetaTexto: 'acompanado',
-  bannersAncho: 'acompanado',
-  cssPropio: 'a_medida',
-  fuenteTitulos: 'a_medida',
-  fuenteTexto: 'a_medida',
-  anchoPagina: 'a_medida',
-};
+// Qué función desbloquea cada ajuste (sale del catálogo de arriba).
+export const FUNCION_DE_AJUSTE = Object.fromEntries(
+  Object.entries(FUNCIONES).flatMap(([funcion, { ajustes }]) => ajustes.map((ajuste) => [ajuste, funcion])),
+);
 
-// Los ajustes tal como los ve la vidriera: lo que el nivel no incluye vuelve al valor de siempre (lo guardado no se toca).
-export function aplicarNivel(ajustes, nivel) {
+// Los ajustes tal como los ve la vidriera: lo que el plan no incluye vuelve al valor de siempre (lo guardado no se toca).
+export function aplicarFunciones(ajustes, funciones) {
   const aplicados = { ...ajustes };
-  for (const [clave, requerido] of Object.entries(NIVEL_DE_AJUSTE)) {
-    if (!incluyeNivel(nivel, requerido)) aplicados[clave] = AJUSTES_AVANZADOS_POR_DEFECTO[clave];
+  for (const [ajuste, funcion] of Object.entries(FUNCION_DE_AJUSTE)) {
+    if (!funciones.includes(funcion)) aplicados[ajuste] = AJUSTES_AVANZADOS_POR_DEFECTO[ajuste];
   }
   return aplicados;
 }
@@ -260,13 +350,13 @@ export function validarFuenteGoogle(entrada) {
   return { valor: nombre };
 }
 
-// Valida los ajustes que dependen del plan (los campos del formulario de Diseño que no son de Esencial). Devuelve { ajustes, errores }.
-// Lo que el nivel no incluye se ignora; lo que no viene en el formulario queda como estaba. `actuales`: los ajustes guardados (los colores se
+// Valida los ajustes que dependen del plan (los campos del formulario de Diseño que no son de lo básico). Devuelve { ajustes, errores }.
+// Lo que el plan no incluye se ignora; lo que no viene en el formulario queda como estaba. `actuales`: los ajustes guardados (los colores se
 // validan de a pares: el texto tiene que leerse sobre el fondo y sobre las tarjetas).
-export function validarAvanzados(campos, nivel, actuales = AJUSTES_AVANZADOS_POR_DEFECTO) {
+export function validarAvanzados(campos, funciones, actuales = AJUSTES_AVANZADOS_POR_DEFECTO) {
   const ajustes = {};
   const errores = {};
-  const incluye = (clave) => incluyeNivel(nivel, NIVEL_DE_AJUSTE[clave]);
+  const incluye = (clave) => funciones.includes(FUNCION_DE_AJUSTE[clave]);
 
   // Cada color tiene su casilla "usar otro": sin ella vuelve al de siempre.
   for (const campo of Object.keys(COLORES)) {

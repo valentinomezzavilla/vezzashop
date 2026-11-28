@@ -1,4 +1,4 @@
-// Maquetas web (plan Acompañado). El cliente sube el material de su marca (marca.js) y pide una maqueta de su tienda; la plataforma le avisa
+// Maquetas web (función "Kit de marca y maqueta web" del plan). El cliente sube el material de su marca (marca.js) y pide una maqueta de su tienda; la plataforma le avisa
 // a un flujo de n8n (evento "maqueta_solicitada") y n8n, cuando la termina, la entrega en POST /webhooks/maquetas/:id (ver rutas/webhooks.js).
 //
 // El pedido y la entrega se cuidan así:

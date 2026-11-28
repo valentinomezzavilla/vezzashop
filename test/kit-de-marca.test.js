@@ -14,7 +14,7 @@ import { crearPlan } from '../src/plataforma.js';
 import { interpretarHoja } from '../src/importacion/interpretar.js';
 import { aplicarImportacion } from '../src/importacion/aplicar.js';
 import { leerAjustes } from '../src/diseno.js';
-import { NIVELES } from '../src/diseno-por-plan.js';
+import { PRESETS, funcionesDePreset } from '../src/diseno-por-plan.js';
 import { formatearPesos } from '../src/util/formato.js';
 import { leerMarca, listarArchivos, nombreParaMostrar, validarMarca, MAX_ARCHIVOS } from '../src/marca.js';
 import { limpiarCss, limpiarHtml, hashDeToken, crearToken, MAX_HTML, MAX_POR_DIA, MAX_GUARDADAS } from '../src/maquetas.js';
@@ -209,13 +209,14 @@ after(() => {
   rmSync(dirSubidas, { recursive: true, force: true });
 });
 
-// Una tienda con productos en un plan del nivel dado, ya con la sesión iniciada.
+// Una tienda con productos en un plan con las funciones del punto de partida dado ('esencial', 'acompanado', 'a_medida') o de una lista, ya con la sesión iniciada.
 async function tienda(nivel = 'acompanado', puertoApp = puerto) {
   contador++;
   const slug = `marca-${contador}`;
   const { tienda: creada, clave } = await crearTienda(db, { nombre: `Casa ${contador}`, email: `${slug}@ejemplo.com`, slug });
   if (nivel) {
-    const planId = await crearPlan(db, { nombre: `Plan ${nivel} ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, nivelDiseno: nivel });
+    const funciones = Array.isArray(nivel) ? nivel : funcionesDePreset(nivel);
+    const planId = await crearPlan(db, { nombre: `Plan ${Array.isArray(nivel) ? funciones.join('+') || 'basico' : nivel} ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, funciones });
     await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(planId, creada.id);
   }
   const { productos } = interpretarHoja([['SKU', 'Nombre', 'Precio', 'Stock'], [`TAZA${contador}`, 'Taza', 1500, 10], [`MATE${contador}`, 'Mate', 2500, 10]]);
@@ -246,9 +247,9 @@ async function pedida(t) {
 test('un plan Esencial ve el kit bloqueado y no puede guardar, subir ni pedir nada aunque arme los pedidos a mano', async () => {
   const t = await tienda('esencial');
   const html = await pagina(t, '/admin/marca');
-  assert.ok(html.includes('Disponible desde el plan <strong>Acompañado</strong>') && html.includes('Tu plan incluye el diseño Esencial'));
+  assert.ok(html.includes('no incluye <strong>Kit de marca y maqueta web</strong>') && html.includes('Tu plan Plan esencial'));
   assert.ok(!html.includes('name="archivos"') && !html.includes('id="form-marca"'), 'no hay formularios');
-  assert.ok((await pagina(t, '/admin/marca/maqueta')).includes('Disponible desde el plan <strong>Acompañado</strong>'));
+  assert.ok((await pagina(t, '/admin/marca/maqueta')).includes('no incluye <strong>Kit de marca y maqueta web</strong>'));
 
   // Los formularios no están, pero el pedido se puede armar a mano: no pasa nada. Hace falta un token de la sesión: se saca del Diseño.
   const csrf = await t.nav.csrfDe('/admin/diseno');
@@ -265,16 +266,25 @@ test('un plan Esencial ve el kit bloqueado y no puede guardar, subir ni pedir na
   assert.equal((await db.prepare('SELECT count(*) AS n FROM marca_archivos WHERE tienda_id = ?').get(t.tiendaId)).n, 0);
   assert.equal((await db.prepare('SELECT count(*) AS n FROM maquetas WHERE tienda_id = ?').get(t.tiendaId)).n, 0);
   assert.equal(recibidos.length, antes, 'a n8n no le llegó nada');
-  assert.ok((await pagina(t, '/admin/marca')).includes('Disponible desde el plan <strong>Acompañado</strong>'), 'el aviso lo dice');
+  assert.ok((await pagina(t, '/admin/marca')).includes('no incluye <strong>Kit de marca y maqueta web</strong>'), 'el aviso lo dice');
 });
 
-test('Diseño muestra la card del kit de marca en todos los planes, y la lista de lo que incluye Acompañado la nombra', async () => {
+test('Diseño muestra la card del kit de marca en todos los planes, y el punto de partida Acompañado la incluye', async () => {
   const esencial = await pagina(await tienda('esencial'), '/admin/diseno');
   assert.ok(esencial.includes('href="/admin/marca">Kit de marca y maqueta web</a>') && esencial.includes('Ver qué incluye'));
   const acompanado = await pagina(await tienda('acompanado'), '/admin/diseno');
   assert.ok(acompanado.includes('href="/admin/marca">Kit de marca y maqueta web</a>') && acompanado.includes('Armar mi maqueta'));
-  assert.ok(NIVELES.acompanado.incluye.some((linea) => linea.startsWith('Kit de marca')));
-  assert.ok(!NIVELES.esencial.incluye.some((linea) => linea.includes('Kit de marca')));
+  assert.ok(PRESETS.acompanado.funciones.includes('kit_de_marca'));
+  assert.ok(!PRESETS.esencial.funciones.includes('kit_de_marca'));
+});
+
+test('el kit de marca es una función más del plan: con solo esa tildada ya se usa, y sin ella no, aunque el plan lleve todo lo demás', async () => {
+  const solo = await tienda(['kit_de_marca']);
+  const html = await pagina(solo, '/admin/marca');
+  assert.ok(html.includes('id="form-marca"') && !html.includes('no incluye <strong>Kit de marca y maqueta web</strong>'));
+  const sin = await tienda(funcionesDePreset('a_medida').filter((funcion) => funcion !== 'kit_de_marca'));
+  assert.ok((await pagina(sin, '/admin/marca')).includes('no incluye <strong>Kit de marca y maqueta web</strong>'));
+  assert.ok((await pagina(sin, '/admin/diseno')).includes('Ver qué incluye'), 'y la card de Diseño lo explica');
 });
 
 test('el kit: se guarda, vuelve a mostrarse y los datos mal puestos no pisan lo guardado', async () => {
@@ -725,12 +735,12 @@ test('bajar de plan: lo guardado se conserva, pero el kit y las maquetas vuelven
   await entregar(id, { token, estado: 'lista', html: HTML_OK });
   assert.equal((await t.nav.pedir(`/admin/marca/maqueta/${id}/vista`)).status, 200);
 
-  const esencial = await crearPlan(db, { nombre: `Baja marca ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, nivelDiseno: 'esencial' });
+  const esencial = await crearPlan(db, { nombre: `Baja marca ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, funciones: funcionesDePreset('esencial') });
   await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(esencial, t.tiendaId);
-  assert.ok((await pagina(t, '/admin/marca')).includes('Disponible desde el plan <strong>Acompañado</strong>'));
+  assert.ok((await pagina(t, '/admin/marca')).includes('no incluye <strong>Kit de marca y maqueta web</strong>'));
   assert.equal((await t.nav.pedir(`/admin/marca/maqueta/${id}/vista`)).status, 404, 'tampoco se sirve el HTML');
   assert.equal((await listarArchivos(db, t.tiendaId)).length, 1, 'el archivo sigue guardado');
-  const acompanado = await crearPlan(db, { nombre: `Sube marca ${contador}`, precioCentavos: 3000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, nivelDiseno: 'acompanado' });
+  const acompanado = await crearPlan(db, { nombre: `Sube marca ${contador}`, precioCentavos: 3000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, funciones: funcionesDePreset('acompanado') });
   await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(acompanado, t.tiendaId);
   assert.equal((await t.nav.pedir(`/admin/marca/maqueta/${id}/vista`)).status, 200, 'y al volver a subir, todo está como estaba');
 });

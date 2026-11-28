@@ -7,8 +7,8 @@ import { dominioDeTiendas, urlPanel, urlTienda } from '../util/dominios.js';
 import { formatearFecha, formatearPrecio, plural } from '../util/formato.js';
 import { formatearDia, formatearDiaLargo, hoy, sumarMeses } from '../util/fechas.js';
 import { precioParaEditar } from '../productos.js';
-import { precioDe } from '../landing.js';
-import { NIVELES, datosDeNivel, incluyeNivel } from '../diseno-por-plan.js';
+import { descripcionAutomatica, itemsAutomaticos, precioDe } from '../landing.js';
+import { BASE_DEL_DISENO, FUNCIONES, PRESETS, datosDeDiseno, nombreDeDiseno, presetDeFunciones, resumenDeFunciones, tieneFuncion } from '../diseno-por-plan.js';
 import { ESTADOS_DOMINIO, cambiarActivacion, leerDominio, quitarDominio, registrosDns, solicitarDominio, verificarDominio } from '../dominios-propios.js';
 import { armarAvisoCuentaCreada } from '../notificaciones.js';
 import { cancelarSuscripcionDeTienda, estadoDeSuscripcion, leerSuscripcion, listarAltasSinCuenta, reenviarEnlaceDeAlta, sincronizarSuscripcion } from '../suscripciones.js';
@@ -19,6 +19,9 @@ import {
   LARGO_MINIMO_CLAVE_SUPERADMIN,
   listarPlanes,
   leerPlan,
+  MAX_CARACTERISTICAS,
+  MAX_DESCRIPCION_PLAN,
+  MAX_LARGO_CARACTERISTICA,
   validarPlan,
   crearPlan,
   editarPlan,
@@ -176,24 +179,25 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
       partesLink: urlTienda(req, dominioDeTiendas(config), '\0').split('\0'),
       enlacesAnteriores: await listarEnlacesAnteriores(db, cliente.id),
       suscripcion: servicios ? await estadoDeSuscripcion(db, cliente.id) : null,
-      diseno: await datosDeDiseno(cliente.id),
+      diseno: await fichaDeDiseno(cliente.id),
       sugerido: sumarMeses(cliente.venceEn && cliente.venceEn >= hoy() ? cliente.venceEn : hoy(), 1),
       errores,
       valores,
     });
   }
 
-  // El diseño y el dominio propio de un cliente: su nivel de diseño, el dominio (con los registros DNS que le corresponden) y los códigos de seguimiento.
+  // El diseño y el dominio propio de un cliente: lo que incluye su plan, el dominio (con los registros DNS que le corresponden) y los códigos de seguimiento.
   // config.resolverDns solo lo usan los tests (para no salir a internet): sin él se usa el DNS de verdad.
   const opcionesDns = { panel: config.dominio, ip: config.ipServidor ?? '', resolver: config.resolverDns };
-  async function datosDeDiseno(tiendaId) {
-    const { nivel } = await datosDeNivel(db, tiendaId);
+  async function fichaDeDiseno(tiendaId) {
+    const { funciones, planNombre } = await datosDeDiseno(db, tiendaId);
     const actual = await leerDominio(db, tiendaId);
     const codigos = await db.prepare('SELECT codigo_cabecera AS cabecera, codigo_pie AS pie FROM tiendas WHERE id = ?').get(tiendaId);
     return {
-      nivel,
-      nivelTitulo: NIVELES[nivel].titulo,
-      aMedida: incluyeNivel(nivel, 'a_medida'),
+      planNombre,
+      nombre: nombreDeDiseno(funciones),
+      conDominio: tieneFuncion(funciones, 'dominio'),
+      conCodigos: tieneFuncion(funciones, 'codigos'),
       dominio: actual,
       estadosDominio: ESTADOS_DOMINIO,
       registros: actual ? registrosDns(actual.dominio, opcionesDns) : [],
@@ -223,7 +227,8 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
     else volverADominio(req, res, 'error', `El DNS de ${resultado.dominio} todavía no apunta a la plataforma: encontramos ${visto}. Tiene que ser un CNAME a ${config.dominio}${config.ipServidor ? ` o un registro A a ${config.ipServidor}` : ''}.`);
   });
   router.post('/clientes/:clienteId/dominio/activar', cargarCliente, verificarCsrf, async (req, res) => {
-    if (!incluyeNivel((await datosDeNivel(db, req.cliente.id)).nivel, 'a_medida')) return volverADominio(req, res, 'error', 'El plan de este cliente no incluye dominio propio (es del plan A medida).');
+    const { funciones, planNombre } = await datosDeDiseno(db, req.cliente.id);
+    if (!tieneFuncion(funciones, 'dominio')) return volverADominio(req, res, 'error', `El plan de este cliente${planNombre ? ` (${planNombre})` : ''} no incluye dominio propio. Tildá "Dominio propio" en ese plan o pasalo a uno que lo incluya.`);
     if (!(await cambiarActivacion(db, req.cliente.id, true))) return volverADominio(req, res, 'error', 'Este cliente no tiene un dominio cargado.');
     volverADominio(req, res, 'ok', 'Activamos el dominio: la tienda ya se resuelve ahí y el link de siempre redirige. Si ves que no carga con https, desactivalo y revisá Coolify.');
   });
@@ -458,7 +463,9 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
 
   // ---------- Planes ----------
 
-  router.get('/planes', async (req, res) => res.render('plataforma/planes', { niveles: NIVELES, planes: await listarPlanes(db) }));
+  // El diseño de cada plan para la lista: el nombre del punto de partida si coincide, o "Personalizado" con lo que incluye.
+  const conDiseno = (plan) => ({ ...plan, disenoNombre: nombreDeDiseno(plan.funciones), disenoPersonalizado: presetDeFunciones(plan.funciones) === null, disenoResumen: resumenDeFunciones(plan.funciones) });
+  router.get('/planes', async (req, res) => res.render('plataforma/planes', { planes: (await listarPlanes(db)).map(conDiseno) }));
 
   const formularioDePlan = (plan) => ({
     nombre: plan?.nombre ?? '',
@@ -469,10 +476,14 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
     activo: plan?.activo ?? true,
     diasPrueba: plan?.diasPrueba ?? '',
     suspenderAlVencer: plan?.suspenderAlVencer ?? false,
-    nivelDiseno: plan?.nivelDiseno ?? 'esencial',
+    funciones: plan?.funciones ?? [],
+    descripcion: plan?.descripcion ?? '',
+    caracteristicas: (plan?.caracteristicas ?? []).join('\n'),
+    destacado: plan?.destacado ?? false,
   });
 
   // Los datos validados de un plan, otra vez como campos de formulario (para llevarlos escondidos a la pantalla de confirmación).
+  // Las funciones de diseño van como una lista; `funcionesEnviadas` hace que "ninguna" no se confunda con "no se tocó".
   const camposDePlan = (datos) => ({
     nombre: datos.nombre,
     precio: precioParaEditar(datos.precioCentavos),
@@ -482,17 +493,33 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
     diasPrueba: datos.diasPrueba ?? '',
     activo: datos.activo ? '1' : '',
     suspenderAlVencer: datos.suspenderAlVencer ? '1' : '',
-    nivelDiseno: datos.nivelDiseno,
+    funcionesEnviadas: '1',
+    funciones: datos.funciones,
+    descripcion: datos.descripcion,
+    caracteristicas: datos.caracteristicas.join('\n'),
+    destacado: datos.destacado ? '1' : '',
   });
 
+  // Lo que se ve en el formulario cuando volvió con errores: lo que se envió, con las casillas ya como valores.
+  const valoresEnviados = (cuerpo, datos) => ({ ...cuerpo, activo: datos.activo, suspenderAlVencer: datos.suspenderAlVencer, funciones: datos.funciones, destacado: datos.destacado });
+
   const mostrarPlan = (req, res, { plan = null, valores, errores = {}, status = 200 }) =>
-    res.status(status).render('plataforma/plan', { plan, valores: valores ?? formularioDePlan(plan), errores, niveles: NIVELES });
+    res.status(status).render('plataforma/plan', {
+      plan,
+      valores: valores ?? formularioDePlan(plan),
+      errores,
+      funciones: FUNCIONES,
+      presets: PRESETS,
+      base: BASE_DEL_DISENO,
+      textosAutomaticos: plan ? { descripcion: descripcionAutomatica(plan), items: itemsAutomaticos(plan) } : null,
+      limites: { descripcion: MAX_DESCRIPCION_PLAN, caracteristicas: MAX_CARACTERISTICAS, linea: MAX_LARGO_CARACTERISTICA },
+    });
 
   router.get('/planes/nuevo', (req, res) => mostrarPlan(req, res, {}));
 
   router.post('/planes/nuevo', verificarCsrf, async (req, res) => {
     const { datos, errores } = await validarPlan(db, null, req.body);
-    if (Object.keys(errores).length > 0) return mostrarPlan(req, res, { valores: { ...req.body, activo: datos.activo, suspenderAlVencer: datos.suspenderAlVencer }, errores, status: 400 });
+    if (Object.keys(errores).length > 0) return mostrarPlan(req, res, { valores: valoresEnviados(req.body, datos), errores, status: 400 });
     await crearPlan(db, datos);
     avisar(req, 'ok', `Creamos el plan "${datos.nombre}".`);
     res.redirect('/plataforma/planes');
@@ -509,7 +536,7 @@ export function rutasPlataforma({ db, config, servicios = null, notificar = asyn
   router.post('/planes/:planId', cargarPlan, verificarCsrf, async (req, res) => {
     const { datos, errores } = await validarPlan(db, req.plan.id, req.body);
     if (Object.keys(errores).length > 0) {
-      return mostrarPlan(req, res, { plan: req.plan, valores: { ...req.body, activo: datos.activo, suspenderAlVencer: datos.suspenderAlVencer }, errores, status: 400 });
+      return mostrarPlan(req, res, { plan: req.plan, valores: valoresEnviados(req.body, datos), errores, status: 400 });
     }
     // Si el cambio le toca a quienes ya tienen el plan (el precio, los topes, lo que pasa al vencer), no se guarda de entrada: primero se ve a quiénes
     // alcanza, se elige a quiénes se saca de un aumento y si se les avisa por mail.

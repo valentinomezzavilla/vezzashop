@@ -118,7 +118,7 @@ function leerN8n(env) {
   return url ? { url, secreto: (env.N8N_WEBHOOK_SECRET ?? '').trim() } : null;
 }
 
-// Las maquetas web del plan Acompañado (src/maquetas.js) las genera otro flujo de n8n, con su propio webhook: N8N_MAQUETAS_URL.
+// Las maquetas web (src/maquetas.js, una función de los planes) las genera otro flujo de n8n, con su propio webhook: N8N_MAQUETAS_URL.
 // Usa el mismo secreto que los mails (N8N_WEBHOOK_SECRET) salvo que se defina N8N_MAQUETAS_SECRET. Sin la URL, el kit de marca se puede
 // completar pero no se puede pedir la maqueta. Devuelve null o { url, secreto }.
 function leerMaquetas(env) {

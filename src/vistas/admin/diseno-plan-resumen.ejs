@@ -1,25 +1,52 @@
-<%# Arriba de Diseño: qué nivel de diseño tiene el plan de la tienda y qué incluye cada nivel. Recibe: plan = { nivel, nombre, niveles }. %>
-<% const { nivel, niveles } = plan; %>
+<%#
+  Arriba de Diseño: qué incluye el plan de la tienda y, en un desplegable, qué incluye cada plan que se ofrece.
+  Recibe: plan (de planDeDiseno en src/plataforma.js).
+%>
+<%
+  // Si el plan de la tienda no se ofrece (uno interno, o pausado), igual aparece en la comparación, primero.
+  const columnas = !plan.nombre || plan.ofrecidos.some((p) => p.nombre === plan.nombre)
+    ? plan.ofrecidos
+    : [{ nombre: plan.nombre, funciones: plan.funciones }, ...plan.ofrecidos];
+%>
 <section class="tarjeta nivel-resumen" aria-labelledby="titulo-nivel">
   <div class="nivel-resumen-cabecera">
     <div>
-      <h2 id="titulo-nivel">Tu diseño: <%= niveles[nivel].titulo %></h2>
-      <p class="ayuda"><%= plan.nombre ? `Tu plan es ${plan.nombre}. ` : '' %><%= niveles[nivel].lema %>. Lo que tu plan no incluye aparece bloqueado más abajo.</p>
+      <h2 id="titulo-nivel">Tu plan<%= plan.nombre ? `: ${plan.nombre}` : '' %></h2>
+      <p class="ayuda">Diseño incluido: <%= plan.resumen %>. Lo que tu plan no incluye aparece bloqueado más abajo.</p>
     </div>
     <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
   </div>
-  <details class="nivel-detalle">
-    <summary>¿Qué incluye cada plan?</summary>
-    <div class="niveles-grilla">
-      <% for (const [clave, datos] of Object.entries(niveles)) { %>
-        <div class="nivel-columna<%= clave === nivel ? ' nivel-actual' : '' %>">
-          <h3><%= datos.titulo %><% if (clave === nivel) { %> <span class="pastilla pastilla-ok">Tu plan</span><% } %></h3>
-          <p class="ayuda"><%= datos.lema %></p>
-          <ul>
-            <% for (const item of datos.incluye) { %><li><%= item %></li><% } %>
-          </ul>
-        </div>
-      <% } %>
-    </div>
-  </details>
+  <% if (columnas.length > 0) { %>
+    <details class="nivel-detalle">
+      <summary>¿Qué incluye cada plan?</summary>
+      <div class="tabla-contenedor tabla-sin-borde">
+        <table class="tabla tabla-comparacion">
+          <thead>
+            <tr>
+              <th scope="col">Diseño de la tienda</th>
+              <% for (const columna of columnas) { %>
+                <th scope="col" class="<%= columna.nombre === plan.nombre ? 'nivel-actual' : '' %>"><%= columna.nombre %><% if (columna.nombre === plan.nombre) { %> <span class="pastilla pastilla-ok">Tu plan</span><% } %></th>
+              <% } %>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Lo básico: logo, color, tipografía, cabecera, catálogo y banners</th>
+              <% for (const columna of columnas) { %><td class="<%= columna.nombre === plan.nombre ? 'nivel-actual' : '' %>" data-etiqueta="<%= columna.nombre %>"><%- icono('check', { tamano: 16 }) %><span class="visualmente-oculto">Incluido</span></td><% } %>
+            </tr>
+            <% for (const [clave, funcion] of Object.entries(plan.catalogo)) { %>
+              <tr>
+                <th scope="row"><%= funcion.titulo %></th>
+                <% for (const columna of columnas) { %>
+                  <td class="<%= columna.nombre === plan.nombre ? 'nivel-actual' : '' %>" data-etiqueta="<%= columna.nombre %>">
+                    <% if (columna.funciones.includes(clave)) { %><%- icono('check', { tamano: 16 }) %><span class="visualmente-oculto">Incluido</span><% } else { %><span aria-hidden="true">—</span><span class="visualmente-oculto">No incluido</span><% } %>
+                  </td>
+                <% } %>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  <% } %>
 </section>

@@ -3,7 +3,7 @@
 import { listarPlanes, seOfrece, esAutoservicio } from './plataforma.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
-import { NIVELES } from './diseno-por-plan.js';
+import { lineaDeDiseno } from './diseno-por-plan.js';
 
 const NUMERO = new Intl.NumberFormat('es-AR', { useGrouping: 'always' });
 const PESOS = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
@@ -23,7 +23,8 @@ function topes(plan) {
   ];
 }
 
-function descripcion(plan) {
+// La frase de la tarjeta cuando el plan no tiene escrita la suya (se edita en /plataforma/planes).
+export function descripcionAutomatica(plan) {
   if (plan.diasPrueba) return 'Para conocer la plataforma y armar tu primera tienda.';
   if (plan.maxProductos === null) return 'Sin topes de catálogo, para negocios grandes o con necesidades propias.';
   if (plan.maxProductos <= 200) return 'Para arrancar a vender con un catálogo chico o mediano.';
@@ -44,31 +45,31 @@ export function precioDe(plan) {
   return { precio: gratis ? 'Gratis' : pesos(plan.precioCentavos), unidad: gratis ? (plan.diasPrueba ? `${plan.diasPrueba} días` : '') : '/ mes' };
 }
 
-// Las tarjetas de la sección Planes: solo los planes activos, del más barato al más caro. El destacado ("Recomendado") es el
-// plan pago más barato, y solo si hay otros con quién compararlo.
+// La lista de la tarjeta cuando el plan no tiene escrita la suya: los topes, la prueba y lo que incluye de diseño.
+export function itemsAutomaticos(plan) {
+  const items = topes(plan);
+  if (plan.diasPrueba && plan.precioCentavos !== 0) items.push(`${plan.diasPrueba} días de prueba`);
+  if (plan.diasPrueba && plan.suspenderAlVencer) items.push('Al terminar, la tienda se pausa hasta que elijas un plan');
+  // Cuánto del diseño de la tienda se puede personalizar con este plan (ver diseno-por-plan.js).
+  items.push(lineaDeDiseno(plan.funciones ?? []));
+  if (!plan.diasPrueba) items.push('Todo lo del panel y la tienda');
+  return items;
+}
+
+// Las tarjetas de la sección Planes: solo los planes activos, del más barato al más caro. Los textos son los que se escribieron para cada plan
+// en /plataforma/planes; lo que quedó vacío se arma solo. "Recomendado" es el plan que se marcó así.
 // `pagos`: con los pagos en línea andando, los planes que se contratan solos llevan a /suscribirse (el resto, a WhatsApp).
 export function armarPlanes(planes, { pagos = false } = {}) {
-  const activos = ordenar(planes.filter(seOfrece));
-  const destacado = activos.length > 1 ? activos.find((p) => p.precioCentavos > 0 && !p.diasPrueba) : undefined;
-  return activos.map((plan) => {
-    const gratis = plan.precioCentavos === 0;
-    const items = topes(plan);
-    if (plan.diasPrueba && !gratis) items.push(`${plan.diasPrueba} días de prueba`);
-    if (plan.diasPrueba && plan.suspenderAlVencer) items.push('Al terminar, la tienda se pausa hasta que elijas un plan');
-    // Cuánto del diseño de la tienda se puede personalizar con este plan (ver diseno-por-plan.js).
-    items.push((NIVELES[plan.nivelDiseno] ?? NIVELES.esencial).resumen);
-    if (!plan.diasPrueba) items.push('Todo lo del panel y la tienda');
-    return {
-      id: plan.id,
-      nombre: plan.nombre,
-      descripcion: descripcion(plan),
-      ...precioDe(plan),
-      items,
-      destacado: plan === destacado,
-      boton: boton(plan),
-      href: pagos && esAutoservicio(plan) ? `/suscribirse?plan=${plan.id}` : null,
-    };
-  });
+  return ordenar(planes.filter(seOfrece)).map((plan) => ({
+    id: plan.id,
+    nombre: plan.nombre,
+    descripcion: plan.descripcion || descripcionAutomatica(plan),
+    ...precioDe(plan),
+    items: plan.caracteristicas?.length ? [...plan.caracteristicas] : itemsAutomaticos(plan),
+    destacado: Boolean(plan.destacado),
+    boton: boton(plan),
+    href: pagos && esAutoservicio(plan) ? `/suscribirse?plan=${plan.id}` : null,
+  }));
 }
 
 // Los precios para el bloque de datos estructurados (JSON-LD) de la página. El "<" va escapado para que nada cierre el <script>.

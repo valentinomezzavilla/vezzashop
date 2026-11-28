@@ -8,6 +8,7 @@ import { abrirBase } from '../src/db.js';
 import { crearApp } from '../src/app.js';
 import { crearPlan, editarPlan, pausarPlan, PLANES_SUGERIDOS } from '../src/plataforma.js';
 import { armarPlanes, ofertasJsonLd } from '../src/landing.js';
+import { CLAVES_DE_FUNCIONES } from '../src/diseno-por-plan.js';
 import { pedirConHost } from './ayudantes.js';
 
 const PUBLICO = path.join(import.meta.dirname, '..', 'src', 'publico');
@@ -90,10 +91,32 @@ test('armarPlanes: precio, topes y botón de cada tarjeta, del más barato al m�
   assert.equal(medida.boton.texto, 'Consultar');
 });
 
-test('armarPlanes: el recomendado es el plan pago más barato, y solo si hay con quién compararlo', () => {
-  const tarjetas = armarPlanes([plan({ id: 1, nombre: 'Prueba', precioCentavos: 0, diasPrueba: 7 }), plan({ id: 2 }), plan({ id: 3, nombre: 'Pro', precioCentavos: 5_000_000, maxProductos: 1000 })]);
-  assert.deepEqual(tarjetas.filter((t) => t.destacado).map((t) => t.nombre), ['Esencial']);
-  assert.equal(armarPlanes([plan()])[0].destacado, false);
+test('armarPlanes: el recomendado es el plan que se marcó, y ninguno si no se marcó ninguno', () => {
+  const planes = [plan({ id: 1, nombre: 'Prueba', precioCentavos: 0, diasPrueba: 7 }), plan({ id: 2 }), plan({ id: 3, nombre: 'Pro', precioCentavos: 5_000_000, maxProductos: 1000 })];
+  assert.deepEqual(armarPlanes(planes).filter((t) => t.destacado), [], 'sin marcar, ninguno');
+  assert.deepEqual(armarPlanes(planes.map((p) => (p.id === 3 ? { ...p, destacado: true } : p))).filter((t) => t.destacado).map((t) => t.nombre), ['Pro']);
+  assert.equal(armarPlanes([plan({ destacado: true })])[0].destacado, true, 'si se marcó, se muestra aunque sea el único plan');
+});
+
+test('armarPlanes: la frase y la lista que se escribieron para un plan reemplazan a las automáticas', () => {
+  const [propio, automatico] = armarPlanes([
+    plan({ id: 1, descripcion: 'Para tiendas que recién arrancan.', caracteristicas: ['Hasta 150 productos', 'Soporte por WhatsApp'] }),
+    plan({ id: 2, nombre: 'Pro', precioCentavos: 5_000_000, maxProductos: 1000 }),
+  ]);
+  assert.equal(propio.descripcion, 'Para tiendas que recién arrancan.');
+  assert.deepEqual(propio.items, ['Hasta 150 productos', 'Soporte por WhatsApp'], 'la lista propia reemplaza a toda la automática');
+  assert.equal(automatico.descripcion, 'Para negocios que ya venden y quieren seguir creciendo.');
+  assert.equal(automatico.items.at(-2), 'Diseño de tu tienda: Esencial', 'sin lista propia, se arma sola');
+  assert.deepEqual(armarPlanes([plan({ descripcion: '', caracteristicas: [] })])[0].items.slice(0, 2), ['Hasta 150 productos', '4 fotos por producto'], 'vacíos, se arma sola');
+});
+
+test('armarPlanes: la línea de diseño sale de las funciones del plan', () => {
+  const linea = (funciones) => armarPlanes([plan({ funciones })])[0].items.at(-2);
+  assert.equal(linea([]), 'Diseño de tu tienda: Esencial');
+  assert.equal(linea(['colores', 'logo_cabecera', 'portada', 'tarjetas', 'pie', 'kit_de_marca']), 'Más controles de diseño: colores, portada y tarjetas', 'las de siempre del plan Acompañado');
+  assert.equal(linea(CLAVES_DE_FUNCIONES), 'Diseño 100 % a medida y dominio propio', 'todas: las de siempre del plan A medida');
+  assert.equal(linea(['colores', 'pie']), 'Más controles de diseño: colores y pie');
+  assert.equal(linea(['colores', 'logo_cabecera', 'portada', 'tarjetas', 'pie', 'fuentes', 'css']), 'Diseño muy personalizable: colores, logo y cabecera, portada, tarjetas y más');
 });
 
 test('armarPlanes: los miles se separan con punto, los centavos solo aparecen si hay, y los planes pausados no salen', () => {

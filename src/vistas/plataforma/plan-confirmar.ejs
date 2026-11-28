@@ -15,7 +15,7 @@
 
 <form method="post" action="/plataforma/planes/<%= plan.id %>/confirmar" class="ajustes">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <% for (const [nombre, valor] of Object.entries(campos)) { %><input type="hidden" name="<%= nombre %>" value="<%= valor %>"><% } %>
+  <% for (const [nombre, valor] of Object.entries(campos)) { %><% for (const uno of [].concat(valor)) { %><input type="hidden" name="<%= nombre %>" value="<%= uno %>"><% } %><% } %>
   <% for (const c of clientes) { %><input type="hidden" name="visto" value="<%= c.id %>"><% } %>
 
   <section class="ajuste ajuste-ancho">

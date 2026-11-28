@@ -2,6 +2,8 @@
 <%
   const error = (campo) => include('../parciales/error-campo', { mensaje: errores[campo], id: `error-${campo}` });
   const invalido = (campo) => (errores[campo] ? ` aria-invalid="true" aria-describedby="error-${campo}"` : '');
+  const tildada = (clave) => (valores.funciones ?? []).includes(clave);
+  const tilde = (valor) => valor === true || valor === '1' || valor === 'on';
 %>
 <header class="encabezado">
   <div>
@@ -44,16 +46,35 @@
       <%- error('maxBanners') %>
     </div>
   </div>
-  <div class="campo">
-    <label for="nivelDiseno">Diseño de la tienda</label>
-    <select id="nivelDiseno" name="nivelDiseno" aria-describedby="ayuda-nivelDiseno"<%- invalido('nivelDiseno') %>>
-      <% for (const [clave, nivel] of Object.entries(niveles)) { %>
-        <option value="<%= clave %>"<%= valores.nivelDiseno === clave ? ' selected' : '' %>><%= nivel.titulo %> · <%= nivel.lema %></option>
+  <fieldset class="campo funciones-plan" aria-describedby="ayuda-funciones">
+    <legend class="etiqueta">Diseño de la tienda</legend>
+    <p class="ayuda" id="ayuda-funciones">Lo que puede personalizar de su vidriera quien tiene este plan. Tildá las funciones que suma: en el panel del cliente, lo que no tenga queda bloqueado con un aviso.</p>
+    <details class="funciones-base">
+      <summary>Lo básico, que tienen todos los planes</summary>
+      <ul>
+        <% for (const item of base) { %><li><%= item %></li><% } %>
+      </ul>
+    </details>
+    <div class="puntos-de-partida">
+      <span class="ayuda">Empezar desde:</span>
+      <% for (const preset of Object.values(presets)) { %>
+        <button class="boton boton-secundario boton-chico" type="button" data-funciones-preset="<%= preset.funciones.join(',') %>" title="<%= preset.lema %>"><%= preset.titulo %></button>
       <% } %>
-    </select>
-    <span class="ayuda" id="ayuda-nivelDiseno">Cuánto puede personalizar de su vidriera quien tiene este plan. <strong>Esencial</strong>: identidad, tipografía, cabecera y banners. <strong>Acompañado</strong>: suma colores, logo, portada y tarjetas. <strong>A medida</strong>: todo, con CSS propio y dominio propio. Si un cliente baja de nivel, lo que había elegido de más queda guardado pero no se ve.</span>
-    <%- error('nivelDiseno') %>
-  </div>
+    </div>
+    <p class="ayuda" data-funciones-preset-aviso hidden>Tildamos las funciones de ese punto de partida. Ajustalas a gusto y guardá el plan.</p>
+    <input type="hidden" name="funcionesEnviadas" value="1">
+    <div class="funciones-plan-lista">
+      <% for (const [clave, funcion] of Object.entries(funciones)) { %>
+        <label class="funcion-plan">
+          <input type="checkbox" name="funciones" value="<%= clave %>"<%= tildada(clave) ? ' checked' : '' %>>
+          <strong><%= funcion.titulo %></strong>
+          <span class="ayuda"><%= funcion.ayuda %></span>
+        </label>
+      <% } %>
+    </div>
+    <%- error('funciones') %>
+    <p class="ayuda">Si un cliente baja de plan, lo que había elegido de más queda guardado pero no se ve en su tienda; si vuelve a subir, reaparece.</p>
+  </fieldset>
   <div class="campo">
     <label for="diasPrueba">Días de prueba <span class="opcional">(opcional)</span></label>
     <input id="diasPrueba" type="text" name="diasPrueba" value="<%= valores.diasPrueba %>" inputmode="numeric" placeholder="Sin prueba" aria-describedby="ayuda-diasPrueba"<%- invalido('diasPrueba') %>>
@@ -69,6 +90,26 @@
     <input type="checkbox" name="activo" value="1"<%= valores.activo === true || valores.activo === '1' || valores.activo === 'on' ? ' checked' : '' %>>
     <span class="interruptor-pista" aria-hidden="true"></span>
     <span class="interruptor-texto"><strong>Disponible para clientes nuevos</strong><span class="ayuda">Si lo pausás, deja de ofrecerse al dar de alta o cambiar de plan, pero los clientes que ya lo tienen lo conservan y no cambia nada para ellos.</span></span>
+  </label>
+
+  <h2 class="formulario-subtitulo">Cómo se ve en la web</h2>
+  <p class="ayuda">Así se ve este plan en la página de inicio (la lista, también al suscribirse). Lo que dejes vacío se arma solo.</p>
+  <div class="campo">
+    <label for="descripcion">Frase de la tarjeta <span class="opcional">(opcional)</span></label>
+    <input id="descripcion" type="text" name="descripcion" value="<%= valores.descripcion %>" maxlength="<%= limites.descripcion %>"<% if (textosAutomaticos) { %> placeholder="<%= textosAutomaticos.descripcion %>"<% } %> aria-describedby="ayuda-descripcion"<%- invalido('descripcion') %>>
+    <span class="ayuda" id="ayuda-descripcion">Va debajo del nombre del plan, en la página de inicio. Hasta <%= limites.descripcion %> caracteres.<%= textosAutomaticos ? ' Vacía, se muestra la que ves en gris.' : '' %></span>
+    <%- error('descripcion') %>
+  </div>
+  <div class="campo">
+    <label for="caracteristicas">Qué incluye <span class="opcional">(opcional)</span></label>
+    <textarea id="caracteristicas" name="caracteristicas" rows="7" aria-describedby="ayuda-caracteristicas"<%- invalido('caracteristicas') %>><%= valores.caracteristicas %></textarea>
+    <span class="ayuda" id="ayuda-caracteristicas">Una línea por cada punto de la tarjeta (hasta <%= limites.caracteristicas %> líneas de <%= limites.linea %> caracteres). Vacío, se arma con los topes, la prueba y el diseño<%= textosAutomaticos ? `; hoy diría: ${textosAutomaticos.items.join(' · ')}` : '' %>.</span>
+    <%- error('caracteristicas') %>
+  </div>
+  <label class="interruptor">
+    <input type="checkbox" name="destacado" value="1"<%= tilde(valores.destacado) ? ' checked' : '' %>>
+    <span class="interruptor-pista" aria-hidden="true"></span>
+    <span class="interruptor-texto"><strong>Mostrarlo como "Recomendado"</strong><span class="ayuda">En la página de inicio lleva la etiqueta y el botón resaltado. Lo tiene un solo plan: al guardar este, se la sacás al que la tenía.</span></span>
   </label>
   <div class="acciones">
     <button class="boton" type="submit"><%- icono('check', { tamano: 18 }) %> Guardar plan</button>

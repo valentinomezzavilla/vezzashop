@@ -1,11 +1,11 @@
-// El kit de marca y las maquetas web del plan Acompañado: el cliente sube sus logos y fotos, elige sus colores y cuenta cómo es su marca;
+// El kit de marca y las maquetas web (una función del plan): el cliente sube sus logos y fotos, elige sus colores y cuenta cómo es su marca;
 // con eso se le pide a un flujo de n8n una maqueta de su tienda, que se ve acá apenas llega. Ver marca.js y maquetas.js.
 import express from 'express';
 import multer from 'multer';
 import { verificarCsrf } from '../csrf.js';
 import { buscarTienda } from '../tiendas.js';
 import { leerAjustes } from '../diseno.js';
-import { NIVELES, datosDeNivel, incluyeNivel } from '../diseno-por-plan.js';
+import { planDeDiseno } from '../plataforma.js';
 import { TAMANO_MAXIMO_IMAGEN, urlImagen } from '../imagenes.js';
 import {
   COLORES,
@@ -78,11 +78,8 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
       next(error);
     });
 
-  // El plan de la tienda y si incluye esto (desde el nivel Acompañado). Con un plan que no lo incluye todo se ve bloqueado, y nada se guarda.
-  async function planDe(tiendaId) {
-    const { nivel, planNombre } = await datosDeNivel(db, tiendaId);
-    return { nivel, nombre: planNombre, niveles: NIVELES, puede: incluyeNivel(nivel, 'acompanado') };
-  }
+  // El plan de la tienda y si incluye esto (la función "Kit de marca y maqueta web"). Con un plan que no lo incluye se ve bloqueado, y nada se guarda.
+  const planDe = (tiendaId) => planDeDiseno(db, tiendaId);
   const volver = (req, res, tipo, texto, ruta = '/admin/marca') => {
     req.session.aviso = { tipo, texto };
     res.redirect(ruta);
@@ -90,7 +87,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
   // Para las acciones: sin el plan, vuelve al kit (que se ve bloqueado) con un aviso.
   async function conPlan(req, res, siguiente) {
     const plan = await planDe(req.session.usuario.tiendaId);
-    if (!plan.puede) return volver(req, res, 'error', `Disponible desde el plan ${NIVELES.acompanado.titulo}.`);
+    if (!plan.puede.kit_de_marca) return volver(req, res, 'error', 'Tu plan no incluye el kit de marca y la maqueta web.');
     return siguiente(plan);
   }
 
@@ -108,7 +105,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
   async function mostrarKit(req, res, { valores = null, errores = {}, status = 200 } = {}) {
     const { tiendaId } = req.session.usuario;
     const plan = await planDe(tiendaId);
-    if (!plan.puede) return res.status(status).render('admin/marca', { seccionActual: 'diseno', plan, ultima: null });
+    if (!plan.puede.kit_de_marca) return res.status(status).render('admin/marca', { seccionActual: 'diseno', plan, ultima: null });
     await vencerPendientes(db, tiendaId);
     const [marca, ajustes, archivos, maquetas] = await Promise.all([leerMarca(db, tiendaId), leerAjustes(db, tiendaId), listarArchivos(db, tiendaId), listarMaquetas(db, tiendaId)]);
     const logoTienda = urlImagen(tiendaId, ajustes.logo);
@@ -169,7 +166,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
   router.get('/marca/maqueta', async (req, res) => {
     const { tiendaId } = req.session.usuario;
     const plan = await planDe(tiendaId);
-    if (!plan.puede) return res.render('admin/maqueta', { seccionActual: 'diseno', plan, ultima: null });
+    if (!plan.puede.kit_de_marca) return res.render('admin/maqueta', { seccionActual: 'diseno', plan, ultima: null });
     await vencerPendientes(db, tiendaId);
     const [maquetas, ajustes, archivos] = await Promise.all([listarMaquetas(db, tiendaId), leerAjustes(db, tiendaId), listarArchivos(db, tiendaId)]);
     const pedida = Number.parseInt(req.query.ver, 10);
@@ -197,7 +194,7 @@ export function rutasAdminMarca({ db, config, notificarMaquetas = async () => fa
   // El HTML de la maqueta, para el iframe de la página (y para abrirla en pantalla completa). Va con su propia política de seguridad.
   router.get('/marca/maqueta/:id/vista', async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    const html = (await planDe(tiendaId)).puede && /^\d{1,9}$/.test(req.params.id) ? await htmlDeMaqueta(db, tiendaId, Number(req.params.id)) : null;
+    const html = (await planDe(tiendaId)).puede.kit_de_marca && /^\d{1,9}$/.test(req.params.id) ? await htmlDeMaqueta(db, tiendaId, Number(req.params.id)) : null;
     if (!html) return res.status(404).type('text/plain').send('Esta maqueta no existe.');
     res
       .set({

@@ -36,7 +36,7 @@ import { arbolCategoriasAdmin, aplanar, validarCategoria, crearCategoria, editar
 import { buscarTienda, renombrarTienda, cambiarClave, LARGO_MINIMO_CLAVE } from '../tiendas.js';
 import { guardarImagen, borrarImagen, urlMiniatura, huellaDe, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN } from '../imagenes.js';
 import { dominioDeTiendas, urlPublicaDeTienda } from '../util/dominios.js';
-import { datosDeNivel, incluyeNivel } from '../diseno-por-plan.js';
+import { planDeDiseno } from '../plataforma.js';
 import { ESTADOS_DOMINIO, leerDominio, quitarDominio, registrosDns, solicitarDominio, verificarDominio } from '../dominios-propios.js';
 import { limitesDeTienda, usoDeTienda, llegoAlTopeDeProductos, ampliarPlan } from '../limites.js';
 import { estadoDeSuscripcion } from '../suscripciones.js';
@@ -389,14 +389,15 @@ export function rutasAdminTienda({ db, config, servicios = null }) {
     });
   }
 
-  // El dominio propio (plan a medida): lo que se muestra en Cuenta. Los registros DNS que hay que cargar dependen del tipo de dominio.
+  // El dominio propio (una función de diseño del plan): lo que se muestra en Cuenta. Los registros DNS que hay que cargar dependen del tipo de dominio.
   // config.resolverDns solo lo usan los tests (para no salir a internet): sin él se usa el DNS de verdad.
   const opcionesDns = { panel: config.dominio, ip: config.ipServidor ?? '', resolver: config.resolverDns };
   async function datosDeDominio(tiendaId) {
-    const { nivel } = await datosDeNivel(db, tiendaId);
+    const plan = await planDeDiseno(db, tiendaId);
     const actual = await leerDominio(db, tiendaId);
     return {
-      disponible: incluyeNivel(nivel, 'a_medida'),
+      disponible: plan.puede.dominio,
+      plan,
       actual,
       estados: ESTADOS_DOMINIO,
       registros: actual ? registrosDns(actual.dominio, opcionesDns) : [],
@@ -417,8 +418,8 @@ export function rutasAdminTienda({ db, config, servicios = null }) {
   // Mientras está activo no se cambia desde acá: cambiarlo dejaría la tienda sin su dominio de un momento a otro.
   const dominioPermitido = async (req, res) => {
     const { tiendaId } = req.session.usuario;
-    if (!incluyeNivel((await datosDeNivel(db, tiendaId)).nivel, 'a_medida')) {
-      avisar(req, 'error', 'El dominio propio es parte del plan A medida.');
+    if (!(await planDeDiseno(db, tiendaId)).puede.dominio) {
+      avisar(req, 'error', 'Tu plan no incluye dominio propio.');
       res.redirect('/admin/cuenta#dominio');
       return false;
     }

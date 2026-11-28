@@ -22,7 +22,7 @@ import {
   CATEGORIAS_EN_PORTADA,
   CATEGORIAS_EN_PIE,
 } from '../diseno.js';
-import { aplicarNivel, nivelDeTienda, seccionesDePortada } from '../diseno-por-plan.js';
+import { aplicarFunciones, funcionesDeTienda, seccionesDePortada } from '../diseno-por-plan.js';
 import { dimensionesDe, urlImagen, urlMiniatura } from '../imagenes.js';
 import { formatearFecha, formatearPrecio } from '../util/formato.js';
 import { leerEventos, armarSeguimiento, tituloParaCliente } from '../envios.js';
@@ -148,11 +148,11 @@ export function rutasTienda({ db, config, notificar = async () => false }) {
   const limiteCobrosMp = crearLimite({ maximo: COBROS_MP_POR_HORA, ventanaMs: 60 * 60 * 1000 });
 
   router.use(async (req, res, next) => {
-    // Lo que la tienda eligió, limitado a lo que incluye el nivel de diseño de su plan (lo de más queda guardado pero no se ve).
-    const nivel = await nivelDeTienda(db, req.tienda.id);
-    const ajustes = aplicarNivel(await leerAjustes(db, req.tienda.id), nivel);
-    // El código de seguimiento (píxeles, analítica) lo carga quien administra la plataforma; solo se usa con el plan a medida.
-    const codigos = nivel === 'a_medida' ? await db.prepare('SELECT codigo_cabecera AS cabecera, codigo_pie AS pie FROM tiendas WHERE id = ?').get(req.tienda.id) : null;
+    // Lo que la tienda eligió, limitado a las funciones de diseño que incluye su plan (lo de más queda guardado pero no se ve).
+    const funciones = await funcionesDeTienda(db, req.tienda.id);
+    const ajustes = aplicarFunciones(await leerAjustes(db, req.tienda.id), funciones);
+    // El código de seguimiento (píxeles, analítica) lo carga quien administra la plataforma; solo se usa si el plan incluye esa función.
+    const codigos = funciones.includes('codigos') ? await db.prepare('SELECT codigo_cabecera AS cabecera, codigo_pie AS pie FROM tiendas WHERE id = ?').get(req.tienda.id) : null;
     // Con "ocultar los sin stock", una categoría que solo tiene de esos tampoco se muestra.
     const arbol = await arbolCategorias(db, req.tienda.id, { sinStock: ajustes.sinStock });
     const checkout = await estadoCheckout(db, req.tienda.id, ajustes);
@@ -238,7 +238,7 @@ export function rutasTienda({ db, config, notificar = async () => false }) {
     const datos = await listado(req, {});
     // Los destacados y los banners van arriba solo en la primera vista de la portada, sin filtros ni orden elegido.
     const portada = !req.query.orden && !datos.hayFiltros && datos.pagina === 1;
-    // Qué secciones van arriba y en qué orden (Diseño, plan Acompañado): por defecto, los banners y los destacados, como siempre.
+    // Qué secciones van arriba y en qué orden (Diseño, función "Portada personalizable" del plan): por defecto, los banners y los destacados, como siempre.
     const seccionesPortada = portada ? seccionesDePortada(req.ajustes.portadaSecciones) : [];
     const banners = seccionesPortada.includes('banners')
       ? await Promise.all(

@@ -42,9 +42,16 @@ Estilo de producto profesional: superficies neutras, un solo color de marca, bor
   La card de Diseño que lleva al kit de marca (`.marca-acceso`, `parciales/marca-acceso.ejs`) reusa el mismo patrón y solo cambia la grilla.
 - **Kit de marca y maqueta** (`.marca-*`, `.maqueta-*`; `admin/marca.ejs` y `admin/maqueta.ejs`): los archivos del kit son una grilla de tarjetas (`.marca-archivos`) con la imagen sobre un
   fondo ajedrezado, para que se vean los logos transparentes, y su nombre con elipsis; los colores usan `.selector-color` y las opciones de estilo, `.opcion-tipo`. Lo bloqueado por el plan usa
-  `.nivel-bloqueado` como en Diseño. La maqueta se ve en un `<iframe sandbox="">` (`.maqueta-iframe`, siempre sobre fondo blanco: es otra página con sus propios colores) con un selector
+  `.nivel-bloqueado` (el aviso, `parciales/plan-bloqueo.ejs`) como en Diseño. La maqueta se ve en un `<iframe sandbox="">` (`.maqueta-iframe`, siempre sobre fondo blanco: es otra página con sus propios colores) con un selector
   de tamaño (computadora o celular) hecho solo con CSS (`:has(input:checked)`), y mientras se genera hay un bloque de espera con `role="status"`; `admin.js` lo consulta y recarga la página
   cuando termina (sin JavaScript queda el botón "Actualizar"). El estado nunca va solo en color: lleva su texto (*Generando*, *Lista*, *Con problemas*).
+
+- **Planes y funciones de diseño** (`admin/diseno-plan.ejs`, `admin/diseno-plan-resumen.ejs`, `plataforma/plan.ejs`): cada función de diseño que un plan puede incluir es un **bloque propio**
+  (`.funcion-bloque`, con su título `.funcion-titulo` y separado del anterior por una línea). Si el plan no la incluye, el bloque lleva `.funcion-bloqueada` (sus campos, dentro de un
+  `fieldset.bloqueable[disabled]`, se atenúan al 50 %) y arriba el aviso `.nivel-bloqueado` con el candado, qué función falta y qué planes la incluyen (`parciales/plan-bloqueo.ejs`, el mismo que
+  usan el kit de marca y el dominio propio). La tabla de "¿Qué incluye cada plan?" es `.tabla-comparacion` (tilde donde está, raya donde no; el plan del cliente resaltado con `.nivel-actual`; nunca
+  solo color: lleva el texto "Incluido" / "No incluido" para lectores de pantalla). En el formulario de un plan de `/plataforma`, las funciones son una grilla de casillas (`.funciones-plan`,
+  `.funcion-plan`: la tarjeta entera es la casilla y se resalta al tildarla) y los puntos de partida son botones comunes (`type="button"`, `data-funciones-preset`) que `admin.js` usa para tildarlas.
 
 ## Vidriera (`src/publico/tienda.css`)
 

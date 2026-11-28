@@ -22,11 +22,11 @@ Estado al 24/11/2026. **No hice commit ni push** (solo si me lo pedís). La suit
 El flujo de n8n **ya está actualizado en vivo** (nodo "Validar y armar mail" y remitente / Reply-To del nodo de envío).
 
 ### Punto 9 en dos líneas
-- **Diseño por plan:** cada plan tiene un "Diseño de la tienda" (se elige en `/plataforma/planes`). En el panel de Diseño de cada cliente, lo que su plan no incluye sale **bloqueado**, y
-  arriba hay una comparación de qué trae cada nivel. *Acompañado*: colores (fondo, texto, tarjetas, cabecera), logo a izquierda/centro/derecha, portada ordenable con una sección nueva de **Ofertas**,
-  tarjetas con borde o sombra, pie claro/oscuro/de color, banners de punta a punta. *A medida*: CSS propio, tipografías de Google Fonts, ancho de página, dominio propio y códigos de seguimiento
-  (que cargás vos). Lo de más que haya elegido un cliente que baja de plan queda guardado pero no se ve.
-- **Dominio propio:** el cliente A medida lo pide en *Cuenta*, verifica su DNS, y **vos lo activás** desde su ficha en `/plataforma` (en la lista de clientes aparece "Dominio por activar").
+- **Diseño por plan:** cada plan tiene su propia lista de **funciones de diseño** que tildás en `/plataforma/planes` (colores, logo y cabecera, portada, tarjetas, pie, tipografías, ancho, CSS propio, dominio
+  propio, códigos de seguimiento y kit de marca), más los textos de su tarjeta en la web. En el panel de Diseño de cada cliente, lo que su plan no incluye sale **bloqueado** función por función, y
+  arriba hay una tabla de qué incluye cada plan. Los tres niveles de antes (Esencial, Acompañado y A medida) quedaron como botones de punto de partida que tildan sus funciones. Lo de más que haya
+  elegido un cliente que baja de plan queda guardado pero no se ve.
+- **Dominio propio:** el cliente cuyo plan lo incluye lo pide en *Cuenta*, verifica su DNS, y **vos lo activás** desde su ficha en `/plataforma` (en la lista de clientes aparece "Dominio por activar").
 
 ## Lo que tenés que hacer vos
 
@@ -38,14 +38,20 @@ El flujo de n8n **ya está actualizado en vivo** (nodo "Validar y armar mail" y 
       solas al arrancar.
 - [ ] **No cambies `SECRETO_SESION`**: ahora también cifra los tokens de Mercado Pago de las tiendas. Si cambia, cada tienda tiene que volver a conectar.
 
-### 2. Planes y niveles de diseño (punto 9)
-- [ ] Entrá a `/plataforma/planes` y mirá la columna **Diseño** de cada plan. La migración le puso *Acompañado* al plan que se llame "Acompañado", *A medida* a "A medida" y a "Sin límites"
-      (el interno de las tiendas que ya existían, para que no pierdan nada), y *Esencial* a los demás. Si renombraste planes, corregilo editando cada plan.
-- [ ] Mirá el panel de **Diseño** de un cliente de cada nivel (podés entrar a su panel desde `/plataforma`) y probá guardar colores, logo al centro, portada con ofertas, etc. Probé todo con
-      fotos de relleno (letras); conviene verlo con **fotos y un logo reales**, y con un menú de categorías, que fue lo que no pude probar.
-- [ ] Probá una **tipografía de Google Fonts** a elección (plan A medida, ej. `Playfair Display`). Con `Playfair Display` y conexión a internet se vio bien; probá una que tenga un solo peso
+### 2. Planes y funciones de diseño (punto 9)
+Los planes ya no tienen tres niveles fijos: cada uno tiene su **lista de funciones de diseño** (colores, portada, tarjetas, CSS propio, dominio propio...), que tildás en `/plataforma/planes`, y los textos de su tarjeta en la web.
+- [ ] Entrá a `/plataforma/planes` y mirá la columna **Diseño** de cada plan. La migración `020` copió el nivel de antes a las funciones: *Acompañado* al plan que se llamaba "Acompañado", *A medida* a "A medida" y a "Sin límites"
+      (el interno de las tiendas que ya existían, para que no pierdan nada), y ninguna (*Esencial*) a los demás. Si renombraste planes, corregilo editando cada plan: tocá un plan y tildá lo que corresponda
+      (los botones **Esencial / Acompañado / A medida** tildan de una las funciones de ese nivel).
+- [ ] La migración también marcó como **Recomendado** al plan pago más barato (lo que se mostraba hasta ahora). Si preferís otro, abrilo y tildá *Mostrarlo como "Recomendado"*: lo tiene un solo plan.
+- [ ] Armá un plan a tu gusto (por ejemplo, solo *Colores* y *Pie de página*) y escribí su **frase** y su **lista de lo que incluye** en *Cómo se ve en la web*: la frase y el Recomendado se ven en la landing, y la lista también en `/suscribirse` y en `/admin/suscripcion`. Dejá vacío lo que
+      quieras que se arme solo. No lo hice con tus planes reales: probalo con uno de prueba.
+- [ ] Mirá el panel de **Diseño** de un cliente de cada plan (podés entrar a su panel desde `/plataforma`) y probá guardar colores, logo al centro, portada con ofertas, etc. Probé todo con
+      fotos de relleno (letras); conviene verlo con **fotos y un logo reales**, y con un menú de categorías, que fue lo que no pude probar. Lo que el plan no incluye sale bloqueado, función por función.
+- [ ] Probá una **tipografía de Google Fonts** a elección (función *Tipografías a elección*, ej. `Playfair Display`). Con `Playfair Display` y conexión a internet se vio bien; probá una que tenga un solo peso
       (ej. `Pacifico`) por si tu navegador la trata distinto.
 - [ ] Tené en cuenta: los **colores** personalizados no se aplican al checkout ni a la página del pedido (para no romper su lectura); el **CSS propio** sí se aplica en todas las páginas de la tienda.
+- [ ] Si le sacás una función a un plan que ya tienen clientes, la pantalla de confirmación te lo muestra y, si dejás tildado "Avisarles por mail", se les avisa. Lo que habían elegido queda guardado y vuelve si la función se vuelve a tildar.
 
 ### 3. Dominio propio de un cliente (punto 9): lo que hacés cuando pide uno
 La plataforma **no** avisa por mail cuando un cliente pide o verifica su dominio: lo ves en `/plataforma/clientes` (etiqueta "Dominio por activar"). Para cada uno:
@@ -54,11 +60,11 @@ La plataforma **no** avisa por mail cuando un cliente pide o verifica su dominio
 - [ ] Abrí `https://www.sudominio.com`, comprobá que carga con el candado y recién ahí tocá **Activar** en la ficha. Desde ahí el link de siempre redirige al dominio propio.
 - [ ] Para dominios **sin www** (`sudominio.com`) hace falta un registro A: poné en Coolify la variable `IP_SERVIDOR` (la IP pública de tu servidor) para que el panel se la muestre al cliente.
 - [ ] Si el cliente usa Cloudflare, el registro tiene que estar en "solo DNS" (nube gris), o la verificación no lo ve (igual podés activarlo a mano si ya carga).
-- [ ] Los **códigos de seguimiento** (píxel de Meta, Google Analytics) los cargás vos en la misma ficha, en *Códigos de seguimiento*: solo se usan con el plan A medida.
+- [ ] Los **códigos de seguimiento** (píxel de Meta, Google Analytics) los cargás vos en la misma ficha, en *Códigos de seguimiento*: solo se usan si su plan incluye la función *Códigos de seguimiento*.
 
 ### 4. n8n: probar los mails nuevos (no mandé ninguno de prueba, como pediste)
 El secreto del webhook no está en el repo, así que tampoco llamé al flujo en vivo. Probá con un email tuyo, uno de cada tipo:
-- [ ] **Cambio de plan** (`plan_modificado`): en `/plataforma`, cambiá el precio, un tope o el nivel de diseño de un plan que tenga un cliente de prueba, y dejá tildado "Avisarles por mail".
+- [ ] **Cambio de plan** (`plan_modificado`): en `/plataforma`, cambiá el precio, un tope o las funciones de diseño de un plan que tenga un cliente de prueba, y dejá tildado "Avisarles por mail".
 - [ ] **Baja** (`suscripcion_cancelada`): cancelá la suscripción de un cliente de prueba y fijate que el mail diga hasta cuándo sigue la tienda y traiga el botón para reactivar.
 - [ ] **Pedido** (`pedido_actualizado`): en una tienda de prueba, un pedido con tu email; pasalo a "Despachado" con "Avisarle por email" tildado. Tiene que salir con **el nombre de la tienda** como remitente y responder al email de contacto de la tienda.
 - [ ] Si algo sale mal, se vuelve atrás: en n8n, historial de versiones del flujo (versión `1009cd1c`), o el respaldo local `17863`. El código nuevo del nodo está también en `n8n/validar-y-armar-mail.js`.
@@ -79,7 +85,7 @@ El secreto del webhook no está en el repo, así que tampoco llamé al flujo en 
 - [ ] Que `PUT /preapproval/{id}` acepte el aumento de monto (puede tener límites de cuánto se sube de una vez; si lo rechaza, el panel lo avisa y queda para reintentar desde la ficha del cliente).
 - [ ] Que al reactivar con `start_date` el primer cobro caiga el día de siempre y no se cobre dos veces.
 
-### 7. Kit de marca y maqueta web (plan Acompañado): ponerlo en marcha
+### 7. Kit de marca y maqueta web (función del plan): ponerlo en marcha
 El panel, el pedido a n8n, la entrega y el flujo de n8n (`n8n/maqueta-web.json`) están hechos y probados (ver *Kit de marca y maquetas web* en el README). Falta lo que depende de tu n8n y tu Coolify:
 - [x] En n8n: el flujo **VEZZA Shop · Maquetas web** ya está creado (id `DCgxn1z2ELG90S0f`), **inactivo**, con tu credencial *VEZZA Shop · Secreto del webhook de cuentas* en el webhook, la de Google Gemini en *Redactar los textos*
       (`models/gemini-3.5-flash-lite`) y *VEZZA · Alerta de errores* como flujo de errores. Lo probé activo, con un secreto temporal que ya borré (y borré también las ejecuciones de prueba): un pedido inválido
@@ -88,7 +94,7 @@ El panel, el pedido a n8n, la entrega y el flujo de n8n (`n8n/maqueta-web.json`)
 - [ ] **Activar el flujo** cuando subas la plataforma nueva (no lo dejé activo porque hasta entonces nadie lo llama).
 - [ ] Recomendado: escribí tu dominio del panel en `DOMINIO_DE_LA_PLATAFORMA` (`n8n/maqueta-pedido.js`), corré `node scripts/armar-flujo-n8n.js` y pegá el código en el nodo: así la entrega de la maqueta no puede ir a ningún otro dominio.
 - [ ] En Coolify: `N8N_MAQUETAS_URL=https://<tu n8n>/webhook/vezza-shop-maquetas` (y `N8N_MAQUETAS_SECRET` si no querés usar el mismo secreto que los mails).
-- [ ] Probalo con una tienda de plan Acompañado: subí un logo y fotos, guardá los colores, "Armar mi maqueta" y esperá menos de un minuto. Si el resumen debajo de la vista previa dice "Textos de ejemplo" en vez de
+- [ ] Probalo con una tienda cuyo plan incluya el kit de marca (por ejemplo, Acompañado): subí un logo y fotos, guardá los colores, "Armar mi maqueta" y esperá menos de un minuto. Si el resumen debajo de la vista previa dice "Textos de ejemplo" en vez de
       "Textos redactados con IA", Gemini no contestó (o contestó en otro formato): mirá esa ejecución en n8n y mandame lo que devolvió el nodo.
 - [ ] Mirá cómo queda: el diseño de la maqueta es la plantilla de `n8n/maqueta-armar.js` (hay cuatro estilos). Si querés otro look, se cambia ahí y se vuelve a armar el flujo.
 - [ ] Decidí si querés que al cliente le llegue un mail cuando su maqueta está lista (hoy solo la ve en el panel) y si querés que pueda **aplicar los colores de la maqueta a su tienda** con un botón.

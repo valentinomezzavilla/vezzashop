@@ -73,12 +73,14 @@ sesión ni cookies: `src/vistas/landing.ejs` (HTML, CSS y JS juntos, con los col
   `opacity`, y lo más nuevo (`animation-timeline`, `@view-transition`, `::details-content`) está detrás de `@supports`: los navegadores que no lo
   tienen ven la versión de siempre. Un test (`test/landing.test.js`) verifica que ninguna animación quede fuera de ese bloque.
 - **Planes: salen de la base.** Las tarjetas de la sección Planes y los precios de los datos estructurados para Google se arman
-  con los planes de `/plataforma/planes`: lo que editás ahí (nombre, precio, topes, días de prueba) se ve en la landing en el acto.
+  con los planes de `/plataforma/planes`: lo que editás ahí (nombre, precio, topes, días de prueba, funciones de diseño y los textos de la tarjeta) se ve en la landing en el acto.
   Salen los planes **activos** con precio o con período de prueba, del más barato al más caro; un plan **pausado**, o uno gratis y
   sin prueba (como "Sin límites", el interno de las tiendas que ya existían), no se muestra. Cada tarjeta lista los topes de
   productos, fotos y banners (un tope vacío se muestra como "sin tope" o con el máximo de la plataforma: 10 fotos y 6 banners). El
-  texto de arriba de cada tarjeta sale de los topes y de la prueba, y el **Recomendado** es el plan pago más barato (si hay más de
-  uno). Si no hay planes para mostrar, la sección queda con un botón para consultar. Se ordenan y redactan en `armarPlanes`.
+  texto de arriba de cada tarjeta y su lista de lo que incluye se escriben en el formulario de cada plan (*Cómo se ve en la web*); lo que
+  queda vacío se arma solo (la frase, según la prueba y el tope de productos; la lista, con los topes, la prueba y el diseño que incluye).
+  El **Recomendado** es el plan que se marcó así (uno solo: al marcar uno se le saca al que lo tenía; sin ninguno marcado, nadie lo lleva).
+  Si no hay planes para mostrar, la sección queda con un botón para consultar. Se ordenan y redactan en `armarPlanes`.
 - **Contacto.** Los botones "Probar gratis" y "Elegir plan" abren WhatsApp con un mensaje armado (el número está en `WHATSAPP`,
   al final del `<script>` de `landing.ejs`). Si lo dejás vacío, llevan a la sección de contacto, que apunta a `vezzadev.com` e Instagram.
 - **Capturas.** Son de una tienda de ejemplo ("Nube Studio") con datos inventados. Para renovarlas, levantá la app con datos de
@@ -250,24 +252,44 @@ Detrás del proxy, `NODE_ENV=production` hace que se respete el host original (`
 
 ### Diseño por plan
 
-Cada plan tiene un **nivel de diseño** (se elige en `/plataforma/planes`) que dice cuánto de la vidriera puede personalizar quien lo tiene. En **Diseño**,
-lo que el plan no incluye aparece **bloqueado** (con el nivel que lo trae) y arriba hay una comparación de qué incluye cada nivel:
+Cada plan tiene su propia **lista de funciones de diseño**: en `/plataforma/planes`, al crear o editar un plan, tildás las que suma (una casilla por función) y el plan
+queda a tu gusto. Lo básico lo tienen todos los planes: logo, color principal y franja, tipografía y esquinas, cabecera y menú, catálogo (orden, tamaño de tarjetas, sin stock,
+categorías), sobre la tienda, contacto y banners (hasta el tope del plan). Las funciones que se suman, cada una por separado:
 
-| Nivel | Qué suma |
+| Función | Qué desbloquea |
 | --- | --- |
-| **Esencial** | Lo que ya existía: logo, color principal, franja, tipografía y esquinas, cabecera y menú, catálogo (orden, tamaño de tarjetas, sin stock, categorías), sobre la tienda, contacto, banners. |
-| **Acompañado** | **Colores** de fondo, texto, tarjetas y cabecera (el texto tiene que leerse: se exige un contraste mínimo de 4,5 a 1 y, si solo se cambia el fondo, el texto se ajusta solo); **logo** a la izquierda, al centro o a la derecha; cabecera fija o que se va con el scroll; **portada** con las secciones que se quieren (banners, **ofertas** —los productos con precio promocional— y destacados) en el orden que se elija, y banners dentro de la página o de punta a punta; **tarjetas de producto** sin marco, con borde o con sombra, foto vertical, cuadrada o apaisada y texto a la izquierda o centrado; **pie** claro, oscuro, del color de la marca o de otro color; y el **kit de marca con maqueta web** (ver [Kit de marca y maquetas web](#kit-de-marca-y-maquetas-web-plan-acompañado)). |
-| **A medida** | **CSS propio** (hasta 20.000 caracteres; sin `<`, `@import`, `expression()`, `javascript:` ni `url()` que no sean https o rutas de la tienda), **tipografías de Google Fonts** a elección para títulos y texto, **ancho de la página** (angosto, normal, ancho, todo el ancho), **dominio propio** y **códigos de seguimiento** (píxeles, analítica) en la cabecera y el pie, que carga quien administra la plataforma desde la ficha del cliente. |
+| **Colores de la tienda** | Colores de fondo, texto, tarjetas y cabecera (el texto tiene que leerse: se exige un contraste mínimo de 4,5 a 1 y, si solo se cambia el fondo, el texto se ajusta solo). |
+| **Logo y cabecera** | El logo a la izquierda, al centro o a la derecha; cabecera fija o que se va con el scroll. |
+| **Portada personalizable** | Las secciones de arriba de la portada que se quieren (banners, **ofertas** —los productos con precio promocional— y destacados) en el orden que se elija, y banners dentro de la página o de punta a punta. |
+| **Tarjetas de producto** | Sin marco, con borde o con sombra; foto vertical, cuadrada o apaisada; texto a la izquierda o centrado. |
+| **Pie de página** | Claro, oscuro, del color de la marca o de otro color. |
+| **Tipografías a elección** | Cualquier tipografía de Google Fonts para los títulos y para el texto. |
+| **Ancho de la página** | Angosto, normal, ancho o todo el ancho. |
+| **CSS propio** | Hasta 20.000 caracteres; sin `<`, `@import`, `expression()`, `javascript:` ni `url()` que no sean https o rutas de la tienda. |
+| **Dominio propio** | Ver [Dominio propio](#dominio-propio). |
+| **Códigos de seguimiento** | Píxeles y analítica en la cabecera y el pie de la tienda, que carga quien administra la plataforma desde la ficha del cliente. |
+| **Kit de marca y maqueta web** | Ver [Kit de marca y maquetas web](#kit-de-marca-y-maquetas-web). |
 
-El nivel se aplica **al leer**: si un cliente baja de plan, lo que había elegido de más queda guardado pero la vidriera deja de aplicarlo, y vuelve si sube.
-Una tienda sin plan, o con el plan interno "Sin límites", vale como A medida (nada cambia para las que ya existían). Las migraciones asignan Acompañado y A medida a los
-planes de esos nombres; los demás quedan en Esencial. Todo lo nuevo tiene como valor por defecto la vidriera de siempre: mientras la tienda no elija nada, no cambia nada.
-Los colores no se aplican al checkout ni a la página del pedido (tienen sus propias tarjetas y fondos fijos); el CSS propio, sí. El nivel viaja también en la tarjeta de cada
-plan de la landing y de `/admin/suscripcion`, y un cambio de nivel figura entre los cambios de un plan que se avisan por mail a sus clientes. Todo está en `src/diseno-por-plan.js`.
+Para no armar cada plan desde cero, el formulario tiene tres botones de **punto de partida** que tildan las funciones de los tres niveles de siempre (después se ajustan a gusto):
+**Esencial** (ninguna: solo lo básico), **Acompañado** (colores, logo y cabecera, portada, tarjetas, pie y kit de marca) y **A medida** (todas). En la lista de planes, un plan con justo esas funciones
+se muestra con ese nombre; si se armó a gusto, figura como "Personalizado" con lo que incluye.
+
+En el panel del cliente, **Diseño** muestra arriba qué incluye su plan y, en un desplegable, una tabla de qué incluye cada plan que se ofrece. Cada función que su plan no tiene aparece **bloqueada** (con un aviso
+que dice qué planes sí la incluyen) y sus campos deshabilitados. Lo mismo pasa con el kit de marca (`/admin/marca`) y con el dominio propio (*Cuenta*).
+
+Las funciones se aplican **al leer**: si un cliente baja de plan, lo que había elegido de más queda guardado pero la vidriera deja de aplicarlo, y vuelve si sube. Una tienda sin plan, o con el plan interno
+"Sin límites", tiene todas (nada cambia para las que ya existían). La migración `020` copió el nivel de cada plan que ya existía a sus funciones (Acompañado y A medida, los puntos de partida de arriba; el resto, ninguna),
+así que ninguna tienda vio cambios. Todo lo nuevo tiene como valor por defecto la vidriera de siempre: mientras la tienda no elija nada, no cambia nada.
+Los colores no se aplican al checkout ni a la página del pedido (tienen sus propios fondos fijos); el CSS propio, sí.
+
+**Lo que se escribe en la tarjeta del plan.** Además de las funciones, cada plan tiene una **frase** (debajo del nombre), una **lista de lo que incluye** (una línea por punto, hasta 12 de 90 caracteres) y la casilla
+**Recomendado**. La frase y el Recomendado se ven en la landing; la lista, también en `/suscribirse` y `/admin/suscripcion`. Lo que queda vacío se arma solo, como siempre. Cambiar las funciones de un plan que ya tienen clientes pasa por la pantalla de
+confirmación como el precio y los topes, y figura entre los cambios que se avisan por mail a sus clientes (evento `plan_modificado`); cambiar solo la frase, la lista o el Recomendado se guarda sin más, porque a los
+clientes no les cambia nada. Todo está en `src/diseno-por-plan.js` (el catálogo de funciones, los puntos de partida, la validación y el estilo que se genera) y `src/plataforma.js` (la lectura y el guardado de los planes).
 
 ### Dominio propio
 
-Los clientes del plan **A medida** pueden usar su propio dominio (`www.mitienda.com`). El recorrido tiene tres pasos:
+Los clientes cuyo plan incluye la función **Dominio propio** pueden usar su propio dominio (`www.mitienda.com`). El recorrido tiene tres pasos:
 
 1. **Solicitado.** El cliente lo escribe en *Cuenta → Dominio propio* (o lo carga la plataforma desde su ficha). El panel le muestra el registro DNS que tiene que crear en el proveedor
    del dominio: un **CNAME** al dominio del panel (para `www.` o cualquier subdominio) o un registro **A** (para el dominio sin `www`, que no puede ser un CNAME; para mostrarlo hace falta
@@ -403,8 +425,8 @@ Muestra una clave generada **una sola vez**. Entrá a `https://<tu dominio>/plat
   que la tienda no está disponible y el panel del cliente queda en solo lectura. No se guarda como una suspensión ni hace falta ninguna
   tarea programada: se calcula al atender cada pedido, así que registrar un pago (o extender la fecha) la reabre en el acto. El día del
   vencimiento todavía está abierta. Sin la opción, el vencimiento solo avisa.
-- **Planes sugeridos.** `npm run cargar-planes` crea cuatro planes de arranque (Prueba, Esencial, Acompañado y A medida) si todavía no
-  existen; no toca los que ya hay, así que se puede correr de nuevo. Los precios son un punto de partida: ajustalos en **Planes**.
+- **Planes sugeridos.** `npm run cargar-planes` crea cuatro planes de arranque (Prueba, Esencial, Acompañado y A medida, cada uno con las funciones de diseño de su punto de partida y Esencial como Recomendado) si todavía no
+  existen; no toca los que ya hay, así que se puede correr de nuevo. Los precios y todo lo demás son un punto de partida: ajustalos en **Planes**.
 - **Cobro manual.** Cobrás por fuera (transferencia, Mercado Pago…). Cada pago que registrás extiende el vencimiento
   desde la fecha en que vence (si todavía no venció) o desde hoy, y queda en un historial. Un cliente figura *al día*,
   *por vencer* (faltan 7 días o menos) o *vencido*, y él lo ve en su Inicio y en Cuenta. **Un vencimiento solo avisa**, salvo que el plan tenga
@@ -446,13 +468,13 @@ el historial con la nota *Mercado Pago · cobro N*. Si el cobro llega antes de q
 crearla. Al crear la cuenta antes del primer cobro, la tienda queda abierta 2 días hasta que llegue. Cancelar el débito **no cierra la
 tienda**: sigue abierta hasta el vencimiento ya pago, y después rige lo que diga el plan (*Cerrar la tienda sola al vencer*).
 
-**Aumentos de precio.** Al editar un plan que ya tienen clientes (`/plataforma/planes`), si cambia el precio, los topes o lo que pasa al vencer,
+**Aumentos de precio.** Al editar un plan que ya tienen clientes (`/plataforma/planes`), si cambia el precio, los topes, las funciones de diseño o lo que pasa al vencer,
 **no se guarda de entrada**: primero se ve a qué clientes les toca, con lo que pagan hoy, lo que pasarían a pagar y su próximo cobro. En un aumento
 se puede **sacar de él** a quien no tenga que pagar más (casilla *Aplicar* sin marcar): conserva lo que paga hoy como **precio fijo**, y los aumentos
 que vengan tampoco lo alcanzan hasta que se cambie en su ficha (sección *Precio*) o lo pasen de plan. Al confirmar, el precio nuevo se aplica al
 cobro de Mercado Pago de cada cliente alcanzado (`PUT /preapproval/{id}`, vale desde su próximo cobro); si Mercado Pago rechaza el cambio de alguno, el plan igual
 se guarda y ese cliente queda listado para reintentar desde su ficha (*Actualizar el cobro a $X*). Una baja se aplica a todos los que no tienen precio fijo.
-Y por cada cliente al que algo le cambia (el precio solo si no tiene precio fijo; los topes a todos) se le manda un mail por n8n (evento `plan_modificado`).
+Y por cada cliente al que algo le cambia (el precio solo si no tiene precio fijo; los topes y el diseño a todos) se le manda un mail por n8n (evento `plan_modificado`).
 
 **Bajas.** Cuando una suscripción se cancela, por el cliente en su panel, por vos desde la ficha o por el propio cliente desde su cuenta de Mercado
 Pago, se le manda **una sola vez** un mail (`suscripcion_cancelada`) que dice hasta cuándo sigue activa su tienda (el vencimiento ya pago: si pagó por última vez
@@ -506,7 +528,7 @@ cuál es:
 | --- | --- | --- |
 | `cuenta_creada` | Al crear la cuenta (y desde *Reenviar mail de bienvenida*) | `email`, `nombre`, `apellido`, `tienda: { nombre, url }`, `plan: { nombre, precio }`, `urlPanel` |
 | `pago_recibido` | Al confirmarse el pago, mientras no haya creado la cuenta (y desde *Reenviar link por mail*) | `email`, `plan: { nombre, precio }`, `urlCuenta` |
-| `plan_modificado` | Al confirmar un cambio de precio o de topes de un plan que tiene clientes (y desde *Actualizar el cobro* en la ficha) | `email`, `nombre`, `tienda: { nombre }`, `plan: { nombre }`, `cambios: [{ etiqueta, antes, despues, cuando }]`, `urlPanel` |
+| `plan_modificado` | Al confirmar un cambio de precio, de topes o de funciones de diseño de un plan que tiene clientes (y desde *Actualizar el cobro* en la ficha) | `email`, `nombre`, `tienda: { nombre }`, `plan: { nombre }`, `cambios: [{ etiqueta, antes, despues, cuando }]`, `urlPanel` |
 | `suscripcion_cancelada` | Al cancelarse una suscripción (una sola vez por suscripción) | `email`, `nombre`, `apellido`, `tienda: { nombre }`, `plan: { nombre }`, `accesoHasta`, `accesoHastaTexto`, `vencida`, `urlReactivar` |
 | `pedido_actualizado` | Al cambiar el estado o el envío de un pedido (y desde *Volver a avisar por mail*), si hay email del comprador | `email`, `cliente: { nombre }`, `tienda: { nombre, url, email, whatsapp }`, `pedido: { numero, url, total, estado }`, `titulo`, `mensaje`, `seguimiento: { empresa, codigo, url, detalle }` o `null` |
 
@@ -519,10 +541,10 @@ reales que arma la app), así que si se cambia un aviso, el test avisa si el nod
 `pago_recibido` lleva `urlCuenta`, el link para completar el formulario. Un flujo mínimo: *Webhook* (POST, Header Auth) → *Switch* por
 `evento` → un nodo *Send Email* (Gmail o SMTP) para cada uno → *Respond to Webhook* con 200.
 
-### Kit de marca y maquetas web (plan Acompañado)
+### Kit de marca y maquetas web
 
-Los clientes con diseño **Acompañado** (o más) tienen en **Diseño** una card que lleva a `/admin/marca`, con dos pestañas. Con un plan que no lo incluye la pantalla se ve
-bloqueada (explica qué es y desde qué plan está) y nada se guarda ni se pide, aunque se arme el pedido a mano.
+Los clientes cuyo plan incluye la función **Kit de marca y maqueta web** (la traen los puntos de partida Acompañado y A medida) tienen en **Diseño** una card que lleva a `/admin/marca`, con dos pestañas. Con un plan que no la incluye la pantalla se ve
+bloqueada (explica qué es y qué planes la incluyen) y nada se guarda ni se pide, aunque se arme el pedido a mano.
 
 - **Kit de marca.** Suben sus **logos y fotos** (JPG, PNG o WEBP de hasta 5 MB; hasta 12 archivos en total y 6 por vez; cada uno se convierte a WebP con miniaturas, como las demás imágenes,
   y los SVG no se aceptan), eligen los **colores** de su marca (el principal, y si quieren un secundario y uno de acento) y cuentan en pocas palabras cómo es: **rubro**, **estilo**
@@ -738,7 +760,7 @@ src/
   dashboard-vista.js     links de cada período y panel, y los gráficos ya armados para las vistas
   vidriera.js            consultas de la vidriera pública
   diseno.js              ajustes de diseño de cada tienda y banners
-  diseno-por-plan.js     niveles de diseño (esencial, acompañado, a medida): qué puede personalizar cada plan, validaciones y el estilo que se genera
+  diseno-por-plan.js     funciones de diseño de cada plan (colores, portada, CSS propio, dominio...) y sus puntos de partida (esencial, acompañado, a medida): qué puede personalizar cada plan, validaciones y el estilo que se genera
   dominios-propios.js    dominio propio de una tienda: validar, pedir, verificar el DNS, activar
   pagos.js               formas de entrega y de pago (Envíos y pagos)
   secretos.js            cifrado (AES-256-GCM) de los tokens de Mercado Pago de cada tienda
@@ -755,7 +777,7 @@ src/
   cambios-de-plan.js     cambios en un plan con clientes: qué cambió, aumentos con excepciones (precio fijo), Mercado Pago y avisos
   mercadopago.js         cliente de la API de Mercado Pago y validación de la firma de los webhooks
   notificaciones.js      avisos a n8n (el flujo que manda los mails de alta)
-  marca.js               kit de marca (plan Acompañado): colores y datos de la marca, y los logos y fotos que sube el cliente
+  marca.js               kit de marca (función del plan): colores y datos de la marca, y los logos y fotos que sube el cliente
   maquetas.js            maquetas web: pedido a n8n con su token, entrega, límites, y la limpieza del HTML que entrega n8n
   plataforma.js          superadmin: cuentas, planes y clientes (alta, cobro, suspensión)
   estado.js              si una tienda está abierta o cerrada (suspensión a mano o cierre al vencer)
@@ -779,7 +801,7 @@ src/
   rutas/plataforma.js    panel /plataforma del administrador de la plataforma
   rutas/suscribirse.js   alta pública: elegir plan, pagar y crear la cuenta (/suscribirse)
   rutas/admin-suscripcion.js  panel /admin: la suscripción del cliente a su plan
-  rutas/admin-marca.js   panel /admin: kit de marca y maqueta web (plan Acompañado)
+  rutas/admin-marca.js   panel /admin: kit de marca y maqueta web
   rutas/webhooks.js      avisos de Mercado Pago (/webhooks/mercadopago y /webhooks/mercadopago/tienda/:id) y la entrega de las maquetas (/webhooks/maquetas/:id)
   util/iconos.js         íconos SVG de las vistas
   util/grafico.js        cuentas de los gráficos de columnas (alturas y ejes); el dibujo es HTML y CSS en vistas/parciales/dashboard/

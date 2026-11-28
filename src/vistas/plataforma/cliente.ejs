@@ -156,11 +156,11 @@
 <section class="ajuste" id="dominio">
   <div class="ajuste-intro">
     <h2>Dominio propio</h2>
-    <p class="texto-suave">Solo con el plan A medida. El cliente lo pide desde su panel (Cuenta); vos lo activás cuando ya lo agregaste en Coolify. Este cliente tiene el diseño <strong><%= diseno.nivelTitulo %></strong>.</p>
+    <p class="texto-suave">Solo con un plan que incluya "Dominio propio". El cliente lo pide desde su panel (Cuenta); vos lo activás cuando ya lo agregaste en Coolify. Su plan es <strong><%= diseno.planNombre ?? 'ninguno' %></strong> (diseño: <%= diseno.nombre %>).</p>
   </div>
   <div class="tarjeta ajuste-campos">
-    <% if (!diseno.aMedida) { %>
-      <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>El plan de este cliente no incluye dominio propio. Si le das el plan A medida, puede pedirlo.</span></p>
+    <% if (!diseno.conDominio) { %>
+      <p class="aviso aviso-info"><%- icono('alerta', { tamano: 18 }) %><span>El plan de este cliente no incluye dominio propio. Pasalo a un plan que lo incluya, o tildá "Dominio propio" en el suyo, para que pueda pedirlo.</span></p>
     <% } %>
     <% if (diseno.dominio) { %>
       <p class="mp-estado">
@@ -200,7 +200,7 @@
 <section class="ajuste" id="codigos">
   <div class="ajuste-intro">
     <h2>Códigos de seguimiento</h2>
-    <p class="texto-suave">HTML (píxel de Meta, Google Analytics...) que va en la cabecera y al pie de la tienda. Solo lo cargás vos, y la tienda lo usa solo con el plan A medida (este cliente: <%= diseno.nivelTitulo %>).</p>
+    <p class="texto-suave">HTML (píxel de Meta, Google Analytics...) que va en la cabecera y al pie de la tienda. Solo lo cargás vos, y la tienda lo usa solo si su plan incluye "Códigos de seguimiento"<%= diseno.conCodigos ? ' (el de este cliente lo incluye)' : ' (el de este cliente no lo incluye todavía)' %>.</p>
   </div>
   <div class="tarjeta ajuste-campos">
     <form method="post" action="/plataforma/clientes/<%= cliente.id %>/codigos" class="formulario">

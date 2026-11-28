@@ -38,7 +38,6 @@ import {
   CATEGORIAS_PORTADA,
 } from '../diseno.js';
 import {
-  NIVELES,
   LOGO_POSICIONES,
   PIE_ESTILOS,
   TARJETA_ESTILOS,
@@ -48,12 +47,12 @@ import {
   ANCHOS_PAGINA,
   SECCIONES_PORTADA,
   MAX_CSS_PROPIO,
-  datosDeNivel,
-  incluyeNivel,
+  datosDeDiseno,
   seccionesDePortada,
   validarAvanzados,
 } from '../diseno-por-plan.js';
 import { arbolCategoriasAdmin } from '../categorias.js';
+import { planDeDiseno } from '../plataforma.js';
 import { limitesDeTienda, ampliarPlan } from '../limites.js';
 import { guardarImagen, borrarImagen, urlImagen, ErrorDeImagen, TAMANO_MAXIMO_IMAGEN, PROPORCION_BANNER, leerRecorte } from '../imagenes.js';
 import { ORDENES } from '../vidriera.js';
@@ -116,13 +115,9 @@ export function rutasAdmin({ db, config, servicios = null, notificar = async () 
     const { tiendaId } = req.session.usuario;
     const ajustes = await leerAjustes(db, tiendaId);
     // Lo que el plan permite personalizar (ver diseno-por-plan.js). Acá se muestran los ajustes guardados, aunque el plan no los incluya.
-    const { nivel, planNombre } = await datosDeNivel(db, tiendaId);
     res.status(status).render('admin/diseno', {
       plan: {
-        nivel,
-        nombre: planNombre,
-        niveles: NIVELES,
-        puede: { acompanado: incluyeNivel(nivel, 'acompanado'), a_medida: incluyeNivel(nivel, 'a_medida') },
+        ...(await planDeDiseno(db, tiendaId)),
         opciones: {
           logoPosicion: LOGO_POSICIONES,
           pieEstilo: PIE_ESTILOS,
@@ -350,9 +345,9 @@ export function rutasAdmin({ db, config, servicios = null, notificar = async () 
   router.post('/diseno', conImagenes(recibirImagenes.single('logo')), verificarCsrf, async (req, res) => {
     const { tiendaId } = req.session.usuario;
     const { ajustes: basicos, errores: erroresBasicos } = validarAjustes(req.body);
-    // Lo que depende del plan: lo que el nivel no incluye se ignora aunque llegue en el formulario.
-    const { nivel } = await datosDeNivel(db, tiendaId);
-    const { ajustes: avanzados, errores: erroresAvanzados } = validarAvanzados(req.body, nivel, await leerAjustes(db, tiendaId));
+    // Lo que depende del plan: lo que el plan no incluye se ignora aunque llegue en el formulario.
+    const { funciones } = await datosDeDiseno(db, tiendaId);
+    const { ajustes: avanzados, errores: erroresAvanzados } = validarAvanzados(req.body, funciones, await leerAjustes(db, tiendaId));
     const ajustes = { ...basicos, ...avanzados };
     const errores = { ...erroresBasicos, ...erroresAvanzados };
     if (Object.keys(errores).length > 0) {

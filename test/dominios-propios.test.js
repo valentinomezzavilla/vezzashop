@@ -1,4 +1,4 @@
-// Dominio propio de una tienda (plan a medida): pedirlo, verificar el DNS, activarlo y que la tienda se vea ahí.
+// Dominio propio de una tienda (una función del plan: la tienen los planes que la tildan): pedirlo, verificar el DNS, activarlo y que la tienda se vea ahí.
 import { test, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -9,6 +9,7 @@ import { crearTienda, buscarTienda, buscarTiendaPorDominio } from '../src/tienda
 import { interpretarHoja } from '../src/importacion/interpretar.js';
 import { aplicarImportacion } from '../src/importacion/aplicar.js';
 import { crearPlan, crearSuperadmin } from '../src/plataforma.js';
+import { funcionesDePreset } from '../src/diseno-por-plan.js';
 import { urlPublicaDeTienda } from '../src/util/dominios.js';
 import {
   cambiarActivacion,
@@ -161,12 +162,14 @@ beforeEach(async () => {
   puerto = servidor.address().port;
 });
 
+// Una tienda con la sesión iniciada, en un plan con las funciones de un punto de partida ('esencial', 'acompanado', 'a_medida') o las de una lista.
 async function tienda(nivel) {
   contador++;
   const slug = `tienda-dom-${contador}`;
   const { tienda: creada, clave } = await crearTienda(db, { nombre: `Casa ${contador}`, email: `${slug}@ejemplo.com`, slug });
   if (nivel) {
-    const planId = await crearPlan(db, { nombre: `Plan ${nivel} ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, nivelDiseno: nivel });
+    const funciones = Array.isArray(nivel) ? nivel : funcionesDePreset(nivel);
+    const planId = await crearPlan(db, { nombre: `Plan ${Array.isArray(nivel) ? funciones.join('+') : nivel} ${contador}`, precioCentavos: 1000, maxProductos: null, maxFotos: null, maxBanners: null, activo: true, funciones });
     await db.prepare('UPDATE tiendas SET plan_id = ? WHERE id = ?').run(planId, creada.id);
   }
   const { productos } = interpretarHoja([['SKU', 'Nombre', 'Precio', 'Stock'], ['TAZA', 'Taza', 1500, 10]]);
@@ -211,7 +214,7 @@ test('el cliente del plan a medida pide su dominio, ve el registro que tiene que
 
   const esencial = await tienda('esencial');
   pagina = await texto(await esencial.nav.pedir('/admin/cuenta'));
-  assert.ok(pagina.includes('El dominio propio es parte del plan <strong>A medida</strong>') && !pagina.includes('Pedir mi dominio'));
+  assert.ok(pagina.includes('no incluye <strong>Dominio propio</strong>') && !pagina.includes('Pedir mi dominio'));
   const intento = await esencial.nav.enviar('/admin/cuenta/dominio', { dominio: 'www.otra.com' }, { desde: '/admin/cuenta' });
   assert.equal(intento.status, 302);
   assert.equal(await leerDominio(db, esencial.tiendaId), null, 'un plan que no lo incluye no puede pedirlo aunque mande el formulario');
@@ -345,4 +348,17 @@ test('el servidor atiende un dominio propio aunque llegue con puerto y mayúscul
     }).on('error', rechazar);
   });
   assert.equal(respuesta, 200);
+});
+
+test('el dominio propio es una función más del plan: con solo esa tildada ya se puede pedir y activar, y sin ella no, aunque el plan lleve todo lo demás', async () => {
+  const soloDominio = await tienda(['dominio']);
+  assert.ok((await texto(await soloDominio.nav.pedir('/admin/cuenta'))).includes('Pedir mi dominio'));
+  await soloDominio.nav.enviar('/admin/cuenta/dominio', { dominio: 'www.solo-dominio.com' }, { desde: '/admin/cuenta' });
+  assert.equal((await leerDominio(db, soloDominio.tiendaId))?.dominio, 'www.solo-dominio.com');
+
+  const todoMenosDominio = await tienda(funcionesDePreset('a_medida').filter((funcion) => funcion !== 'dominio'));
+  const pagina = await texto(await todoMenosDominio.nav.pedir('/admin/cuenta'));
+  assert.ok(pagina.includes('no incluye <strong>Dominio propio</strong>') && !pagina.includes('Pedir mi dominio'));
+  await todoMenosDominio.nav.enviar('/admin/cuenta/dominio', { dominio: 'www.sin-funcion.com' }, { desde: '/admin/cuenta' });
+  assert.equal(await leerDominio(db, todoMenosDominio.tiendaId), null);
 });

@@ -5,7 +5,7 @@ import { crearTienda } from './tiendas.js';
 import { estadoDeCobro, limitesDeTienda, usoDeTienda } from './limites.js';
 import { MAX_FOTOS } from './productos.js';
 import { MAX_BANNERS } from './diseno.js';
-import { esNivel } from './diseno-por-plan.js';
+import { armarPlanDeDiseno, datosDeDiseno, esFuncion, funcionesDePreset, funcionesDeTexto, normalizarFunciones, textoDeFunciones } from './diseno-por-plan.js';
 import { parsearPrecio, ErrorDeValor } from './importacion/valores.js';
 import { esDiaValido, hoy, sumarDias, sumarMeses } from './util/fechas.js';
 import { estadoEfectivo } from './estado.js';
@@ -66,15 +66,26 @@ export async function cambiarClaveSuperadmin(db, id, { actual, nueva, repetida }
 const COLUMNAS_PLAN = `id, nombre, precio_centavos AS "precioCentavos", max_productos AS "maxProductos",
   max_fotos AS "maxFotos", max_banners AS "maxBanners", (activo = 1) AS "activo",
   dias_prueba AS "diasPrueba", (suspender_al_vencer = 1) AS "suspenderAlVencer",
-  nivel_diseno AS "nivelDiseno",
+  funciones, descripcion, caracteristicas, (destacado = 1) AS "destacado",
   (SELECT count(*) FROM tiendas t WHERE t.plan_id = planes.id) AS clientes`;
 
-export function listarPlanes(db) {
-  return db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes ORDER BY (activo = 1) DESC, precio_centavos, lower(nombre)`).all();
+// Los textos de la tarjeta del plan (landing y suscripción). Vacíos, la tarjeta se arma sola con los topes, la prueba y el diseño.
+export const MAX_DESCRIPCION_PLAN = 160;
+export const MAX_CARACTERISTICAS = 12;
+export const MAX_LARGO_CARACTERISTICA = 90;
+
+// "una\ndos" -> ['una', 'dos']: una por línea, sin espacios de más ni líneas vacías.
+const lineasDe = (valor) => (Array.isArray(valor) ? valor : String(valor ?? '').split(/\r?\n/)).map((linea) => String(linea).replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+// La fila de la base como la usa el resto: las funciones de diseño y las características como listas, y "Recomendado" como booleano.
+const armarPlan = (fila) => (fila ? { ...fila, funciones: funcionesDeTexto(fila.funciones), caracteristicas: lineasDe(fila.caracteristicas) } : fila);
+
+export async function listarPlanes(db) {
+  return (await db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes ORDER BY (activo = 1) DESC, precio_centavos, lower(nombre)`).all()).map(armarPlan);
 }
 
 export async function leerPlan(db, id) {
-  return (await db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes WHERE id = ?`).get(id)) ?? null;
+  return armarPlan(await db.prepare(`SELECT ${COLUMNAS_PLAN} FROM planes WHERE id = ?`).get(id)) ?? null;
 }
 
 // Se ofrecen a clientes los planes activos con precio o con período de prueba. Un plan gratis y sin prueba (como "Sin límites",
@@ -84,6 +95,12 @@ export const seOfrece = (plan) => Boolean(plan.activo) && (plan.precioCentavos >
 // Los que alguien puede contratar solo, sin hablar con nosotros: los que se ofrecen y tienen tope de productos. Un plan sin
 // tope ("A medida") se consulta: se arma a medida de cada negocio.
 export const esAutoservicio = (plan) => seOfrece(plan) && plan.maxProductos !== null;
+
+// El plan de una tienda para las pantallas de su panel: lo que incluye de diseño y qué planes de los que se ofrecen incluyen lo que le falta.
+export async function planDeDiseno(db, tiendaId) {
+  const ofrecidos = (await listarPlanes(db)).filter(seOfrece).map(({ id, nombre, precioCentavos, funciones }) => ({ id, nombre, precioCentavos, funciones }));
+  return armarPlanDeDiseno(await datosDeDiseno(db, tiendaId), ofrecidos);
+}
 
 // Un tope vacío es "sin límite" (null); si se escribe, tiene que ser un entero dentro del rango.
 function tope(valor, minimo, maximo, nombre, errores, campo) {
@@ -97,9 +114,11 @@ function tope(valor, minimo, maximo, nombre, errores, campo) {
   return numero;
 }
 
-// Devuelve { datos, errores }. datos solo sirve si no hay errores.
+// Devuelve { datos, errores }. datos solo sirve si no hay errores. Lo que no viene en `campos` (las funciones de diseño y los textos de la
+// tarjeta) queda como estaba en el plan guardado.
 export async function validarPlan(db, id, campos) {
   const errores = {};
+  const actual = id ? await leerPlan(db, id) : null;
   const nombre = texto(campos.nombre).replace(/\s+/g, ' ');
   if (!nombre) errores.nombre = 'Escribí el nombre del plan';
   else if (nombre.length > 40) errores.nombre = 'Máximo 40 caracteres';
@@ -115,6 +134,24 @@ export async function validarPlan(db, id, campos) {
     errores.precio = 'Escribí el precio por mes en pesos, por ejemplo 15000 o 15.000,50';
   }
 
+  // Las funciones de diseño que incluye el plan (ver diseno-por-plan.js): las tildadas en el formulario. Como una casilla sin tildar no viaja, el
+  // formulario manda `funcionesEnviadas` para distinguir "ninguna" de "no se tocó".
+  let funciones = actual?.funciones ?? [];
+  if (campos.funciones !== undefined || campos.funcionesEnviadas !== undefined) {
+    const pedidas = [].concat(campos.funciones ?? []).map(texto).filter(Boolean);
+    if (pedidas.some((clave) => !esFuncion(clave))) errores.funciones = 'Elegí funciones de la lista';
+    funciones = normalizarFunciones(pedidas);
+  }
+
+  // Los textos de la tarjeta del plan.
+  const descripcion = campos.descripcion === undefined ? (actual?.descripcion ?? '') : texto(campos.descripcion).replace(/\s+/g, ' ');
+  if (descripcion.length > MAX_DESCRIPCION_PLAN) errores.descripcion = `Máximo ${MAX_DESCRIPCION_PLAN} caracteres (tiene ${descripcion.length})`;
+  const caracteristicas = campos.caracteristicas === undefined ? (actual?.caracteristicas ?? []) : lineasDe(campos.caracteristicas);
+  if (caracteristicas.length > MAX_CARACTERISTICAS) errores.caracteristicas = `Máximo ${MAX_CARACTERISTICAS} líneas (tiene ${caracteristicas.length})`;
+  else if (caracteristicas.some((linea) => linea.length > MAX_LARGO_CARACTERISTICA)) {
+    errores.caracteristicas = `Cada línea puede tener hasta ${MAX_LARGO_CARACTERISTICA} caracteres: acortá "${caracteristicas.find((linea) => linea.length > MAX_LARGO_CARACTERISTICA).slice(0, 30)}…"`;
+  }
+
   const datos = {
     nombre,
     precioCentavos,
@@ -124,10 +161,12 @@ export async function validarPlan(db, id, campos) {
     activo: campos.activo === '1' || campos.activo === 'on' || campos.activo === true,
     diasPrueba: null,
     suspenderAlVencer: campos.suspenderAlVencer === '1' || campos.suspenderAlVencer === 'on' || campos.suspenderAlVencer === true,
-    // Cuánto del diseño de la tienda puede personalizar quien lo tiene (ver diseno-por-plan.js). Sin elegir, el de siempre.
-    nivelDiseno: esNivel(texto(campos.nivelDiseno)) ? texto(campos.nivelDiseno) : (campos.nivelDiseno === undefined && id ? ((await leerPlan(db, id))?.nivelDiseno ?? 'esencial') : 'esencial'),
+    funciones,
+    descripcion,
+    caracteristicas,
+    // "Recomendado" en la tarjeta: lo tiene un solo plan (al guardar uno, se le saca a los demás).
+    destacado: campos.destacado === '1' || campos.destacado === 'on' || campos.destacado === true,
   };
-  if (campos.nivelDiseno !== undefined && texto(campos.nivelDiseno) !== '' && !esNivel(texto(campos.nivelDiseno))) errores.nivelDiseno = 'Elegí una de las opciones';
   // Días de prueba: vacío es "sin prueba". Al darle este plan a un cliente, vence a los N días.
   const dias = texto(campos.diasPrueba);
   if (dias !== '') {
@@ -137,25 +176,42 @@ export async function validarPlan(db, id, campos) {
   return { datos, errores };
 }
 
+// `datos.funciones`, `descripcion`, `caracteristicas` y `destacado` son opcionales: sin ellos, el plan arranca sin funciones de diseño y con la
+// tarjeta armada sola. Un plan "Recomendado" se lo saca al que lo tenía.
 export async function crearPlan(db, datos) {
   const { rows } = await db
     .prepare(
-      `INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo, dias_prueba, suspender_al_vencer, nivel_diseno)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO planes (nombre, precio_centavos, max_productos, max_fotos, max_banners, activo, dias_prueba, suspender_al_vencer,
+                           funciones, descripcion, caracteristicas, destacado)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
-    .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), datos.nivelDiseno ?? 'esencial');
+    .run(
+      datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null,
+      Number(Boolean(datos.suspenderAlVencer)), textoDeFunciones(datos.funciones), datos.descripcion ?? '', lineasDe(datos.caracteristicas).join('\n'),
+      Number(Boolean(datos.destacado)),
+    );
+  if (datos.destacado) await db.prepare('UPDATE planes SET destacado = 0 WHERE id <> ?').run(rows[0].id);
   return rows[0].id;
 }
 
+// Lo que `datos` no trae (las funciones de diseño, los textos de la tarjeta, "Recomendado") queda como estaba.
 export async function editarPlan(db, id, datos) {
-  return (
-    (await db
+  const aTexto = (valor, convertir) => (valor === undefined ? null : convertir(valor));
+  const cambios = (
+    await db
       .prepare(
         `UPDATE planes SET nombre = ?, precio_centavos = ?, max_productos = ?, max_fotos = ?, max_banners = ?, activo = ?,
-         dias_prueba = ?, suspender_al_vencer = ?, nivel_diseno = ? WHERE id = ?`,
+         dias_prueba = ?, suspender_al_vencer = ?, funciones = COALESCE(?, funciones), descripcion = COALESCE(?, descripcion),
+         caracteristicas = COALESCE(?, caracteristicas), destacado = COALESCE(?, destacado) WHERE id = ?`,
       )
-      .run(datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null, Number(Boolean(datos.suspenderAlVencer)), datos.nivelDiseno ?? 'esencial', id)).changes > 0
-  );
+      .run(
+        datos.nombre, datos.precioCentavos, datos.maxProductos, datos.maxFotos, datos.maxBanners, Number(datos.activo), datos.diasPrueba ?? null,
+        Number(Boolean(datos.suspenderAlVencer)), aTexto(datos.funciones, textoDeFunciones), aTexto(datos.descripcion, String),
+        aTexto(datos.caracteristicas, (lineas) => lineasDe(lineas).join('\n')), aTexto(datos.destacado, (valor) => Number(Boolean(valor))), id,
+      )
+  ).changes;
+  if (datos.destacado) await db.prepare('UPDATE planes SET destacado = 0 WHERE id <> ?').run(id);
+  return cambios > 0;
 }
 
 // Pausar un plan: deja de ofrecerse a clientes nuevos, pero los que ya lo tienen lo conservan y siguen igual. Reanudar lo vuelve a ofrecer.
@@ -391,21 +447,23 @@ export async function usoDeCliente(db, tiendaId) {
 export const PLANES_SUGERIDOS = [
   // 7 días de prueba desde que el cliente entra al plan; al terminar, la tienda se cierra hasta que se le registre un pago.
   { nombre: 'Prueba', precioCentavos: 0, maxProductos: 20, maxFotos: 3, maxBanners: 1, diasPrueba: 7, suspenderAlVencer: true },
-  { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2, nivelDiseno: 'esencial' },
-  { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4, nivelDiseno: 'acompanado' },
-  { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null, nivelDiseno: 'a_medida' },
+  { nombre: 'Esencial', precioCentavos: 1_290_000, maxProductos: 150, maxFotos: 4, maxBanners: 2, funciones: funcionesDePreset('esencial'), destacado: true },
+  { nombre: 'Acompañado', precioCentavos: 3_490_000, maxProductos: 1000, maxFotos: 8, maxBanners: 4, funciones: funcionesDePreset('acompanado') },
+  { nombre: 'A medida', precioCentavos: 8_990_000, maxProductos: null, maxFotos: null, maxBanners: null, funciones: funcionesDePreset('a_medida') },
 ];
 
 // Crea los que no existan (por nombre, sin distinguir mayúsculas) y deja intactos los demás: se puede correr de nuevo sin pisar
 // lo que ya se editó. Devuelve { creados, existentes } con los nombres.
 export async function cargarPlanesSugeridos(db) {
   const resultado = { creados: [], existentes: [] };
+  // Si ya hay un plan recomendado (el que se eligió a mano), el sugerido no se lo saca.
+  const hayRecomendado = Boolean(await db.prepare('SELECT 1 FROM planes WHERE destacado = 1').get());
   for (const plan of PLANES_SUGERIDOS) {
     if (await db.prepare('SELECT 1 FROM planes WHERE lower(nombre) = lower(?)').get(plan.nombre)) {
       resultado.existentes.push(plan.nombre);
       continue;
     }
-    await crearPlan(db, { ...plan, activo: true });
+    await crearPlan(db, { ...plan, activo: true, destacado: plan.destacado && !hayRecomendado });
     resultado.creados.push(plan.nombre);
   }
   return resultado;

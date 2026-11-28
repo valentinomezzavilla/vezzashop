@@ -1,5 +1,5 @@
 <%- include('cabecera', { titulo }) %>
-<%# Las secciones de arriba de la portada, en el orden que eligió la tienda (Diseño, plan Acompañado). Por defecto: banners y destacados. %>
+<%# Las secciones de arriba de la portada, en el orden que eligió la tienda (Diseño, función "Portada personalizable" del plan). Por defecto: banners y destacados. %>
 <% for (const seccion of (locals.seccionesPortada ?? ['banners', 'destacados'])) { %><%- include(`portada-${seccion}`) %><% } %>
 
 <% if (migas.length) { %>

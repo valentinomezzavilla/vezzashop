@@ -36,16 +36,12 @@
 
 <section class="ajuste<%= dominio.disponible ? '' : ' ajuste-bloqueado' %>" id="dominio">
   <div class="ajuste-intro">
-    <h2>Dominio propio <span class="pastilla pastilla-nivel">Plan A medida</span></h2>
+    <h2>Dominio propio</h2>
     <p class="texto-suave">Que tu tienda se vea en tu propio dominio, por ejemplo <strong>www.mitienda.com</strong>, en vez de en el link de la plataforma.</p>
   </div>
   <div class="tarjeta ajuste-campos">
     <% if (!dominio.disponible) { %>
-      <div class="nivel-bloqueado" role="note">
-        <%- icono('candado', { tamano: 18 }) %>
-        <span>El dominio propio es parte del plan <strong>A medida</strong>.<%= locals.pagosActivos ? '' : (contactoPlataforma ? ` Para cambiar de plan, contactanos: ${contactoPlataforma}.` : ' Contactanos para cambiar de plan.') %></span>
-        <% if (locals.pagosActivos) { %><a class="boton boton-secundario boton-chico" href="/admin/suscripcion">Ver planes</a><% } %>
-      </div>
+      <%- include('../parciales/plan-bloqueo', { plan: dominio.plan, funcion: 'dominio' }) %>
     <% } else if (!dominio.actual) { %>
       <form method="post" action="/admin/cuenta/dominio" class="formulario">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
