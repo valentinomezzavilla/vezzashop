@@ -81,8 +81,11 @@ El secreto del webhook no está en el repo, así que tampoco llamé al flujo en 
 
 ### 7. Kit de marca y maqueta web (plan Acompañado): ponerlo en marcha
 El panel, el pedido a n8n, la entrega y el flujo de n8n (`n8n/maqueta-web.json`) están hechos y probados (ver *Kit de marca y maquetas web* en el README). Falta lo que depende de tu n8n y tu Coolify:
-- [ ] En n8n: importá `n8n/maqueta-web.json` (o pedime que lo cree desde acá), elegí en el nodo *Webhook* la credencial Header Auth con el mismo secreto que `N8N_WEBHOOK_SECRET` y en *Redactar los textos*
-      la de Google Gemini (el modelo es `models/gemini-3.5-flash-lite`, el mismo del flujo de la mesa de ayuda), y activalo.
+- [x] En n8n: el flujo **VEZZA Shop · Maquetas web** ya está creado (id `DCgxn1z2ELG90S0f`), **inactivo**, con tu credencial *VEZZA Shop · Secreto del webhook de cuentas* en el webhook, la de Google Gemini en *Redactar los textos*
+      (`models/gemini-3.5-flash-lite`) y *VEZZA · Alerta de errores* como flujo de errores. Lo probé activo, con un secreto temporal que ya borré (y borré también las ejecuciones de prueba): un pedido inválido
+      responde 400 con sus errores; uno válido, 202 en menos de un segundo, y después Gemini redacta los textos (con tildes y ñ), la plantilla arma la maqueta y la entrega sale con el cuerpo que espera la plataforma.
+      Lo único que no pude ver es la entrega exitosa, porque apunté a un dominio de prueba que no existe: eso se ve cuando la plataforma nueva esté en producción.
+- [ ] **Activar el flujo** cuando subas la plataforma nueva (no lo dejé activo porque hasta entonces nadie lo llama).
 - [ ] Recomendado: escribí tu dominio del panel en `DOMINIO_DE_LA_PLATAFORMA` (`n8n/maqueta-pedido.js`), corré `node scripts/armar-flujo-n8n.js` y pegá el código en el nodo: así la entrega de la maqueta no puede ir a ningún otro dominio.
 - [ ] En Coolify: `N8N_MAQUETAS_URL=https://<tu n8n>/webhook/vezza-shop-maquetas` (y `N8N_MAQUETAS_SECRET` si no querés usar el mismo secreto que los mails).
 - [ ] Probalo con una tienda de plan Acompañado: subí un logo y fotos, guardá los colores, "Armar mi maqueta" y esperá menos de un minuto. Si el resumen debajo de la vista previa dice "Textos de ejemplo" en vez de
